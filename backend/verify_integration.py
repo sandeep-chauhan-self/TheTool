@@ -1,0 +1,54 @@
+import requests
+import json
+import time
+from database import get_db_connection
+
+print("1. Adding stock to watchlist...")
+response = requests.post('http://localhost:5000/watchlist', 
+    json={'symbol': 'INFY.NS', 'name': 'Infosys Limited'},
+    timeout=10)
+print(f"   Status: {response.status_code}")
+
+print("\n2. Getting watchlist...")
+response = requests.get('http://localhost:5000/watchlist')
+print(f"   Stocks in watchlist: {len(response.json())}")
+print(f"   Symbols: {[s['symbol'] for s in response.json()]}")
+
+print("\n3. Running analysis on INFY.NS...")
+response = requests.post('http://localhost:5000/analyze', 
+    json={'tickers': ['INFY.NS'], 'capital': 100000},
+    timeout=30)
+
+job_id = response.json()['job_id']
+print(f"   Job ID: {job_id}")
+
+# Wait for completion
+for i in range(30):
+    status_response = requests.get(f'http://localhost:5000/status/{job_id}')
+    status = status_response.json()
+    
+    if status['status'] == 'completed':
+        print(f"   ✓ Analysis completed!")
+        break
+    print(f"   Waiting... ({i+1}/30)")
+    time.sleep(1)
+
+print("\n4. Fetching analysis history for INFY.NS...")
+response = requests.get('http://localhost:5000/history/INFY.NS')
+print(f"   Status: {response.status_code}")
+if response.status_code == 200:
+    data = response.json()
+    if data['history']:
+        latest = data['history'][0]
+        print(f"   ✓ Found analysis!")
+        print(f"   - Verdict: {latest['verdict']}")
+        print(f"   - Score: {latest['score']}")
+        print(f"   - Entry: {latest['entry']}")
+        print(f"   - Stop Loss: {latest['stop']}")
+        print(f"   - Target: {latest['target']}")
+    else:
+        print(f"   ✗ No history found")
+else:
+    print(f"   Error: {response.json()}")
+
+print("\n✓ Test complete!")
