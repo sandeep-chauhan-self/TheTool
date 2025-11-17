@@ -9,26 +9,57 @@ from typing import Union, Tuple
 from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
+from auth import require_auth, MASTER_API_KEY
+from config import config
+
+# SECURITY FIX (ISSUE_023): Optional rate limiting (graceful degradation)
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    LIMITER_AVAILABLE = True
+except ImportError:
+    LIMITER_AVAILABLE = False
+    print("WARNING: flask-limiter not installed. Rate limiting disabled.")
+    print("Install with: pip install Flask-Limiter>=3.5.0")
 
 load_dotenv()
 
 app = Flask(__name__)
-# Allow both localhost and IP address access
+
+# SECURITY FIX (ISSUE_021): Added Authorization header to CORS
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000", "http://192.168.57.1:3000"],
+        "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization", "X-API-Key"]
     }
 })
 
+# SECURITY FIX (ISSUE_023): Rate limiting to prevent DoS attacks
+if LIMITER_AVAILABLE and config.RATE_LIMIT_ENABLED:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=[f"{config.RATE_LIMIT_PER_MINUTE} per minute"],
+        storage_uri="memory://",
+    )
+else:
+    # Mock limiter for graceful degradation
+    class MockLimiter:
+        @staticmethod
+        def limit(limit_value):
+            def decorator(f):
+                return f
+            return decorator
+    limiter = MockLimiter()
+
 # Lazy imports - only load when needed
 def get_logger():
-    from utils.logger import setup_logger
+    from utils.infrastructure.logging import setup_logger
     return setup_logger()
 
 def get_analyze_ticker():
-    from utils.compute_score import analyze_ticker, export_to_excel
+    from utils.analysis.orchestrator import analyze_ticker, export_to_excel
     return analyze_ticker, export_to_excel
 
 # Setup logging with DEBUG level
@@ -50,6 +81,9 @@ logger.info("=" * 60)
 logger.info("FLASK APPLICATION STARTING")
 logger.info("Async Job Processing with Threading (Redis-free)")
 logger.info("=" * 60)
+logger.info(f"MASTER API KEY: {MASTER_API_KEY}")
+logger.info("SECURITY: API authentication enabled for all endpoints")
+logger.info("=" * 60)
 
 # Initialize database (lightweight operation)
 from database import init_db, get_db_connection
@@ -60,7 +94,7 @@ _scheduler_started = False
 def ensure_scheduler():
     global _scheduler_started
     if not _scheduler_started:
-        from utils.cron_tasks import start_scheduler
+        from utils.infrastructure.scheduler import start_scheduler
         start_scheduler()
         _scheduler_started = True
 
@@ -70,34 +104,54 @@ MAX_THREADS = min(10, (os.cpu_count() or 1) * 2)
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
+    """
+    Health check endpoint (public - no authentication required).
+    Used by load balancers and monitoring systems.
+    """
+    from cache import get_cache_stats
+    
     uptime = (datetime.now() - app.config.get('start_time', datetime.now())).total_seconds()
+    cache_stats = get_cache_stats()
+    
     return jsonify({
         "status": "ok",
-        "uptime": uptime
+        "uptime": uptime,
+        "authentication": "enabled",
+        "cache": cache_stats
     })
 
 @app.route('/analyze', methods=['POST'])
+@require_auth
+@limiter.limit(f"{config.ANALYZE_RATE_LIMIT} per minute")
 def analyze():
-    """Analyze one or more tickers (async with Threading)"""
+    """
+    Analyze one or more tickers (async with Threading).
+    
+    SECURITY FIX (ISSUE_021): Requires API key authentication.
+    SECURITY FIX (ISSUE_022): Input validation using Pydantic schemas.
+    SECURITY FIX (ISSUE_023): Rate limited to prevent DoS attacks.
+    """
     try:
         logger.info("=" * 50)
         logger.info("NEW ANALYSIS REQUEST")
         logger.info("=" * 50)
         
-        from thread_tasks import start_analysis_job
+        from infrastructure.thread_tasks import start_analysis_job
+        from models.validation import TickerAnalysisRequest, validate_request
         
         data = request.get_json()
         logger.debug(f"Request data: {data}")
         
-        tickers = data.get('tickers', [])
-        indicators = data.get('indicators', None)  # None means use all
-        capital = data.get('capital', 100000)  # Default 1 lakh capital
-        use_demo = data.get('use_demo_data', True)  # Enable demo mode by default for testing
+        # Validate request data (ISSUE_022)
+        validated, error = validate_request(TickerAnalysisRequest, data)
+        if error:
+            logger.error(f"Validation failed: {error}")
+            return jsonify(error), 400
         
-        if not tickers:
-            logger.error("No tickers provided in request")
-            return jsonify({"error": "No tickers provided"}), 400
+        tickers = validated.tickers
+        indicators = validated.indicators
+        capital = validated.capital
+        use_demo = validated.use_demo_data
         
         job_id = str(uuid.uuid4())
         logger.info(f"Generated job_id: {job_id}")
@@ -164,8 +218,9 @@ def analyze():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/status/<job_id>', methods=['GET'])
+@require_auth
 def get_status(job_id):
-    """Get analysis job status"""
+    """Get analysis job status (requires authentication)"""
     try:
         logger.debug(f"Status check requested for job_id: {job_id}")
         
@@ -213,10 +268,11 @@ def get_status(job_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/cancel/<job_id>', methods=['POST'])
+@require_auth
 def cancel_job(job_id):
-    """Cancel a running analysis job"""
+    """Cancel a running analysis job (requires authentication)"""
     try:
-        from thread_tasks import cancel_job as thread_cancel_job
+        from infrastructure.thread_tasks import cancel_job as thread_cancel_job
         
         # Cancel the thread
         cancelled = thread_cancel_job(job_id)
@@ -253,8 +309,9 @@ def cancel_job(job_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/history/<ticker>', methods=['GET'])
+@require_auth
 def get_history(ticker):
-    """Get analysis history for a ticker (last 10 analyses)"""
+    """Get analysis history for a ticker (requires authentication)"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -293,8 +350,9 @@ def get_history(ticker):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/report/<ticker>', methods=['GET'])
+@require_auth
 def get_report(ticker):
-    """Get analysis report for a specific ticker"""
+    """Get analysis report for a specific ticker (requires authentication)"""
     try:
         logger.debug(f"Report requested for ticker: {ticker}")
         
@@ -350,8 +408,9 @@ def get_report(ticker):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/report/<ticker>/download', methods=['GET'])
+@require_auth
 def download_report(ticker):
-    """Download Excel report for a ticker"""
+    """Download analysis report as Excel (requires authentication)"""
     try:
         # Lazy load export function
         _, export_to_excel = get_analyze_ticker()
@@ -461,8 +520,9 @@ def get_nse_stocks():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/watchlist', methods=['GET', 'POST', 'DELETE'])
+@require_auth
 def manage_watchlist() -> Union[Response, Tuple[Response, int]]:
-    """Manage watchlist"""
+    """Manage watchlist (requires authentication)"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -513,10 +573,13 @@ def manage_watchlist() -> Union[Response, Tuple[Response, int]]:
 
 
 @app.route('/initialize-all-stocks', methods=['POST'])
+@require_auth
 def initialize_all_stocks():
     """
-    Initialize all_stocks_analysis table with all NSE stocks
-    Only runs if table is empty (idempotent)
+    Initialize UNIFIED analysis_results table with all NSE stocks
+    Only runs if table is empty for bulk analysis (idempotent)
+    
+    MIGRATION NOTE: Now inserts into unified analysis_results table with analysis_source='bulk'
     """
     try:
         logger.info("Initialize all stocks requested")
@@ -524,12 +587,12 @@ def initialize_all_stocks():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check if already initialized
-        cursor.execute('SELECT COUNT(*) FROM all_stocks_analysis')
+        # Check if already initialized (check bulk analysis records)
+        cursor.execute("SELECT COUNT(*) FROM analysis_results WHERE analysis_source = 'bulk'")
         count = cursor.fetchone()[0]
         
         if count > 0:
-            logger.info(f"Already initialized with {count} stocks")
+            logger.info(f"Already initialized with {count} bulk stocks")
             conn.close()
             return jsonify({
                 "message": "Already initialized",
@@ -551,13 +614,18 @@ def initialize_all_stocks():
         if not stocks:
             return jsonify({"error": "No stocks found in data file"}), 404
         
-        # Insert all stocks with status='pending'
+        # Insert all stocks with status='pending' into UNIFIED table
+        from datetime import datetime
+        now = datetime.now().isoformat()
+        
         for stock in stocks:
             cursor.execute('''
-                INSERT INTO all_stocks_analysis 
-                (symbol, name, yahoo_symbol, status) 
-                VALUES (?, ?, ?, 'pending')
-            ''', (stock['symbol'], stock['name'], stock['yahoo_symbol']))
+                INSERT INTO analysis_results 
+                (ticker, symbol, name, yahoo_symbol, score, verdict, status, 
+                 created_at, updated_at, analysis_source) 
+                VALUES (?, ?, ?, ?, 0.0, 'Pending', 'pending', ?, ?, 'bulk')
+            ''', (stock['yahoo_symbol'], stock['symbol'], stock['name'], 
+                  stock['yahoo_symbol'], now, now))
         
         conn.commit()
         inserted_count = len(stocks)
@@ -577,16 +645,20 @@ def initialize_all_stocks():
 
 
 @app.route('/all-stocks', methods=['GET'])
+@require_auth
 def get_all_stocks():
     """
-    Get all stocks from all_stocks_analysis table
+    Get all stocks from UNIFIED analysis_results table (analysis_source='bulk')
     Returns latest analysis for each stock
+    
+    MIGRATION NOTE: Now queries unified analysis_results table instead of 
+    deprecated all_stocks_analysis table.
     """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get latest record for each stock
+        # Get latest record for each stock from UNIFIED table (bulk analyses only)
         cursor.execute('''
             SELECT 
                 symbol, 
@@ -603,10 +675,12 @@ def get_all_stocks():
                 error_message,
                 created_at,
                 updated_at
-            FROM all_stocks_analysis
-            WHERE id IN (
+            FROM analysis_results
+            WHERE analysis_source = 'bulk'
+            AND id IN (
                 SELECT MAX(id) 
-                FROM all_stocks_analysis 
+                FROM analysis_results 
+                WHERE analysis_source = 'bulk'
                 GROUP BY symbol
             )
             ORDER BY symbol ASC
@@ -650,9 +724,12 @@ def get_all_stocks():
 
 
 @app.route('/all-stocks/<symbol>/history', methods=['GET'])
+@require_auth
 def get_stock_history(symbol):
     """
-    Get analysis history for a specific stock (last 10 analyses)
+    Get analysis history for a specific stock (last 10 analyses from bulk analysis)
+    
+    MIGRATION NOTE: Now queries unified analysis_results table with analysis_source='bulk'
     """
     try:
         conn = get_db_connection()
@@ -676,8 +753,8 @@ def get_stock_history(symbol):
                 raw_data,
                 error_message,
                 created_at
-            FROM all_stocks_analysis
-            WHERE symbol = ?
+            FROM analysis_results
+            WHERE symbol = ? AND analysis_source = 'bulk'
             ORDER BY created_at DESC
             LIMIT 10
         ''', (symbol,))
@@ -734,6 +811,7 @@ def get_stock_history(symbol):
 
 
 @app.route('/all-stocks/progress', methods=['GET'])
+@require_auth
 def get_all_stocks_progress():
     """
     Get real-time progress of bulk analysis
@@ -811,13 +889,15 @@ def get_all_stocks_progress():
 
 
 @app.route('/analyze-all-stocks', methods=['POST'])
+@require_auth
+@limiter.limit("5 per hour")
 def analyze_all_stocks():
     """
-    Trigger bulk analysis for all or selected stocks
-    Creates individual jobs for each stock
+    Trigger bulk analysis for all or selected stocks.
+    SECURITY: Very resource-intensive, rate limited to 5 per hour.
     """
     try:
-        from thread_tasks import start_bulk_analysis
+        from infrastructure.thread_tasks import start_bulk_analysis
         
         data = request.get_json() or {}
         symbols = data.get('symbols', [])  # If empty, analyze all

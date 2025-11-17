@@ -39,7 +39,11 @@ function Dashboard() {
         data.map(async (stock) => {
           try {
             // Get analysis history for this stock
-            const historyData = await fetch(`http://localhost:5000/history/${stock.symbol}`)
+            const historyData = await fetch(`http://localhost:5000/history/${stock.symbol}`, {
+              headers: {
+                'X-API-Key': process.env.REACT_APP_API_KEY || ''
+              }
+            })
               .then(res => res.json());
             
             if (historyData && historyData.history && historyData.history.length > 0) {
@@ -159,7 +163,12 @@ function Dashboard() {
     
     if (window.confirm('Cancel the running analysis?')) {
       try {
-        await fetch(`http://localhost:5000/cancel/${jobId}`, { method: 'POST' });
+        await fetch(`http://localhost:5000/cancel/${jobId}`, { 
+          method: 'POST',
+          headers: {
+            'X-API-Key': process.env.REACT_APP_API_KEY || ''
+          }
+        });
         setAnalyzing(false);
         sessionStorage.removeItem('activeJobId');
         alert('Analysis cancelled');

@@ -1,0 +1,20 @@
+# Security and Performance Fixes - Required Dependencies
+# Part 1 Implementation Requirements
+
+# ISSUE_022: Input Validation
+pydantic>=2.0.0
+
+# ISSUE_023: Rate Limiting (DoS Protection)
+Flask-Limiter>=3.5.0
+
+# ISSUE_006: Numba JIT Compilation for Performance
+numba>=0.58.0
+
+# Dependencies for existing features
+python-dotenv>=1.0.0
+Flask>=3.0.0
+Flask-CORS>=4.0.0
+pandas>=2.0.0
+numpy>=1.24.0
+yfinance>=0.2.0
+requests>=2.31.0

@@ -231,28 +231,36 @@ function Results() {
         <div className="bg-white rounded shadow p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold">Final Verdict</h2>
-            <span className={`px-4 py-2 rounded font-bold text-xl ${getVerdictColor(report.verdict)}`}>
-              {report.verdict}
+            <span className={`px-4 py-2 rounded font-bold text-xl ${getVerdictColor(report.verdict || 'Neutral')}`}>
+              {report.verdict || 'No verdict'}
             </span>
           </div>
           
           <div className="flex items-center gap-2 mb-6">
             <span className="text-gray-600">Score:</span>
-            <span className="font-bold text-xl">{report.score > 0 ? '+' : ''}{report.score}</span>
+            <span className="font-bold text-xl">
+              {report.score != null ? `${report.score > 0 ? '+' : ''}${report.score}` : 'N/A'}
+            </span>
           </div>
 
           <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded">
             <div>
               <div className="text-sm text-gray-600">Entry Price</div>
-              <div className="text-xl font-bold text-blue-600">Rs. {report.entry.toFixed(2)}</div>
+              <div className="text-xl font-bold text-blue-600">
+                {report.entry != null ? `Rs. ${Number(report.entry).toFixed(2)}` : 'N/A'}
+              </div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Stop Loss</div>
-              <div className="text-xl font-bold text-red-600">Rs. {report.stop.toFixed(2)}</div>
+              <div className="text-xl font-bold text-red-600">
+                {report.stop != null ? `Rs. ${Number(report.stop).toFixed(2)}` : 'N/A'}
+              </div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Target</div>
-              <div className="text-xl font-bold text-green-600">Rs. {report.target.toFixed(2)}</div>
+              <div className="text-xl font-bold text-green-600">
+                {report.target != null ? `Rs. ${Number(report.target).toFixed(2)}` : 'N/A'}
+              </div>
             </div>
           </div>
         </div>
@@ -274,17 +282,27 @@ function Results() {
               </tr>
             </thead>
             <tbody>
-              {report.indicators.map((indicator, index) => (
-                <tr key={index} className="border-t hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium">{indicator.name}</td>
-                  <td className={`px-6 py-3 font-bold ${getVoteColor(indicator.vote)}`}>
-                    {getVoteDisplay(indicator.vote)}
+              {report.indicators && Array.isArray(report.indicators) && report.indicators.length > 0 ? (
+                report.indicators.map((indicator, index) => (
+                  <tr key={index} className="border-t hover:bg-gray-50">
+                    <td className="px-6 py-3 font-medium">{indicator.name || 'N/A'}</td>
+                    <td className={`px-6 py-3 font-bold ${getVoteColor(indicator.vote)}`}>
+                      {getVoteDisplay(indicator.vote)}
+                    </td>
+                    <td className="px-6 py-3">
+                      {indicator.confidence != null ? `${(indicator.confidence * 100).toFixed(0)}%` : 'N/A'}
+                    </td>
+                    <td className="px-6 py-3 capitalize">{indicator.category || 'N/A'}</td>
+                    <td className="px-6 py-3 text-gray-600">{indicator.value || 'N/A'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="px-6 py-3 text-center text-gray-500">
+                    No indicator data available
                   </td>
-                  <td className="px-6 py-3">{(indicator.confidence * 100).toFixed(0)}%</td>
-                  <td className="px-6 py-3 capitalize">{indicator.category}</td>
-                  <td className="px-6 py-3 text-gray-600">{indicator.value}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

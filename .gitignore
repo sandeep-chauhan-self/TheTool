@@ -11,13 +11,23 @@ ENV/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
 
 # Logs
 logs/
 *.log
+backend/logs/
+backend/utils/logs/
 
-# Data
-data/
+# Data & Databases
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+backend/data/cache/
+backend/data/reports/
 *.db
 *.sqlite
 *.sqlite3
@@ -27,6 +37,7 @@ data/
 .env.local
 .env.production.local
 .env.development.local
+*.env
 
 # IDE
 .vscode/
@@ -34,11 +45,16 @@ data/
 *.swp
 *.swo
 *~
+*.code-workspace
+.vscode-test/
 
 # OS
 .DS_Store
 Thumbs.db
 desktop.ini
+*.bak
+*.tmp
+*.old
 
 # Node
 node_modules/
@@ -47,6 +63,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnp
 .pnp.js
+package-lock.json
 
 # React
 frontend/build/
@@ -56,14 +73,63 @@ frontend/.cache/
 # Testing
 coverage/
 .nyc_output
+htmlcov/
+.coverage
+.coverage.*
+*.cover
 
 # Excel reports
 *.xlsx
 *.xls
 
-# Misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Generated analysis reports (regenerate with scripts in tests/)
+docs/analysis_tools/*.txt
+docs/analysis_tools/*.md
+
+# Prerequisite folder (optional dependencies)
+Prerequisite/
+
+# Audit reports (comprehensive analysis documents)
+AUDIT_REPORTS/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+backend/venv/
+
+# Build artifacts
+*.egg
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+dump.rdb
+
+# Docker
+*.dockerignore
+docker-compose.override.yml
+
+# Project cleanup summaries (regenerate as needed)
+PROJECT_CLEANUP_SUMMARY.md

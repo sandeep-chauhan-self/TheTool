@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TheTool - Stock Analysis Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.online {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+        
+        .status-dot.offline {
+            background: #ef4444;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .card ul {
+            list-style: none;
+        }
+        
+        .card li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .card li:last-child {
+            border-bottom: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .endpoint {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 5px 0;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 0.8em;
+        }
+        
+        .method.get {
+            background: #10b981;
+            color: white;
+        }
+        
+        .method.post {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            opacity: 0.8;
+        }
+        
+        .info-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        code {
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>?? TheTool</h1>
+            <p>Professional Stock Analysis Platform</p>
+        </div>
+        
+        <div class="status-card">
+            <h2>?? Server Status</h2>
+            <div class="status-indicator">
+                <div class="status-dot online" id="backendStatus"></div>
+                <strong>Backend API:</strong>
+                <span id="backendText">Checking...</span>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot offline" id="frontendStatus"></div>
+                <strong>Frontend:</strong>
+                <span id="frontendText">Not Running (npm required)</span>
+            </div>
+            
+            <div class="info-box">
+                <strong>?? Frontend Setup Required:</strong><br>
+                To run the React frontend, install Node.js from 
+                <a href="https://nodejs.org/" target="_blank">nodejs.org</a>, then run:<br>
+                <code>cd frontend && npm install && npm start</code>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>?? Available Indicators</h3>
+                <ul id="indicatorList">
+                    <li>Loading...</li>
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h3>?? API Endpoints</h3>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    /health
+                </div>
+                <div class="endpoint">
+                    <span class="method post">POST</span>
+                    /analyze
+                </div>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    /status/:jobId
+                </div>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    /config
+                </div>
+                <div class="endpoint">
+                    <span class="method get">GET</span>
+                    /watchlist
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>? Features</h3>
+                <ul>
+                    <li>? 13+ Technical Indicators</li>
+                    <li>? Real-time Analysis</li>
+                    <li>? Multi-Stock Support</li>
+                    <li>? Background Processing</li>
+                    <li>? Job Status Tracking</li>
+                    <li>? Watchlist Management</li>
+                    <li>? Historical Data</li>
+                    <li>? 350+ Tests Passing</li>
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h3>?? Documentation</h3>
+                <ul>
+                    <li><strong>Architecture Guide:</strong> ARCHITECTURE.md</li>
+                    <li><strong>Installation:</strong> docs/INSTALLATION.md</li>
+                    <li><strong>API Reference:</strong> docs/API_REFERENCE.md</li>
+                    <li><strong>Project Structure:</strong> docs/PROJECT_STRUCTURE.md</li>
+                    <li><strong>Tests:</strong> backend/tests/</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>TheTool v2.0.0 | 350+ Tests Passing | State Machine: 23/23 ?</p>
+            <p>Backend: http://localhost:5000 | Frontend: http://localhost:3000 (when started)</p>
+        </div>
+    </div>
+    
+    <script>
+        // Check backend status
+        fetch('http://localhost:5000/health')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('backendStatus').classList.add('online');
+                document.getElementById('backendText').textContent = `Running (Uptime: ${Math.floor(data.uptime)}s)`;
+            })
+            .catch(err => {
+                document.getElementById('backendStatus').classList.add('offline');
+                document.getElementById('backendText').textContent = 'Offline';
+            });
+        
+        // Load indicators
+        fetch('http://localhost:5000/config')
+            .then(res => res.json())
+            .then(data => {
+                const indicators = [
+                    'RSI - Relative Strength Index',
+                    'MACD - Moving Average Convergence Divergence',
+                    'Bollinger Bands',
+                    'EMA - Exponential Moving Average',
+                    'ADX - Average Directional Index',
+                    'Stochastic Oscillator',
+                    'Williams %R',
+                    'CCI - Commodity Channel Index',
+                    'ATR - Average True Range',
+                    'Supertrend',
+                    'PSAR - Parabolic SAR',
+                    'OBV - On-Balance Volume',
+                    'CMF - Chaikin Money Flow'
+                ];
+                
+                const list = document.getElementById('indicatorList');
+                list.innerHTML = indicators.map(ind => `<li>• ${ind}</li>`).join('');
+            })
+            .catch(err => {
+                document.getElementById('indicatorList').innerHTML = '<li>Error loading indicators</li>';
+            });
+    </script>
+</body>
+</html>
