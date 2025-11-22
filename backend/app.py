@@ -9,7 +9,7 @@ app = Flask(__name__)
 # ---------- GLOBAL CORS (Required for Railway/Vercel) ----------
 CORS(
     app,
-    resources={r"/*": {"origins": ["https://the-tool-theta.vercel.app"]}},
+    resources={r"/*": {"origins": "*"}},
     supports_credentials=True,
     allow_headers=["Content-Type", "X-API-Key", "Authorization"],
     expose_headers=["Content-Type", "X-API-Key"],
@@ -113,3 +113,4 @@ def get_nse_stocks():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000)
