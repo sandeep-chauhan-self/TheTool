@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getWatchlist, addToWatchlist, removeFromWatchlist, analyzeStocks, getJobStatus, getReport, getStockHistory } from '../api/api';
+import { getWatchlist, addToWatchlist, removeFromWatchlist, analyzeStocks, getJobStatus, getReport, getStockHistory, cancelJob } from '../api/api';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 import AddStockModal from '../components/AddStockModal';
@@ -39,12 +39,7 @@ function Dashboard() {
         data.map(async (stock) => {
           try {
             // Get analysis history for this stock
-            const historyData = await fetch(`http://localhost:5000/history/${stock.symbol}`, {
-              headers: {
-                'X-API-Key': process.env.REACT_APP_API_KEY || ''
-              }
-            })
-              .then(res => res.json());
+            const historyData = await getStockHistory(stock.symbol);
             
             if (historyData && historyData.history && historyData.history.length > 0) {
               const latest = historyData.history[0];
@@ -160,15 +155,10 @@ function Dashboard() {
 
   const handleCancelAnalysis = async () => {
     if (!jobId) return;
-    
+
     if (window.confirm('Cancel the running analysis?')) {
       try {
-        await fetch(`http://localhost:5000/cancel/${jobId}`, { 
-          method: 'POST',
-          headers: {
-            'X-API-Key': process.env.REACT_APP_API_KEY || ''
-          }
-        });
+        await cancelJob(jobId);
         setAnalyzing(false);
         sessionStorage.removeItem('activeJobId');
         alert('Analysis cancelled');
