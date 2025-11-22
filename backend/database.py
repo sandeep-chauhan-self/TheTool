@@ -30,6 +30,40 @@ def execute_db(query, args=()):
     db.commit()
     return cur.lastrowid
 
+
+# Thread-safe database functions for background tasks
+def get_db_connection():
+    """Get a new database connection (not Flask g-based)"""
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
+
+
+def get_db_session():
+    """Get a thread-safe database session as context manager"""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def session():
+        conn = get_db_connection()
+        conn.row_factory = sqlite3.Row
+        # Enable WAL mode for better concurrency
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        try:
+            yield conn, conn.cursor()
+            conn.commit()
+        except:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+    return session()
+
+
+def close_thread_connection():
+    """Thread cleanup function - no-op for now since connections are managed by context managers"""
+    pass
+
+
 # Import app for teardown registration (after app is defined)
 def register_teardown(app):
     @app.teardown_appcontext

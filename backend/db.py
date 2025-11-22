@@ -4,7 +4,7 @@ from flask import g
 
 # Database paths - Railway-safe for production, local for development
 import os
-DB_PATH = os.environ.get("DB_PATH", "/tmp/trading_app.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.getcwd(), "trading_app.db"))
 
 
 def init_db_if_needed():
