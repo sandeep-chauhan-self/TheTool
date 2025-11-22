@@ -87,7 +87,7 @@ logger.info("SECURITY: API authentication enabled for all endpoints")
 logger.info("=" * 60)
 
 # Initialize database (lightweight operation)
-from database import init_db, register_teardown
+from database import init_db, register_teardown, get_db, query_db, execute_db
 init_db()
 
 # Register database teardown function
@@ -168,10 +168,8 @@ def analyze():
         logger.info(f"Use demo data: {use_demo}")
         
         # Create job record in database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO analysis_jobs 
+        execute_db('''
+            INSERT INTO analysis_jobs
             (job_id, status, total, completed, progress, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -183,8 +181,6 @@ def analyze():
             datetime.now().isoformat(),
             datetime.now().isoformat()
         ))
-        conn.commit()
-        conn.close()
         
         logger.info(f"Job record created in database: {job_id}")
         
