@@ -303,6 +303,196 @@ def cancel_analysis_job(job_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ---------- BULK ANALYSIS ROUTES ----------
+@app.route('/all-stocks', methods=['GET'])
+def get_all_stocks():
+    """Get all bulk-analyzed stocks with latest analysis"""
+    try:
+        # Get latest analysis for each unique symbol from bulk analysis
+        rows = query_db('''
+            SELECT
+                symbol,
+                name,
+                yahoo_symbol,
+                score,
+                verdict,
+                entry,
+                stop_loss,
+                target,
+                created_at as analyzed_at,
+                updated_at
+            FROM analysis_results
+            WHERE analysis_source = 'bulk'
+            AND (symbol, created_at) IN (
+                SELECT symbol, MAX(created_at)
+                FROM analysis_results
+                WHERE analysis_source = 'bulk'
+                GROUP BY symbol
+            )
+            ORDER BY symbol
+        ''')
+
+        stocks = []
+        if rows:
+            stocks = [{
+                "symbol": r["symbol"],
+                "name": r["name"],
+                "yahoo_symbol": r["yahoo_symbol"],
+                "score": r["score"],
+                "verdict": r["verdict"],
+                "entry": r["entry"],
+                "stop_loss": r["stop_loss"],
+                "target": r["target"],
+                "analyzed_at": r["analyzed_at"],
+                "updated_at": r["updated_at"]
+            } for r in rows]
+
+        return jsonify({
+            "stocks": stocks,
+            "count": len(stocks)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/all-stocks/<symbol>/history', methods=['GET'])
+def get_stock_history(symbol):
+    """Get analysis history for a specific stock"""
+    try:
+        # Get all analyses for this symbol (both bulk and watchlist)
+        rows = query_db('''
+            SELECT
+                ticker,
+                symbol,
+                name,
+                yahoo_symbol,
+                score,
+                verdict,
+                entry,
+                stop_loss,
+                target,
+                entry_method,
+                data_source,
+                is_demo_data,
+                raw_data,
+                status,
+                error_message,
+                created_at as analyzed_at,
+                updated_at,
+                analysis_source
+            FROM analysis_results
+            WHERE symbol = ? OR ticker = ?
+            ORDER BY created_at DESC
+        ''', (symbol, symbol))
+
+        history = []
+        if rows:
+            history = [{
+                "ticker": r["ticker"],
+                "symbol": r["symbol"],
+                "name": r["name"],
+                "yahoo_symbol": r["yahoo_symbol"],
+                "score": r["score"],
+                "verdict": r["verdict"],
+                "entry": r["entry"],
+                "stop_loss": r["stop_loss"],
+                "target": r["target"],
+                "entry_method": r["entry_method"],
+                "data_source": r["data_source"],
+                "is_demo_data": bool(r["is_demo_data"]),
+                "raw_data": r["raw_data"],
+                "status": r["status"],
+                "error_message": r["error_message"],
+                "analyzed_at": r["analyzed_at"],
+                "updated_at": r["updated_at"],
+                "analysis_source": r["analysis_source"]
+            } for r in rows]
+
+        return jsonify({"history": history})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/analyze-all-stocks', methods=['POST'])
+def analyze_all_stocks():
+    """Start bulk analysis of all stocks"""
+    try:
+        from infrastructure import start_bulk_analysis, analyze_single_stock_bulk
+
+        data = request.get_json()
+        symbols = data.get("symbols", []) if data else []
+
+        # If no symbols provided or empty, get all NSE stocks
+        if not symbols:
+            # Try to get from NSE stocks file
+            try:
+                from pathlib import Path
+                import json
+
+                backend_root = Path(__file__).resolve().parent / "data"
+                json_file = backend_root / "nse_stocks.json"
+
+                if json_file.exists():
+                    with open(json_file, 'r') as f:
+                        nse_data = json.load(f)
+                        symbols = [stock.get('symbol', stock.get('yahoo_symbol', '')) for stock in nse_data.get('stocks', [])]
+                        symbols = [s for s in symbols if s]  # Filter out empty strings
+
+                if not symbols:
+                    return jsonify({"error": "No symbols provided and could not load NSE stocks"}), 400
+
+            except Exception as load_error:
+                return jsonify({"error": f"Could not load NSE stocks: {str(load_error)}"}), 500
+
+        # Limit to reasonable number for bulk analysis
+        if len(symbols) > 500:
+            symbols = symbols[:500]
+
+        # Convert symbols to stock objects for bulk analysis
+        stocks = [
+            {
+                "symbol": symbol.replace('.NS', ''),  # Remove exchange suffix for symbol
+                "yahoo_symbol": symbol if '.NS' in symbol else f"{symbol}.NS",
+                "name": ""
+            }
+            for symbol in symbols
+        ]
+
+        # Start bulk analysis (this returns immediately, analysis runs in background)
+        start_bulk_analysis(stocks, use_demo=True)  # Use demo=True for bulk analysis
+
+        return jsonify({
+            "message": f"Started bulk analysis of {len(stocks)} stocks",
+            "total": len(stocks)
+        }), 202
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/all-stocks/progress', methods=['GET'])
+def get_all_stocks_progress():
+    """Get progress of bulk analysis"""
+    # For now, return a simple status since bulk analysis is fire-and-forget
+    # In a more complete implementation, you'd track progress in a database
+    return jsonify({
+        "status": "completed",  # Placeholder
+        "progress": 100,
+        "message": "Bulk analysis completed"
+    })
+
+
+@app.route('/initialize-all-stocks', methods=['POST'])
+def initialize_all_stocks():
+    """Initialize bulk analysis infrastructure"""
+    return jsonify({
+        "message": "Bulk analysis infrastructure initialized",
+        "status": "ready"
+    }), 200
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
