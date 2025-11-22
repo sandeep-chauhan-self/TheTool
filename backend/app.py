@@ -1,55 +1,71 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
+from pathlib import Path
 
-from db import get_db, query_db, execute_db, close_db
+from db import (
+    init_db_if_needed,
+    query_db,
+    execute_db,
+    close_db
+)
 
 app = Flask(__name__)
 
-# ---------- GLOBAL CORS (Required for Railway/Vercel) ----------
+# ---------- CORS (Vercel → Railway) ----------
+FRONTEND_URL = "https://the-tool-theta.vercel.app"
+
 CORS(
     app,
-    resources={r"/*": {"origins": "*"}},
-    supports_credentials=True,
+    resources={r"/*": {"origins": [FRONTEND_URL]}},
+    supports_credentials=False,
     allow_headers=["Content-Type", "X-API-Key", "Authorization"],
     expose_headers=["Content-Type", "X-API-Key"],
 )
 
-# Ensure DB closes after every request
+# ---------- DB CLOSE ----------
 app.teardown_appcontext(close_db)
 
-# ---------- AUTH MIDDLEWARE ----------
+# ---------- DB INIT (Gunicorn SAFE) ----------
+@app.before_request
+def ensure_db_initialized():
+    init_db_if_needed()
+
+
+# ---------- AUTH ----------
 @app.before_request
 def require_api_key():
-    # Skip health and CORS preflight
-    if request.path == "/health" or request.method == "OPTIONS":
+    if request.method == "OPTIONS":
         return
-
-    # Extract API key from request
-    api_key = request.headers.get('X-API-Key')
-
-    # For now, allow any API key (implement proper validation later)
+    if request.path == "/health":
+        return
+    
+    api_key = request.headers.get("X-API-Key")
     if not api_key:
         return jsonify({
             "error": "Unauthorized",
-            "message": "Invalid or missing API key. Please provide X-API-Key header."
+            "message": "Missing X-API-Key"
         }), 401
+
 
 # ---------- ROUTES ----------
 @app.route("/")
 def index():
-    return {"status": "ok", "message": "Your Railway app is running!"}
+    return {"status": "ok", "message": "Railway backend running"}
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "message": "backend running"})
+    return {"status": "ok"}
+
 
 @app.route("/watchlist", methods=["GET"])
 def get_watchlist():
     rows = query_db("SELECT id, symbol, name FROM watchlist")
-    if rows is None:
-        rows = []
-    return jsonify([{"id": r[0], "symbol": r[1], "name": r[2]} for r in rows])
+    return jsonify([
+        {"id": row["id"], "symbol": row["symbol"], "name": row["name"]}
+        for row in rows
+    ])
+
 
 @app.route("/watchlist", methods=["POST"])
 def add_watchlist():
@@ -58,59 +74,58 @@ def add_watchlist():
     name = data.get("name", "")
 
     if not symbol:
-        return jsonify({"error": "Symbol is required"}), 400
+        return {"error": "Symbol required"}, 400
 
-    # Check if symbol already exists
-    existing = query_db("SELECT id FROM watchlist WHERE symbol = ?", (symbol,), one=True)
+    existing = query_db(
+        "SELECT id FROM watchlist WHERE symbol = ?",
+        (symbol,),
+        one=True
+    )
+
     if existing:
-        return jsonify({"error": "Symbol already in watchlist", "already_exists": True}), 409
+        return {"error": "Already exists", "already_exists": True}, 409
 
-    execute_db("INSERT INTO watchlist (symbol, name) VALUES (?, ?)", (symbol, name))
-    return jsonify({"message": "Added to watchlist", "symbol": symbol}), 201
+    execute_db(
+        "INSERT INTO watchlist (symbol, name) VALUES (?, ?)",
+        (symbol, name)
+    )
+
+    return {"message": "Added", "symbol": symbol}, 201
+
 
 @app.route("/watchlist", methods=["DELETE"])
 def delete_watchlist():
     data = request.get_json()
     symbol = data.get("symbol")
-
     execute_db("DELETE FROM watchlist WHERE symbol = ?", (symbol,))
-    return jsonify({"message": "Removed from watchlist"})
+    return {"message": "Removed"}
 
-@app.route('/nse-stocks', methods=['GET'])
+
+@app.route("/nse-stocks", methods=["GET"])
 def get_nse_stocks():
-    """Get list of all NSE stocks"""
     try:
-        from pathlib import Path
-        import json
+        backend_root = Path(__file__).parent
+        file_txt = backend_root / "backend" / "data" / "nse_stocks.txt"
+        file_json = backend_root / "backend" / "data" / "nse_stocks.json"
 
-        # Path to NSE stocks file
-        stocks_file = Path(__file__).parent / 'data' / 'nse_stocks.txt'
-        json_file = Path(__file__).parent / 'data' / 'nse_stocks.json'
+        if file_json.exists():
+            return jsonify(json.loads(file_json.read_text()))
 
-        # If JSON file exists, return it (includes metadata)
-        if json_file.exists():
-            with open(json_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return jsonify(data)
-
-        # Fallback: read TXT file
-        if stocks_file.exists():
-            with open(stocks_file, 'r', encoding='utf-8') as f:
-                stocks = [line.strip() for line in f if line.strip()]
+        if file_txt.exists():
+            stocks = [x.strip() for x in file_txt.read_text().split("\n") if x.strip()]
             return jsonify({
-                'count': len(stocks),
-                'stocks': [{'symbol': s, 'yahoo_symbol': s, 'name': s.replace('.NS', '')} for s in stocks]
+                "count": len(stocks),
+                "stocks": [
+                    {"symbol": s, "yahoo_symbol": s, "name": s.replace(".NS", "")}
+                    for s in stocks
+                ]
             })
 
-        # If file doesn't exist, return error
-        return jsonify({
-            'error': 'NSE stocks list not found. Run fetch_nse_stocks.py first.',
-            'count': 0,
-            'stocks': []
-        }), 404
+        return {"error": "NSE stock file not found"}, 404
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
