@@ -87,31 +87,45 @@ def delete_watchlist():
     return {"message": "Removed"}
 
 
-@app.route("/nse-stocks", methods=["GET"])
+@app.route('/nse-stocks', methods=['GET'])
 def get_nse_stocks():
-    backend_root = Path(__file__).parent / "backend" / "data"
-
-    json_file = backend_root / "nse_stocks.json"
-    txt_file = backend_root / "nse_stocks.txt"
-
     try:
+        from pathlib import Path
+        import json
+
+        backend_root = Path(__file__).resolve().parent / "data"
+
+        json_file = backend_root / "nse_stocks.json"
+        txt_file = backend_root / "nse_stocks.txt"
+
         if json_file.exists():
             return jsonify(json.loads(json_file.read_text()))
 
         if txt_file.exists():
-            stocks = [x.strip() for x in txt_file.read_text().split("\n") if x.strip()]
+            stocks = [
+                line.strip() for line in txt_file.read_text().splitlines()
+                if line.strip()
+            ]
             return jsonify({
                 "count": len(stocks),
                 "stocks": [
-                    {"symbol": s, "yahoo_symbol": s, "name": s.replace(".NS", "")}
-                    for s in stocks
+                    {
+                        "symbol": s,
+                        "yahoo_symbol": s,
+                        "name": s.replace(".NS", "")
+                    } for s in stocks
                 ]
             })
 
-        return {"error": "NSE stock file missing"}, 404
+        return jsonify({
+            "error": "NSE stocks list not found.",
+            "count": 0,
+            "stocks": []
+        }), 404
 
     except Exception as e:
-        return {"error": str(e)}, 500
+        return jsonify({"error": str(e)}), 500
+
 
 
 if __name__ == "__main__":
