@@ -26,20 +26,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# SECURITY FIX (ISSUE_021): Added Authorization header to CORS
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "https://the-tool-theta.vercel.app",  # Production Vercel domain
-            "http://localhost:3000",              # Local development
-            "http://192.168.57.1:3000"            # Network access
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-API-Key"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type", "X-API-Key"]
-    }
-})
+# CRITICAL FIX: Global CORS configuration for all routes and error responses
+CORS(
+    app,
+    origins=["https://the-tool-theta.vercel.app"],
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+    expose_headers=["Content-Type", "X-API-Key"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+)
 
 # SECURITY FIX (ISSUE_023): Rate limiting to prevent DoS attacks
 if LIMITER_AVAILABLE and config.RATE_LIMIT_ENABLED:
@@ -92,11 +87,11 @@ logger.info("SECURITY: API authentication enabled for all endpoints")
 logger.info("=" * 60)
 
 # Initialize database (lightweight operation)
-from database import init_db, get_db_connection, close_db_connection
+from database import init_db, register_teardown
 init_db()
 
 # Register database teardown function
-app.teardown_appcontext(close_db_connection)
+register_teardown(app)
 
 # Start background scheduler (lazy - will be imported on first use)
 _scheduler_started = False

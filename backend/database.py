@@ -1,80 +1,43 @@
 import sqlite3
 import os
-from contextlib import contextmanager
 from flask import g
 from config import config
 
-# CRITICAL FIX (ISSUE_019): Use centralized configuration
+# CRITICAL FIX: Proper Flask + SQLite pattern for Gunicorn multi-worker environment
 DB_PATH = config.DB_PATH
 
-# Database connection constants
-DB_LOCK_TIMEOUT = 30.0  # seconds - timeout for lock acquisition
-DB_WAL_MODE = 'WAL'     # Write-Ahead Logging for better concurrency
-DB_SYNC_MODE = 'NORMAL' # Balance safety and performance
-
-def get_db_connection():
-    """
-    Get request-scoped database connection.
-    Creates a new connection per Flask request using Flask's 'g' object.
-
-    CRITICAL FIX: Thread-local storage doesn't work across Gunicorn workers (processes).
-    Using Flask's g object ensures each HTTP request gets a fresh connection.
-
-    Returns:
-        sqlite3.Connection: Request-scoped database connection
-    """
-    # Check if current request already has a connection
+def get_db():
+    """Get database connection for current request"""
     if 'db' not in g:
-        # Create new connection for this request
-        conn = sqlite3.connect(
-            DB_PATH,
-            check_same_thread=False,  # Allow multi-threading (Gunicorn workers)
-            timeout=DB_LOCK_TIMEOUT
-        )
-        conn.row_factory = sqlite3.Row
-        # Enable WAL mode for better concurrent read performance
-        conn.execute(f'PRAGMA journal_mode={DB_WAL_MODE}')
-        conn.execute(f'PRAGMA synchronous={DB_SYNC_MODE}')
-        g.db = conn
-
+        g.db = sqlite3.connect(DB_PATH, check_same_thread=False)
+        g.db.row_factory = sqlite3.Row
+        # Enable WAL mode for better concurrency
+        g.db.execute('PRAGMA journal_mode=WAL')
+        g.db.execute('PRAGMA synchronous=NORMAL')
     return g.db
 
+def query_db(query, args=(), one=False):
+    """Query database and return results"""
+    cur = get_db().execute(query, args)
+    rv = cur.fetchall()
+    cur.close()
+    return (rv[0] if rv else None) if one else rv
 
-@contextmanager
-def get_db_session():
-    """
-    Context manager for database transactions with automatic commit/rollback.
-    Ensures proper cleanup even if exceptions occur.
-    
-    Usage:
-        with get_db_session() as (conn, cursor):
-            cursor.execute(...)
-            # Auto-commits on success, auto-rolls back on exception
-    
-    Yields:
-        tuple: (connection, cursor)
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        yield conn, cursor
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise
-    finally:
-        # Note: We don't close the connection here as it's reused within the thread
-        cursor.close()
+def execute_db(query, args=()):
+    """Execute database modification and return last row ID"""
+    db = get_db()
+    cur = db.execute(query, args)
+    db.commit()
+    return cur.lastrowid
 
-
-def close_db_connection(error):
-    """
-    Close the database connection for the current request.
-    Called automatically by Flask after each request.
-    """
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
+# Import app for teardown registration (after app is defined)
+def register_teardown(app):
+    @app.teardown_appcontext
+    def close_db_connection(exception):
+        """Close database connection at end of request"""
+        db = g.pop('db', None)
+        if db is not None:
+            db.close()
 
 def init_db():
     """Initialize database schema"""
