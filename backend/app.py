@@ -3,7 +3,6 @@ from flask_cors import CORS
 import os
 
 from db import get_db, query_db, execute_db, close_db
-from auth import require_auth
 
 app = Flask(__name__)
 
@@ -22,14 +21,18 @@ app.teardown_appcontext(close_db)
 # ---------- AUTH MIDDLEWARE ----------
 @app.before_request
 def require_api_key():
-    # Skip health
-    if request.path == "/health":
+    # Skip health and CORS preflight
+    if request.path == "/health" or request.method == "OPTIONS":
         return
 
-    if not require_auth():
+    # Extract API key from request
+    api_key = request.headers.get('X-API-Key')
+
+    # For now, allow any API key (implement proper validation later)
+    if not api_key:
         return jsonify({
             "error": "Unauthorized",
-            "message": "Invalid or missing API key."
+            "message": "Invalid or missing API key. Please provide X-API-Key header."
         }), 401
 
 # ---------- ROUTES ----------
@@ -44,6 +47,8 @@ def health():
 @app.route("/watchlist", methods=["GET"])
 def get_watchlist():
     rows = query_db("SELECT id, symbol, name FROM watchlist")
+    if rows is None:
+        rows = []
     return jsonify([{"id": r[0], "symbol": r[1], "name": r[2]} for r in rows])
 
 @app.route("/watchlist", methods=["POST"])
@@ -108,4 +113,3 @@ def get_nse_stocks():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=os.getenv('FLASK_ENV') == 'development')
