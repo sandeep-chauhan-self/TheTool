@@ -1,15 +1,28 @@
+# ---- Builder Stage ----
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends gcc
+
+# Install python dependencies
+COPY requirements-prod.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements-prod.txt
+
+
+# ---- Final Stage ----
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Create a non-root user
+RUN useradd --create-home appuser
+USER appuser
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy installed dependencies from builder
+COPY --from=builder /app/wheels /wheels
+RUN pip install --no-cache /wheels/*
 
 # Copy application code
 COPY . .

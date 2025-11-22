@@ -270,6 +270,35 @@ docker-compose up --build
 - Frontend (React SPA)
 - Volume mounts for data persistence
 
+## ?? Production Deployment
+
+In a production environment, you will need to run this application behind a reverse proxy (e.g., Nginx, Apache, or a cloud provider's load balancer). The reverse proxy should be configured to:
+
+1.  Serve the frontend's static files (from the `frontend/build` directory).
+2.  Route all requests to `/api` to the backend service on port 5000.
+
+Here is an example Nginx configuration:
+
+```nginx
+server {
+    listen 80;
+    server_name your_domain.com;
+
+    location / {
+        root   /path/to/your/frontend/build;
+        index  index.html;
+        try_files $uri /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:5000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
 ## ?? Performance
 
 | Scenario | Time | Notes |
