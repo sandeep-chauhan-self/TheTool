@@ -10,7 +10,7 @@ A comprehensive stock analysis system featuring async job processing, real-time 
 
 ![System Demo](docs/images/demo.gif)
 
-## ? Key Features
+## ? Key Features-Testing of Stocks
 
 - ?? **Async Job Processing** - Python threading-based background processing (no Redis required)
 - ?? **12 Technical Indicators** - Trend, momentum, volatility, and volume analysis
@@ -25,7 +25,7 @@ A comprehensive stock analysis system featuring async job processing, real-time 
 
 ### Prerequisites
 
-- **Python 3.11+** ([Download](https://www.python.org/downloads/)) 
+- **Python 3.11+** ([Download](https://www.python.org/downloads/))
 - **Node.js** (bundled in `Prerequisite/node-v20.19.5-win-x64/`)
 
 ### Installation & Running
@@ -50,20 +50,21 @@ cd frontend
 
 ## ?? Documentation
 
-| Document | Description |
-|----------|-------------|
-| **[START_HERE.md](START_HERE.md)** | ?? **Start here!** Complete getting started guide |
-| [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md) | 5-minute quick start guide |
-| [docs/guides/START_NOW.md](docs/guides/START_NOW.md) | Quick test examples |
-| [docs/setup/NO_REDIS_SETUP.md](docs/setup/NO_REDIS_SETUP.md) | Threading architecture explained |
-| [docs/guides/TROUBLESHOOTING.md](docs/guides/TROUBLESHOOTING.md) | Common issues and solutions |
-| [docs/reference/API_TESTING.md](docs/reference/API_TESTING.md) | API endpoints reference |
+| Document                                                      | Description                                            |
+| ------------------------------------------------------------- | ------------------------------------------------------ |
+| **[START_HERE.md](START_HERE.md)**                         | ??**Start here!** Complete getting started guide |
+| [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md)           | 5-minute quick start guide                             |
+| [docs/guides/START_NOW.md](docs/guides/START_NOW.md)             | Quick test examples                                    |
+| [docs/setup/NO_REDIS_SETUP.md](docs/setup/NO_REDIS_SETUP.md)     | Threading architecture explained                       |
+| [docs/guides/TROUBLESHOOTING.md](docs/guides/TROUBLESHOOTING.md) | Common issues and solutions                            |
+| [docs/reference/API_TESTING.md](docs/reference/API_TESTING.md)   | API endpoints reference                                |
 
 **Full Documentation Index:** [docs/INDEX.md](docs/INDEX.md)
 
 ## ?? How It Works
 
 ### 1. Add Stocks to Watchlist
+
 ```javascript
 // Add stocks to track
 POST /watchlist
@@ -71,6 +72,7 @@ POST /watchlist
 ```
 
 ### 2. Analyze Stocks
+
 ```javascript
 // Start async analysis with progress tracking
 POST /analyze  
@@ -81,6 +83,7 @@ POST /analyze
 ```
 
 ### 3. Track Progress
+
 ```javascript
 // Poll for real-time progress updates
 GET /status/abc-123
@@ -95,6 +98,7 @@ GET /status/abc-123
 ```
 
 ### 4. View Results
+
 ```javascript
 // Get analysis results
 GET /report/AAPL
@@ -113,22 +117,26 @@ GET /report/AAPL
 ## ?? Technical Indicators
 
 ### Trend Indicators (4)
+
 - **EMA Crossover** (50/200) - Golden/Death cross signals
 - **MACD** - Moving Average Convergence Divergence
 - **ADX** (14) - Trend strength measurement
 - **Parabolic SAR** - Stop and reverse points
 
 ### Momentum Indicators (4)
+
 - **RSI** (14) - Relative Strength Index
 - **Stochastic** - Overbought/oversold conditions
 - **CCI** (20) - Commodity Channel Index
 - **Williams %R** - Momentum oscillator
 
 ### Volatility Indicators (2)
+
 - **ATR** (14) - Average True Range
 - **Bollinger Bands** - Price envelope analysis
 
 ### Volume Indicators (2)
+
 - **OBV** - On-Balance Volume
 - **Chaikin Money Flow** - Volume-weighted average
 
@@ -150,6 +158,7 @@ GET /report/AAPL
 ### Technology Stack
 
 **Backend:**
+
 - Python 3.13 + Flask 3.0
 - SQLite (job tracking + history)
 - Python threading (async processing)
@@ -157,6 +166,7 @@ GET /report/AAPL
 - yfinance (market data)
 
 **Frontend:**
+
 - React 18.2 + React Router
 - Tailwind CSS (styling)
 - Axios (HTTP client)
@@ -202,6 +212,7 @@ TheTool/
 ## ?? Usage Examples
 
 ### Analyze Single Stock
+
 ```powershell
 $body = @{
     tickers = @('AAPL')
@@ -218,6 +229,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/status/$jobId"
 ```
 
 ### Batch Analysis (Multiple Stocks)
+
 ```powershell
 $body = @{
     tickers = @('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA')
@@ -243,6 +255,7 @@ for($i=0; $i -lt 60; $i++) {
 Create `.env` files in backend and frontend:
 
 **backend/.env:**
+
 ```bash
 DATA_PATH=./data
 LOG_LEVEL=INFO
@@ -250,6 +263,7 @@ FLASK_ENV=development
 ```
 
 **frontend/.env.local:**
+
 ```bash
 REACT_APP_API_URL=http://localhost:5000
 GENERATE_SOURCEMAP=false
@@ -266,6 +280,7 @@ docker-compose up --build
 ```
 
 **docker-compose.yml** includes:
+
 - Backend (Flask API)
 - Frontend (React SPA)
 - Volume mounts for data persistence
@@ -274,8 +289,8 @@ docker-compose up --build
 
 In a production environment, you will need to run this application behind a reverse proxy (e.g., Nginx, Apache, or a cloud provider's load balancer). The reverse proxy should be configured to:
 
-1.  Serve the frontend's static files (from the `frontend/build` directory).
-2.  Route all requests to `/api` to the backend service on port 5000.
+1. Serve the frontend's static files (from the `frontend/build` directory).
+2. Route all requests to `/api` to the backend service on port 5000.
 
 Here is an example Nginx configuration:
 
@@ -301,14 +316,15 @@ server {
 
 ## ?? Performance
 
-| Scenario | Time | Notes |
-|----------|------|-------|
-| Single stock (demo) | ~3-5s | Fast testing mode |
-| Single stock (live) | ~10-15s | With network fetch |
-| 10 stocks (parallel) | ~40-60s | Background processing |
-| 100 stocks (batch) | ~5-10 min | With progress tracking |
+| Scenario             | Time      | Notes                  |
+| -------------------- | --------- | ---------------------- |
+| Single stock (demo)  | ~3-5s     | Fast testing mode      |
+| Single stock (live)  | ~10-15s   | With network fetch     |
+| 10 stocks (parallel) | ~40-60s   | Background processing  |
+| 100 stocks (batch)   | ~5-10 min | With progress tracking |
 
 **Scaling:**
+
 - Threading approach: Perfect for 1-500 stocks
 - For 1000+ stocks: See `docs/setup/ASYNC_JOBS_SETUP.md` for Redis + Celery setup
 
@@ -329,7 +345,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 ## ?? Acknowledgments
 
 - **Yahoo Finance** - Market data provider
-- **TradingView** - UI/UX inspiration  
+- **TradingView** - UI/UX inspiration
 - **Technical Analysis Library** - Indicator calculations
 
 ## ?? Support

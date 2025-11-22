@@ -102,6 +102,10 @@ def ensure_scheduler():
 jobs = {}
 MAX_THREADS = min(10, (os.cpu_count() or 1) * 2)
 
+@app.route("/")
+def index():
+    return {"status": "ok", "message": "Your Railway app is running!"}
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
