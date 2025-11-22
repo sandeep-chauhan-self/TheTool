@@ -92,8 +92,11 @@ logger.info("SECURITY: API authentication enabled for all endpoints")
 logger.info("=" * 60)
 
 # Initialize database (lightweight operation)
-from database import init_db, get_db_connection
+from database import init_db, get_db_connection, close_db_connection
 init_db()
+
+# Register database teardown function
+app.teardown_appcontext(close_db_connection)
 
 # Start background scheduler (lazy - will be imported on first use)
 _scheduler_started = False

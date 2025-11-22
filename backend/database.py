@@ -1,7 +1,7 @@
 import sqlite3
 import os
-import threading
 from contextlib import contextmanager
+from flask import g
 from config import config
 
 # CRITICAL FIX (ISSUE_019): Use centralized configuration
@@ -12,36 +12,32 @@ DB_LOCK_TIMEOUT = 30.0  # seconds - timeout for lock acquisition
 DB_WAL_MODE = 'WAL'     # Write-Ahead Logging for better concurrency
 DB_SYNC_MODE = 'NORMAL' # Balance safety and performance
 
-# Thread-local storage for database connections
-_thread_local = threading.local()
-
 def get_db_connection():
     """
-    Get thread-safe database connection.
-    Creates a new connection per thread and reuses it within that thread.
-    
-    CRITICAL FIX (ISSUE_010):
-    SQLite connections CANNOT be shared across threads. This implementation
-    ensures each thread gets its own connection instance using thread-local storage.
-    
+    Get request-scoped database connection.
+    Creates a new connection per Flask request using Flask's 'g' object.
+
+    CRITICAL FIX: Thread-local storage doesn't work across Gunicorn workers (processes).
+    Using Flask's g object ensures each HTTP request gets a fresh connection.
+
     Returns:
-        sqlite3.Connection: Thread-local database connection
+        sqlite3.Connection: Request-scoped database connection
     """
-    # Check if current thread already has a connection
-    if not hasattr(_thread_local, 'connection') or _thread_local.connection is None:
-        # Create new connection for this thread
+    # Check if current request already has a connection
+    if 'db' not in g:
+        # Create new connection for this request
         conn = sqlite3.connect(
             DB_PATH,
-            check_same_thread=False,  # We handle thread safety ourselves
+            check_same_thread=False,  # Allow multi-threading (Gunicorn workers)
             timeout=DB_LOCK_TIMEOUT
         )
         conn.row_factory = sqlite3.Row
         # Enable WAL mode for better concurrent read performance
         conn.execute(f'PRAGMA journal_mode={DB_WAL_MODE}')
         conn.execute(f'PRAGMA synchronous={DB_SYNC_MODE}')
-        _thread_local.connection = conn
-    
-    return _thread_local.connection
+        g.db = conn
+
+    return g.db
 
 
 @contextmanager
@@ -71,14 +67,14 @@ def get_db_session():
         cursor.close()
 
 
-def close_thread_connection():
+def close_db_connection(error):
     """
-    Close the database connection for the current thread.
-    Should be called when a thread is finishing its work.
+    Close the database connection for the current request.
+    Called automatically by Flask after each request.
     """
-    if hasattr(_thread_local, 'connection') and _thread_local.connection:
-        _thread_local.connection.close()
-        _thread_local.connection = None
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
 def init_db():
     """Initialize database schema"""
