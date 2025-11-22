@@ -10,6 +10,7 @@ from typing import Union, Tuple
 from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Local modules (keep existing project structure)
 # db.py must expose init_db_if_needed, get_db_connection (or get_db), query_db, execute_db, close_db
@@ -122,6 +123,9 @@ def get_analysis_orchestrator():
 def get_thread_tasks():
     from infrastructure.thread_tasks import start_analysis_job, cancel_job, start_bulk_analysis
     return start_analysis_job, cancel_job, start_bulk_analysis
+
+def _data_root():
+    return Path(__file__).resolve().parent
 
 
 # -------------------------
@@ -573,29 +577,6 @@ def initialize_all_stocks():
         logger.exception("Initialize all stocks error")
         return jsonify({"error": str(e)}), 500
 
-@app.route("/all-stocks", methods=["GET"])
-def get_all_stocks():
-    try:
-        rows = query_db('''SELECT symbol, name, yahoo_symbol, status, score, verdict, entry, stop_loss, target, entry_method, data_source, error_message, created_at, updated_at FROM analysis_results WHERE analysis_source = 'bulk' AND id IN (SELECT MAX(id) FROM analysis_results WHERE analysis_source='bulk' GROUP BY symbol) ORDER BY symbol ASC''')
-        stocks = []
-        for r in rows or []:
-            stocks.append({
-                "symbol": r["symbol"],
-                "name": r["name"],
-                "yahoo_symbol": r["yahoo_symbol"],
-                "status": r["status"],
-                "score": r["score"],
-                "verdict": r["verdict"],
-                "entry": r["entry"],
-                "stop_loss": r["stop_loss"],
-                "target": r["target"],
-                "analyzed_at": r["created_at"],
-                "updated_at": r["updated_at"]
-            })
-        return jsonify({"count": len(stocks), "stocks": stocks})
-    except Exception as e:
-        logger.exception("Get all stocks error")
-        return jsonify({"error": str(e)}), 500
 
 # other routes (history, analyze-all-stocks, progress) should be restored from your older file
 # If you preserved the older file in git, copy/paste the remaining route implementations here.
