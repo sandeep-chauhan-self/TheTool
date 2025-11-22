@@ -40,6 +40,5 @@ USER appuser
 # Expose port
 EXPOSE 5000
 
-# Run with gunicorn
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app", "--workers=2", "--timeout=120"]
-
+# Run with gunicorn (SQLite requires single worker)
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app", "--workers=1", "--timeout=120"]
