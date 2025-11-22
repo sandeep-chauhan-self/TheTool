@@ -1,45 +1,37 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import os
+from db import init_db_if_needed, query_db, execute_db, close_db
 from pathlib import Path
-
-from db import (
-    init_db_if_needed,
-    query_db,
-    execute_db,
-    close_db
-)
+import json
 
 app = Flask(__name__)
 
-# ---------- CORS (Vercel → Railway) ----------
-FRONTEND_URL = "https://the-tool-theta.vercel.app"
-
+# ---------- GLOBAL CORS ----------
 CORS(
     app,
-    resources={r"/*": {"origins": [FRONTEND_URL]}},
+    resources={r"/*": {"origins": ["https://the-tool-theta.vercel.app"]}},
     supports_credentials=False,
     allow_headers=["Content-Type", "X-API-Key", "Authorization"],
     expose_headers=["Content-Type", "X-API-Key"],
 )
 
-# ---------- DB CLOSE ----------
+# Ensure DB connection cleanup
 app.teardown_appcontext(close_db)
 
-# ---------- DB INIT (Gunicorn SAFE) ----------
+# ---------- DB INIT (Gunicorn-safe) ----------
 @app.before_request
-def ensure_db_initialized():
+def ensure_db():
     init_db_if_needed()
 
 
 # ---------- AUTH ----------
 @app.before_request
 def require_api_key():
+    if request.path in ["/health", "/"]:
+        return
     if request.method == "OPTIONS":
         return
-    if request.path == "/health":
-        return
-    
+
     api_key = request.headers.get("X-API-Key")
     if not api_key:
         return jsonify({
@@ -51,7 +43,7 @@ def require_api_key():
 # ---------- ROUTES ----------
 @app.route("/")
 def index():
-    return {"status": "ok", "message": "Railway backend running"}
+    return {"status": "ok", "message": "Backend running"}
 
 @app.route("/health")
 def health():
@@ -62,10 +54,9 @@ def health():
 def get_watchlist():
     rows = query_db("SELECT id, symbol, name FROM watchlist")
     return jsonify([
-        {"id": row["id"], "symbol": row["symbol"], "name": row["name"]}
-        for row in rows
+        {"id": r["id"], "symbol": r["symbol"], "name": r["name"]}
+        for r in rows
     ])
-
 
 @app.route("/watchlist", methods=["POST"])
 def add_watchlist():
@@ -78,18 +69,13 @@ def add_watchlist():
 
     existing = query_db(
         "SELECT id FROM watchlist WHERE symbol = ?",
-        (symbol,),
-        one=True
+        (symbol,), one=True
     )
 
     if existing:
-        return {"error": "Already exists", "already_exists": True}, 409
+        return {"error": "Symbol exists", "already_exists": True}, 409
 
-    execute_db(
-        "INSERT INTO watchlist (symbol, name) VALUES (?, ?)",
-        (symbol, name)
-    )
-
+    execute_db("INSERT INTO watchlist (symbol, name) VALUES (?, ?)", (symbol, name))
     return {"message": "Added", "symbol": symbol}, 201
 
 
@@ -103,16 +89,17 @@ def delete_watchlist():
 
 @app.route("/nse-stocks", methods=["GET"])
 def get_nse_stocks():
+    backend_root = Path(__file__).parent / "backend" / "data"
+
+    json_file = backend_root / "nse_stocks.json"
+    txt_file = backend_root / "nse_stocks.txt"
+
     try:
-        backend_root = Path(__file__).parent
-        file_txt = backend_root / "backend" / "data" / "nse_stocks.txt"
-        file_json = backend_root / "backend" / "data" / "nse_stocks.json"
+        if json_file.exists():
+            return jsonify(json.loads(json_file.read_text()))
 
-        if file_json.exists():
-            return jsonify(json.loads(file_json.read_text()))
-
-        if file_txt.exists():
-            stocks = [x.strip() for x in file_txt.read_text().split("\n") if x.strip()]
+        if txt_file.exists():
+            stocks = [x.strip() for x in txt_file.read_text().split("\n") if x.strip()]
             return jsonify({
                 "count": len(stocks),
                 "stocks": [
@@ -121,7 +108,7 @@ def get_nse_stocks():
                 ]
             })
 
-        return {"error": "NSE stock file not found"}, 404
+        return {"error": "NSE stock file missing"}, 404
 
     except Exception as e:
         return {"error": str(e)}, 500
