@@ -36,12 +36,26 @@ app = Flask(__name__)
 # -------------------------
 CORS(
     app,
-    resources={r"/*": {"origins": config.CORS_ORIGINS if getattr(config, "CORS_ORIGINS", None) else ["https://the-tool-theta.vercel.app"]}},
+    resources={r"/*": {"origins": config.CORS_ORIGINS}},
     supports_credentials=False,
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
     expose_headers=["Content-Type", "X-API-Key"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 )
+
+# -------------------------
+# Global OPTIONS handler for preflight requests
+# -------------------------
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        resp = app.make_default_options_response()
+        headers = resp.headers
+        # Allow the vercel origin
+        headers["Access-Control-Allow-Origin"] = "https://the-tool-theta.vercel.app"
+        headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key, Authorization"
+        headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, PUT, OPTIONS"
+        return resp
 
 # Ensure DB connection closed after request
 app.teardown_appcontext(close_db)
