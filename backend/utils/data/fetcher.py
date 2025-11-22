@@ -57,7 +57,7 @@ MIN_REQUIRED_ROWS = 50  # Minimum rows for meaningful analysis
 
 # Ticker validation constants  
 TICKER_MIN_LENGTH = 1
-TICKER_MAX_LENGTH = 10
+TICKER_MAX_LENGTH = 20
 TICKER_VALID_CHARS_PATTERN = r'^[A-Z0-9.-]+$'  # Alphanumeric, dots, dashes
 
 # Session configuration
@@ -405,7 +405,7 @@ def fetch_ticker_data(
         logger.info(f"Fetching fresh data from Yahoo Finance for {ticker} (timeout: {timeout}s)")
         
         session = _get_session()
-        stock = yf.Ticker(ticker, session=session)
+        stock = yf.Ticker(ticker)
         
         # Try primary period first
         try:

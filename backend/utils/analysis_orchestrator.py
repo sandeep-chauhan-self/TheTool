@@ -518,8 +518,25 @@ class AnalysisOrchestrator:
             trade_params = self.trade_calculator.calculate_trade_parameters(
                 df, score, verdict, capital
             )
-            
-            # Step 5: Format results
+
+            # Step 5: Validate and fix trade parameters
+            result_dict = {
+                'ticker': ticker,
+                'current_price': float(df['Close'].iloc[-1]),
+                'signal': trade_params.get('signal', 'HOLD'),
+                'entry_price': trade_params['entry'],
+                'stop_loss': trade_params['stop'],
+                'target_price': trade_params['target'],
+                'score': score
+            }
+
+            fixed_result, was_fixed, fixes = TradeValidator.validate_and_fix(result_dict)
+            if was_fixed:
+                trade_params['entry'] = fixed_result['entry_price']
+                trade_params['stop'] = fixed_result['stop_loss']
+                trade_params['target'] = fixed_result['target_price']
+
+            # Step 6: Format results
             result = self.result_formatter.format(
                 ticker=ticker,
                 score=score,
@@ -530,7 +547,7 @@ class AnalysisOrchestrator:
                 data_message=data_message,
                 warnings=warnings
             )
-            
+
             return result
             
         except Exception as e:
