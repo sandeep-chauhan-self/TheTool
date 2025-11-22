@@ -29,9 +29,15 @@ app = Flask(__name__)
 # SECURITY FIX (ISSUE_021): Added Authorization header to CORS
 CORS(app, resources={
     r"/*": {
-        "origins": config.CORS_ORIGINS,
+        "origins": [
+            "https://the-tool-theta.vercel.app",  # Production Vercel domain
+            "http://localhost:3000",              # Local development
+            "http://192.168.57.1:3000"            # Network access
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-API-Key"]
+        "allow_headers": ["Content-Type", "Authorization", "X-API-Key"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "X-API-Key"]
     }
 })
 
