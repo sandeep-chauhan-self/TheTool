@@ -306,9 +306,9 @@ def cancel_analysis_job(job_id):
 # ---------- BULK ANALYSIS ROUTES ----------
 @app.route('/all-stocks', methods=['GET'])
 def get_all_stocks():
-    """Get all bulk-analyzed stocks with latest analysis"""
+    """Get all analyzed stocks with latest analysis (both bulk and individual)"""
     try:
-        # Get latest analysis for each unique symbol from bulk analysis
+        # Get latest analysis for each unique symbol from all analyses
         rows = query_db('''
             SELECT
                 symbol,
@@ -320,14 +320,15 @@ def get_all_stocks():
                 stop_loss,
                 target,
                 created_at as analyzed_at,
-                updated_at
+                updated_at,
+                analysis_source
             FROM analysis_results
-            WHERE analysis_source = 'bulk'
-            AND (symbol, created_at) IN (
-                SELECT symbol, MAX(created_at)
+            WHERE analysis_source IN ('bulk', 'watchlist')
+            AND (COALESCE(symbol, ticker), created_at) IN (
+                SELECT COALESCE(symbol, ticker), MAX(created_at)
                 FROM analysis_results
-                WHERE analysis_source = 'bulk'
-                GROUP BY symbol
+                WHERE analysis_source IN ('bulk', 'watchlist')
+                GROUP BY COALESCE(symbol, ticker)
             )
             ORDER BY symbol
         ''')
@@ -344,7 +345,8 @@ def get_all_stocks():
                 "stop_loss": r["stop_loss"],
                 "target": r["target"],
                 "analyzed_at": r["analyzed_at"],
-                "updated_at": r["updated_at"]
+                "updated_at": r["updated_at"],
+                "analysis_source": r["analysis_source"]
             } for r in rows]
 
         return jsonify({
