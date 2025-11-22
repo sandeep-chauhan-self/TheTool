@@ -55,7 +55,7 @@ class Config:
         """Parse CORS origins from comma-separated string"""
         origins_str = os.getenv(
             'CORS_ORIGINS',
-            'http://localhost:3000,http://192.168.57.1:3000'
+            'http://localhost:3000,http://192.168.57.1:3000,https://the-tool-theta.vercel.app'
         )
         return [origin.strip() for origin in origins_str.split(',')]
     
