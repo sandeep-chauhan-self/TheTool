@@ -137,12 +137,15 @@ def analyze_stocks_batch(self, job_id, tickers, indicators=None, capital=100000,
                     logger.debug(f"Job {job_id}: Storing {ticker} results in database")
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    cursor.execute('''
+                    
+                    sql = '''
                         INSERT INTO analysis_results 
                         (ticker, score, verdict, entry, stop_loss, target, entry_method, 
                          data_source, is_demo_data, raw_data, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
+                    '''
+                    
+                    params = (
                         ticker,
                         result['score'],
                         result['verdict'],
@@ -154,7 +157,11 @@ def analyze_stocks_batch(self, job_id, tickers, indicators=None, capital=100000,
                         result.get('is_demo_data', False),
                         str(result.get('indicators', [])),
                         datetime.now().isoformat()
-                    ))
+                    )
+                    
+                    # Convert placeholders for database driver
+                    sql, params = _convert_query_params(sql, params)
+                    cursor.execute(sql, params)
                     conn.commit()
                     conn.close()
                     logger.debug(f"Job {job_id}: {ticker} saved to database")
