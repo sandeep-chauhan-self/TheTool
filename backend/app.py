@@ -81,11 +81,16 @@ def create_app(config_object=None):
                 default_limits=[f"{config.RATE_LIMIT_PER_MINUTE} per minute"],
                 storage_uri="memory://",
             )
+            # Attach limiter to app so it can be accessed via current_app.limiter
+            app.limiter = limiter
             # Log only once in main/non-worker process
             if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
                 logger.info("Rate limiting enabled")
+        else:
+            app.limiter = None
     except ImportError:
         logger.debug("Flask-Limiter not available, skipping rate limiting")
+        app.limiter = None
     
     # Register error handlers (before_request, after_request, error handlers)
     register_error_handlers(app)
