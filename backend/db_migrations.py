@@ -9,7 +9,6 @@ Usage:
   run_migrations()  # Applied automatically on app startup
 """
 
-import sqlite3
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -23,10 +22,16 @@ CURRENT_SCHEMA_VERSION = 2
 
 def get_migration_conn():
     """Get a database connection for migrations"""
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA synchronous=NORMAL')
+    from database import get_db_connection
+    conn = get_db_connection()
+    
+    # Only apply WAL mode for SQLite
+    if config.DATABASE_TYPE == 'sqlite':
+        cursor = conn.cursor()
+        cursor.execute('PRAGMA journal_mode=WAL')
+        cursor.execute('PRAGMA synchronous=NORMAL')
+        conn.commit()
+    
     return conn
 
 

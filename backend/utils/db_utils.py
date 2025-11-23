@@ -8,7 +8,6 @@ Provides:
 - query_builder: SQL query helpers
 """
 
-import sqlite3
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime

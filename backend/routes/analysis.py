@@ -4,7 +4,6 @@ Analysis routes - Ticker analysis, job management, and status tracking
 import uuid
 import json
 import traceback
-import sqlite3
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
 from utils.logger import setup_logger
