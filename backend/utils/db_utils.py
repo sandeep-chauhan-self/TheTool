@@ -13,6 +13,19 @@ from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from database import get_db_connection, query_db, execute_db
 
+# Import database-specific error classes
+try:
+    import sqlite3
+    sqlite3_available = True
+except ImportError:
+    sqlite3_available = False
+
+try:
+    import psycopg2
+    psycopg2_available = True
+except ImportError:
+    psycopg2_available = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,12 +77,20 @@ class JobStateTransactions:
             ))
             logger.info(f"Job {job_id} created atomically")
             return bool(lastrow)
-        except sqlite3.IntegrityError:
-            logger.warning(f"Job {job_id} already exists (duplicate creation attempt)")
-            return False
         except Exception as e:
-            logger.error(f"Failed to create job {job_id}: {e}")
-            return False
+            # Handle both SQLite and PostgreSQL integrity errors
+            error_str = str(e).lower()
+            
+            # Check for duplicate key/constraint violation
+            if 'duplicate' in error_str or 'unique' in error_str or 'already exists' in error_str:
+                logger.warning(f"Job {job_id} already exists (duplicate creation attempt): {e}")
+                return False
+            elif 'constraint' in error_str or 'integrity' in error_str:
+                logger.warning(f"Job {job_id} constraint violation (likely duplicate): {e}")
+                return False
+            else:
+                logger.error(f"Failed to create job {job_id}: {e}")
+                return False
     
     @staticmethod
     def update_job_progress(
