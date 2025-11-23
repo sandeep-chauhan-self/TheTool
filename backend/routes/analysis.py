@@ -18,7 +18,6 @@ from database import query_db, execute_db, get_db_connection
 from models.job_state import get_job_state_manager
 from utils.db_utils import JobStateTransactions, get_job_status
 from utils.schemas import ResponseSchemas, validate_response
-from auth import require_auth
 
 logger = setup_logger()
 bp = Blueprint("analysis", __name__, url_prefix="/api/analysis")
@@ -31,7 +30,6 @@ def get_analyze_ticker():
 
 
 @bp.route("/analyze", methods=["POST"])
-@require_auth
 def analyze():
     """
     Analyze one or more tickers with given capital allocation.
@@ -107,8 +105,7 @@ def analyze():
 
 
 @bp.route("/status/<job_id>", methods=["GET"])
-@require_auth
-def get_status(job_id):
+def get_job_status(job_id):
     """Get status of a specific analysis job"""
     try:
         status = get_job_status(job_id)
@@ -148,7 +145,6 @@ def get_status(job_id):
 
 
 @bp.route("/cancel/<job_id>", methods=["POST"])
-@require_auth
 def cancel_job(job_id):
     """Cancel a running analysis job"""
     try:
@@ -199,7 +195,6 @@ def cancel_job(job_id):
 
 
 @bp.route("/history/<ticker>", methods=["GET"])
-@require_auth
 def get_history(ticker):
     """Get analysis history for a specific ticker"""
     try:
@@ -245,7 +240,6 @@ def get_history(ticker):
 
 
 @bp.route("/report/<ticker>", methods=["GET"])
-@require_auth
 def get_report(ticker):
     """Get detailed analysis report for a ticker"""
     try:
@@ -299,7 +293,6 @@ def get_report(ticker):
 
 
 @bp.route("/report/<ticker>/download", methods=["GET"])
-@require_auth
 def download_report(ticker):
     """Download analysis report as Excel file"""
     try:

@@ -9,7 +9,6 @@ from utils.api_utils import (
     RequestValidator
 )
 from database import query_db, execute_db
-from auth import require_auth
 import json
 
 logger = setup_logger()
@@ -17,7 +16,6 @@ bp = Blueprint("watchlist", __name__, url_prefix="/api/watchlist")
 
 
 @bp.route("", methods=["GET", "POST", "DELETE"])
-@require_auth
 def watchlist():
     """
     Manage user watchlist.

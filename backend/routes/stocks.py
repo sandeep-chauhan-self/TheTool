@@ -9,7 +9,6 @@ from flask import Blueprint, jsonify, request
 from utils.logger import setup_logger
 from utils.api_utils import StandardizedErrorResponse, validate_request, RequestValidator
 from database import query_db, execute_db, get_db_connection
-from auth import require_auth
 from utils.db_utils import JobStateTransactions, get_job_status
 
 logger = setup_logger()
@@ -22,7 +21,6 @@ def _data_root() -> Path:
 
 
 @bp.route("/nse", methods=["GET"])
-@require_auth
 def get_nse_list():
     """Get list of NSE stocks from CSV"""
     try:
@@ -61,7 +59,6 @@ def get_nse_list():
 
 
 @bp.route("/nse-stocks", methods=["GET"])
-@require_auth
 def get_nse_stocks():
     """Get NSE stocks from database"""
     try:
@@ -88,7 +85,6 @@ def get_nse_stocks():
 
 
 @bp.route("/all-stocks", methods=["GET"])
-@require_auth
 def get_all_stocks():
     """Get all analyzed stocks"""
     try:
@@ -133,7 +129,6 @@ def get_all_stocks():
 
 
 @bp.route("/all-stocks/<symbol>/history", methods=["GET"])
-@require_auth
 def get_stock_history(symbol):
     """Get analysis history for a specific stock"""
     try:
@@ -169,7 +164,6 @@ def get_stock_history(symbol):
 
 
 @bp.route("/analyze-all-stocks", methods=["POST"])
-@require_auth
 def analyze_all_stocks():
     """
     Start bulk analysis of multiple stocks.
@@ -279,7 +273,6 @@ def analyze_all_stocks():
 
 
 @bp.route("/all-stocks/progress", methods=["GET"])
-@require_auth
 def get_all_stocks_progress():
     """Get progress of bulk analysis jobs"""
     try:
@@ -336,7 +329,6 @@ def get_all_stocks_progress():
 
 
 @bp.route("/initialize-all-stocks", methods=["POST"])
-@require_auth
 def initialize_all_stocks():
     """
     Initialize database with all NSE stocks.
