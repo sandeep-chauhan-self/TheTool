@@ -1,19 +1,29 @@
-import sqlite3
 import os
+import sqlite3
 from flask import g
 from config import config
 
-# CRITICAL FIX: Proper Flask + SQLite pattern for Gunicorn multi-worker environment
+# Database type detection
 DB_PATH = config.DB_PATH
+DATABASE_TYPE = config.DATABASE_TYPE
+
+# Import PostgreSQL support if needed
+if DATABASE_TYPE == 'postgres':
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
 
 def get_db():
     """Get database connection for current request"""
     if 'db' not in g:
-        g.db = sqlite3.connect(DB_PATH, check_same_thread=False)
-        g.db.row_factory = sqlite3.Row
-        # Enable WAL mode for better concurrency
-        g.db.execute('PRAGMA journal_mode=WAL')
-        g.db.execute('PRAGMA synchronous=NORMAL')
+        if DATABASE_TYPE == 'postgres':
+            g.db = psycopg2.connect(config.DATABASE_URL)
+            g.db.autocommit = False
+        else:
+            g.db = sqlite3.connect(DB_PATH, check_same_thread=False)
+            g.db.row_factory = sqlite3.Row
+            # Enable WAL mode for better concurrency
+            g.db.execute('PRAGMA journal_mode=WAL')
+            g.db.execute('PRAGMA synchronous=NORMAL')
     return g.db
 
 def query_db(query, args=(), one=False):
@@ -34,7 +44,10 @@ def execute_db(query, args=()):
 # Thread-safe database functions for background tasks
 def get_db_connection():
     """Get a new database connection (not Flask g-based)"""
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+    if DATABASE_TYPE == 'postgres':
+        return psycopg2.connect(config.DATABASE_URL)
+    else:
+        return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 
 def get_db_session():
@@ -44,10 +57,10 @@ def get_db_session():
     @contextmanager
     def session():
         conn = get_db_connection()
-        conn.row_factory = sqlite3.Row
-        # Enable WAL mode for better concurrency
-        conn.execute('PRAGMA journal_mode=WAL')
-        conn.execute('PRAGMA synchronous=NORMAL')
+        if DATABASE_TYPE == 'sqlite':
+            conn.row_factory = sqlite3.Row
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA synchronous=NORMAL')
         try:
             yield conn, conn.cursor()
             conn.commit()
@@ -74,7 +87,15 @@ def register_teardown(app):
             db.close()
 
 def init_db():
-    """Initialize database schema"""
+    """Initialize database schema for both SQLite and PostgreSQL"""
+    if DATABASE_TYPE == 'postgres':
+        _init_postgres_db()
+    else:
+        _init_sqlite_db()
+
+
+def _init_sqlite_db():
+    """Initialize SQLite database schema"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = get_db_connection()
@@ -153,7 +174,90 @@ def init_db():
     conn.close()
     
     # Use print for startup feedback (before logger is initialized)
-    print("Database initialized successfully")
+    print("SQLite database initialized successfully")
+
+
+def _init_postgres_db():
+    """Initialize PostgreSQL database schema"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Watchlist table (with user_id for future multi-user support)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS watchlist (
+                id SERIAL PRIMARY KEY,
+                symbol TEXT UNIQUE NOT NULL,
+                name TEXT,
+                user_id INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Analysis results table (UNIFIED - stores all analysis from watchlist AND bulk)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_results (
+                id SERIAL PRIMARY KEY,
+                ticker TEXT NOT NULL,
+                symbol TEXT,
+                name TEXT,
+                yahoo_symbol TEXT,
+                score REAL NOT NULL,
+                verdict TEXT NOT NULL,
+                entry REAL,
+                stop_loss REAL,
+                target REAL,
+                entry_method TEXT,
+                data_source TEXT,
+                is_demo_data BOOLEAN DEFAULT FALSE,
+                raw_data TEXT,
+                status TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP,
+                analysis_source TEXT
+            )
+        ''')
+        
+        # Job tracking table for async tasks
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_jobs (
+                job_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                progress INTEGER DEFAULT 0,
+                total INTEGER DEFAULT 0,
+                completed INTEGER DEFAULT 0,
+                successful INTEGER DEFAULT 0,
+                errors TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP
+            )
+        ''')
+        
+        # Create indexes for faster queries on unified analysis_results table
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_ticker ON analysis_results(ticker)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON analysis_results(created_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_ticker_created ON analysis_results(ticker, created_at DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol ON analysis_results(symbol)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_yahoo_symbol ON analysis_results(yahoo_symbol)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_status ON analysis_results(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_source ON analysis_results(analysis_source)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_created ON analysis_results(symbol, created_at DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_source_symbol ON analysis_results(analysis_source, symbol)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON analysis_results(updated_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
+        
+        conn.commit()
+        print("PostgreSQL database initialized successfully")
+    except Exception as e:
+        conn.rollback()
+        print(f"ERROR initializing PostgreSQL database: {e}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):

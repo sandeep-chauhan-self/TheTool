@@ -3,6 +3,9 @@ Flask==3.0.0
 Flask-CORS==4.0.0
 python-dotenv==1.0.0
 
+# Database Support
+psycopg2-binary==2.9.9
+
 # Data Fetching & Processing
 yfinance==0.2.66
 pandas>=2.2.3

@@ -37,7 +37,14 @@ class Config:
     
     # Railway support: Postgres via DATABASE_URL env var (REQUIRED for persistence on Railway)
     # Local development: SQLite at ./data/trading_app.db
-    DATABASE_URL = os.getenv('DATABASE_URL', None)
+    _raw_database_url = os.getenv('DATABASE_URL', None)
+    
+    # Fix PostgreSQL URL format (Railway might use postgres:// instead of postgresql://)
+    if _raw_database_url and _raw_database_url.startswith('postgres://'):
+        DATABASE_URL = _raw_database_url.replace('postgres://', 'postgresql://', 1)
+    else:
+        DATABASE_URL = _raw_database_url
+    
     DATABASE_TYPE = 'postgres' if DATABASE_URL else 'sqlite'
     
     # SQLite configuration (local development only)
