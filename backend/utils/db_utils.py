@@ -115,6 +115,7 @@ class JobStateTransactions:
         Update job progress atomically.
         
         Calculates progress percentage automatically.
+        Uses fresh connection to avoid transaction issues.
         
         Args:
             job_id: Job identifier
@@ -125,29 +126,34 @@ class JobStateTransactions:
         Returns:
             True if updated successfully
         """
+        from database import get_db_session, _convert_query_params
+        
         try:
-            # Get job to calculate progress
-            job = query_db(
-                'SELECT total FROM analysis_jobs WHERE job_id = ?',
-                (job_id,),
-                one=True
-            )
-            if not job:
-                logger.warning(f"Job {job_id} not found for progress update")
-                return False
-            
-            total = job[0]
-            progress = int((completed / total) * 100) if total > 0 else 0
-            errors_json = '[]' if not errors else str(errors)
-            
-            now = datetime.now().isoformat()
-            execute_db('''
-                UPDATE analysis_jobs
-                SET completed = ?, successful = ?, progress = ?, errors = ?, updated_at = ?
-                WHERE job_id = ?
-            ''', (completed, successful, progress, errors_json, now, job_id))
-            
-            return True
+            with get_db_session() as (conn, cursor):
+                # Get job total first
+                query = 'SELECT total FROM analysis_jobs WHERE job_id = ?'
+                query, params = _convert_query_params(query, (job_id,))
+                cursor.execute(query, params)
+                job = cursor.fetchone()
+                
+                if not job:
+                    logger.warning(f"Job {job_id} not found for progress update")
+                    return False
+                
+                total = job[0]
+                progress = int((completed / total) * 100) if total > 0 else 0
+                errors_json = '[]' if not errors else str(errors)
+                
+                now = datetime.now().isoformat()
+                query = '''
+                    UPDATE analysis_jobs
+                    SET completed = ?, successful = ?, progress = ?, errors = ?, updated_at = ?
+                    WHERE job_id = ?
+                '''
+                query, params = _convert_query_params(query, (completed, successful, progress, errors_json, now, job_id))
+                cursor.execute(query, params)
+                
+                return True
         except Exception as e:
             logger.error(f"Failed to update job {job_id} progress: {e}")
             return False
@@ -160,6 +166,8 @@ class JobStateTransactions:
         """
         Mark a job as completed.
         
+        Uses fresh connection to avoid transaction issues.
+        
         Args:
             job_id: Job identifier
             status: Final status ('completed', 'cancelled', 'failed')
@@ -167,16 +175,21 @@ class JobStateTransactions:
         Returns:
             True if marked successfully
         """
+        from database import get_db_session, _convert_query_params
+        
         try:
-            now = datetime.now().isoformat()
-            execute_db('''
-                UPDATE analysis_jobs
-                SET status = ?, completed_at = ?, updated_at = ?
-                WHERE job_id = ?
-            ''', (status, now, now, job_id))
-            
-            logger.info(f"Job {job_id} marked as {status}")
-            return True
+            with get_db_session() as (conn, cursor):
+                now = datetime.now().isoformat()
+                query = '''
+                    UPDATE analysis_jobs
+                    SET status = ?, completed_at = ?, updated_at = ?
+                    WHERE job_id = ?
+                '''
+                query, params = _convert_query_params(query, (status, now, now, job_id))
+                cursor.execute(query, params)
+                
+                logger.info(f"Job {job_id} marked as {status}")
+                return True
         except Exception as e:
             logger.error(f"Failed to mark job {job_id} as {status}: {e}")
             return False
@@ -209,25 +222,32 @@ class ResultInsertion:
         """
         Insert an analysis result atomically.
         
+        Uses fresh connection to avoid transaction issues.
+        
         Returns:
             Row ID if inserted, None if failed
         """
+        from database import get_db_session, _convert_query_params
+        
         try:
-            now = datetime.now().isoformat()
-            lastrow = execute_db('''
-                INSERT INTO analysis_results
-                (ticker, symbol, name, yahoo_symbol, score, verdict,
-                 entry, stop_loss, target, entry_method, data_source,
-                 is_demo_data, raw_data, status, error_message,
-                 created_at, updated_at, analysis_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                ticker, symbol, name, yahoo_symbol, score, verdict,
-                entry, stop_loss, target, entry_method, data_source,
-                is_demo_data, raw_data, status, error_message,
-                now, now, analysis_source
-            ))
-            return lastrow
+            with get_db_session() as (conn, cursor):
+                now = datetime.now().isoformat()
+                query = '''
+                    INSERT INTO analysis_results
+                    (ticker, symbol, name, yahoo_symbol, score, verdict,
+                     entry, stop_loss, target, entry_method, data_source,
+                     is_demo_data, raw_data, status, error_message,
+                     created_at, updated_at, analysis_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                '''
+                query, params = _convert_query_params(query, (
+                    ticker, symbol, name, yahoo_symbol, score, verdict,
+                    entry, stop_loss, target, entry_method, data_source,
+                    is_demo_data, raw_data, status, error_message,
+                    now, now, analysis_source
+                ))
+                cursor.execute(query, params)
+                return True  # PostgreSQL doesn't return lastrowid
         except Exception as e:
             logger.error(f"Failed to insert result for {symbol}: {e}")
             return None
