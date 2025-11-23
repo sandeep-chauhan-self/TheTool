@@ -15,10 +15,10 @@ import sys
 DATABASE_URL = os.getenv('DATABASE_URL', '')
 DATABASE_TYPE = os.getenv('DATABASE_TYPE', 'postgres')
 
-print(f"\n{'='*60}")
-print(f"Database Migration: Add Constraints & Indices")
+print("\n" + "="*60)
+print("Database Migration: Add Constraints & Indices")
 print(f"Database Type: {DATABASE_TYPE}")
-print(f"{'='*60}\n")
+print("="*60 + "\n")
 
 if DATABASE_TYPE == 'postgres' or DATABASE_URL:
     # Try to import psycopg2

@@ -23,6 +23,7 @@ Usage:
 """
 
 import os
+import urllib.parse
 from typing import Dict, Literal
 from enum import Enum
 
@@ -306,11 +307,25 @@ class REDIS_CONFIG:
     
     @staticmethod
     def get_host() -> str:
-        """Get Redis host"""
+        """
+        Get Redis host.
+        
+        Extracts hostname from REDIS_URL if present, otherwise uses REDIS_HOST env var.
+        
+        Returns:
+            str: Redis hostname
+        """
         if redis_url := os.getenv('REDIS_URL'):
-            # Extract host from URL (redis://host:port/db)
-            # For now, return default - proper parsing would be needed
+            # Parse Redis URL to extract hostname (redis://host:port/db)
+            try:
+                parsed = urllib.parse.urlparse(redis_url)
+                if parsed.hostname:
+                    return parsed.hostname
+            except (ValueError, AttributeError):
+                pass
+            # Fall back to REDIS_HOST if parsing fails
             return os.getenv('REDIS_HOST', 'localhost')
+        
         return os.getenv('REDIS_HOST', 'localhost')
     
     @staticmethod

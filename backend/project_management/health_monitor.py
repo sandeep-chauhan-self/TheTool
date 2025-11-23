@@ -39,6 +39,32 @@ class HealthStatus(Enum):
     UNKNOWN = "unknown"
 
 
+def _get_worst_status(status1: 'HealthStatus', status2: 'HealthStatus') -> 'HealthStatus':
+    """
+    Return the most severe (worst) of two health statuses.
+    
+    Severity order (worst to best): UNHEALTHY > DEGRADED > HEALTHY > UNKNOWN
+    
+    Args:
+        status1: First status
+        status2: Second status
+    
+    Returns:
+        The more severe status
+    """
+    status_order = {
+        HealthStatus.UNHEALTHY: 3,
+        HealthStatus.DEGRADED: 2,
+        HealthStatus.HEALTHY: 1,
+        HealthStatus.UNKNOWN: 0
+    }
+    
+    score1 = status_order.get(status1, 0)
+    score2 = status_order.get(status2, 0)
+    
+    return status1 if score1 >= score2 else status2
+
+
 @dataclass
 class HealthCheck:
     """
@@ -78,13 +104,19 @@ class HealthCheck:
             self.last_check = datetime.now()
             self.error_message = None
             
-            # Determine status
+            # Determine status from response time (latency-based)
             if elapsed_ms > self.threshold_ms * 2:
-                self.status = HealthStatus.UNHEALTHY
+                latency_status = HealthStatus.UNHEALTHY
             elif elapsed_ms > self.threshold_ms:
-                self.status = HealthStatus.DEGRADED
+                latency_status = HealthStatus.DEGRADED
             else:
-                self.status = result.get('status', HealthStatus.HEALTHY)
+                latency_status = HealthStatus.HEALTHY
+            
+            # Get status from check result
+            result_status = result.get('status', HealthStatus.HEALTHY)
+            
+            # Combine: use the worst (most severe) of the two statuses
+            self.status = _get_worst_status(latency_status, result_status)
             
             return {
                 'name': self.name,

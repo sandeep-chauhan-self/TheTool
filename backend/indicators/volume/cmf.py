@@ -78,7 +78,11 @@ class CMFIndicator(VolumeIndicator):
         mfm = ((df['Close'] - df['Low']) - (df['High'] - df['Close'])) / range_vals
         mfv = mfm * df['Volume']
         
-        cmf = mfv.rolling(window=period).sum() / df['Volume'].rolling(window=period).sum()
+        # Compute rolling volume sum and guard against zero/near-zero division
+        rolling_vol_sum = df['Volume'].rolling(window=period).sum()
+        safe_vol_sum = rolling_vol_sum.replace(0, np.nan)  # Replace zeros with NaN to avoid Inf
+        
+        cmf = mfv.rolling(window=period).sum() / safe_vol_sum
         
         result = float(cmf.iloc[-1])
         

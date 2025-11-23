@@ -11,6 +11,7 @@ Provides significant performance improvements through data reuse.
 import hashlib
 import pickle
 import time
+import json
 from typing import Optional, Any, Callable
 from datetime import timedelta
 from functools import wraps
@@ -330,6 +331,13 @@ def cached(
         cache_type: Type of cache ("ticker", "indicator", "analysis")
         ttl_seconds: Custom TTL in seconds (uses default if None)
     """
+    # Map cache_type to CacheConfig attribute names
+    TTL_MAPPING = {
+        "ticker": "TICKER_DATA_TTL",
+        "indicator": "INDICATOR_RESULT_TTL",
+        "analysis": "ANALYSIS_RESULT_TTL",
+    }
+    
     def decorator(func: Callable) -> Callable:
         nonlocal cache_layer
         if cache_layer is None:
@@ -337,12 +345,36 @@ def cached(
         
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Generate cache key from function name and arguments
+            # Generate cache key from function name and arguments with deterministic serialization
             key_parts = [func.__name__]
-            key_parts.extend(str(arg) for arg in args)
-            key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
             
-            cache_key = f"{CacheConfig.KEY_PREFIX}:{cache_type}:" + ":".join(key_parts)
+            # Serialize args deterministically
+            for arg in args:
+                try:
+                    # Try JSON serialization first (deterministic)
+                    serialized = json.dumps(arg, separators=(',', ':'), sort_keys=True, default=str)
+                except (TypeError, ValueError):
+                    # Fall back to repr for non-JSON-serializable objects
+                    serialized = repr(arg)
+                key_parts.append(serialized)
+            
+            # Serialize kwargs deterministically
+            for k, v in sorted(kwargs.items()):
+                try:
+                    serialized = json.dumps(v, separators=(',', ':'), sort_keys=True, default=str)
+                except (TypeError, ValueError):
+                    serialized = repr(v)
+                key_parts.append(f"{k}={serialized}")
+            
+            # Build cache key with deterministic separator
+            key_base = f"{CacheConfig.KEY_PREFIX}:{cache_type}:" + "||".join(key_parts)
+            
+            # If key is too long, use hash instead
+            if len(key_base) > 255:
+                key_hash = hashlib.sha256(key_base.encode()).hexdigest()
+                cache_key = f"{CacheConfig.KEY_PREFIX}:{cache_type}:{key_hash}"
+            else:
+                cache_key = key_base
             
             # Try cache
             cached_result = cache_layer._get(cache_key)
@@ -352,8 +384,9 @@ def cached(
             # Compute
             result = func(*args, **kwargs)
             
-            # Cache result
-            ttl = ttl_seconds or getattr(CacheConfig, f"{cache_type.upper()}_TTL", 300)
+            # Determine TTL using mapping with fallback
+            ttl_attr = TTL_MAPPING.get(cache_type, "ANALYSIS_RESULT_TTL")
+            ttl = ttl_seconds or getattr(CacheConfig, ttl_attr, 300)
             cache_layer._set(cache_key, result, ttl)
             
             return result

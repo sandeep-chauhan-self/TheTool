@@ -544,27 +544,30 @@ class RedisJobStateManager(JobStateManager):
                 deserialized[key] = None
                 continue
             
+            # Strip whitespace to handle stored values with leading/trailing spaces
+            value_str = value.strip()
+            
             # Try to parse as JSON (for dicts/lists)
             try:
-                if value.startswith('{') or value.startswith('['):
-                    deserialized[key] = json.loads(value)
+                if value_str.startswith('{') or value_str.startswith('['):
+                    deserialized[key] = json.loads(value_str)
                     continue
             except json.JSONDecodeError:
                 pass
             
             # Try to parse as number
             try:
-                if '.' in value:
-                    deserialized[key] = float(value)
+                if '.' in value_str:
+                    deserialized[key] = float(value_str)
                 else:
-                    deserialized[key] = int(value)
+                    deserialized[key] = int(value_str)
                 continue
             except ValueError:
                 pass
             
             # Try to parse as boolean
-            if value.lower() in ('true', 'false'):
-                deserialized[key] = value.lower() == 'true'
+            if value_str.lower() in ('true', 'false'):
+                deserialized[key] = value_str.lower() == 'true'
                 continue
             
             # Keep as string

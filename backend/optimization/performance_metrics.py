@@ -45,8 +45,10 @@ class PerformanceMetrics:
     @property
     def speedup(self) -> Optional[float]:
         """Calculate speedup vs baseline (set externally)"""
-        if hasattr(self, '_baseline_time') and self._baseline_time > 0:
-            return self._baseline_time / self.wall_time
+        baseline_time = getattr(self, '_baseline_time', 0)
+        wall_time = getattr(self, 'wall_time', 0)
+        if baseline_time > 0 and wall_time > 0:
+            return baseline_time / wall_time
         return None
     
     def set_baseline(self, baseline_time: float) -> None:

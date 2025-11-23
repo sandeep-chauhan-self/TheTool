@@ -50,6 +50,10 @@ class ThreadSafeLRUCache:
         self.default_ttl = default_ttl
         self._cache: OrderedDict[str, Tuple[Any, float]] = OrderedDict()
         self._lock = threading.RLock()
+        # Secondary index: ticker_upper -> set of cache keys for precise invalidation
+        self._ticker_index: Dict[str, set] = {}
+        # Metadata per cache key: key_hash -> (ticker_upper, indicator_lower)
+        self._key_metadata: Dict[str, Tuple[str, str]] = {}
         self._hits = 0
         self._misses = 0
         self._evictions = 0
@@ -123,20 +127,40 @@ class ThreadSafeLRUCache:
         key = self._generate_key(ticker, indicator, **params)
         ttl = ttl or self.default_ttl
         expiry = time.time() + ttl
+        ticker_upper = ticker.upper()
+        indicator_lower = indicator.lower()
         
         with self._lock:
             # Add or update entry
             self._cache[key] = (value, expiry)
             self._cache.move_to_end(key)
             
+            # Update secondary index for precise invalidation
+            if ticker_upper not in self._ticker_index:
+                self._ticker_index[ticker_upper] = set()
+            self._ticker_index[ticker_upper].add(key)
+            
+            # Store metadata: key -> (ticker_upper, indicator_lower)
+            self._key_metadata[key] = (ticker_upper, indicator_lower)
+            
             # Evict oldest if over size limit
             if len(self._cache) > self.max_size:
-                self._cache.popitem(last=False)
+                evicted_key = self._cache.popitem(last=False)[0]
                 self._evictions += 1
+                
+                # Clean up secondary index and metadata for evicted key
+                if evicted_key in self._key_metadata:
+                    evicted_ticker, _ = self._key_metadata[evicted_key]
+                    if evicted_ticker in self._ticker_index:
+                        self._ticker_index[evicted_ticker].discard(evicted_key)
+                        # Remove ticker from index if its set is empty
+                        if not self._ticker_index[evicted_ticker]:
+                            del self._ticker_index[evicted_ticker]
+                    del self._key_metadata[evicted_key]
     
     def invalidate(self, ticker: str, indicator: Optional[str] = None):
         """
-        Invalidate cache entries for a ticker.
+        Invalidate cache entries for a ticker using precise key tracking.
         
         Args:
             ticker: Stock ticker symbol
@@ -145,24 +169,49 @@ class ThreadSafeLRUCache:
         ticker_upper = ticker.upper()
         
         with self._lock:
-            # Find keys to remove
-            keys_to_remove = []
-            for key in self._cache.keys():
-                # Check if key matches ticker (this is approximate, but safe)
-                if ticker_upper in key:
-                    if indicator is None:
-                        keys_to_remove.append(key)
-                    elif indicator.lower() in key:
-                        keys_to_remove.append(key)
+            # Look up exact set of keys for this ticker in the index
+            if ticker_upper not in self._ticker_index:
+                # Ticker not in index, nothing to invalidate
+                return
             
-            # Remove keys
+            keys_to_remove = []
+            
+            if indicator is None:
+                # Invalidate all indicators for this ticker
+                keys_to_remove = list(self._ticker_index[ticker_upper])
+            else:
+                # Invalidate only matching indicator
+                indicator_lower = indicator.lower()
+                for key in self._ticker_index[ticker_upper]:
+                    if key in self._key_metadata:
+                        _, stored_indicator = self._key_metadata[key]
+                        # Exact match on indicator name
+                        if stored_indicator == indicator_lower:
+                            keys_to_remove.append(key)
+            
+            # Delete each key from cache and index
             for key in keys_to_remove:
-                del self._cache[key]
+                if key in self._cache:
+                    del self._cache[key]
+                
+                # Remove from ticker index
+                if ticker_upper in self._ticker_index:
+                    self._ticker_index[ticker_upper].discard(key)
+                
+                # Remove metadata
+                if key in self._key_metadata:
+                    del self._key_metadata[key]
+            
+            # Clean up ticker entry if its set is now empty
+            if ticker_upper in self._ticker_index and not self._ticker_index[ticker_upper]:
+                del self._ticker_index[ticker_upper]
     
     def clear(self):
         """Clear all cache entries"""
         with self._lock:
             self._cache.clear()
+            self._ticker_index.clear()
+            self._key_metadata.clear()
             self._hits = 0
             self._misses = 0
             self._evictions = 0
@@ -183,7 +232,9 @@ class ThreadSafeLRUCache:
                 'misses': self._misses,
                 'evictions': self._evictions,
                 'hit_rate': round(hit_rate * 100, 2),
-                'enabled': config.CACHE_ENABLED
+                'enabled': config.CACHE_ENABLED,
+                'ticker_index_size': len(self._ticker_index),
+                'indexed_tickers': list(self._ticker_index.keys())
             }
 
 

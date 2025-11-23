@@ -186,7 +186,6 @@ def calculate(data, period=ST_DEFAULT_PERIOD, multiplier=ST_DEFAULT_MULTIPLIER):
         # Step 6: Get current values
         current_supertrend = supertrend[-1]
         current_trend = trend_direction[-1]
-        current_close = close[-1]
         
         # Step 7: Detect signal (trend change)
         signal = 'HOLD'

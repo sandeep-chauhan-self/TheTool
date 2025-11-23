@@ -9,8 +9,8 @@ Components:
 - Batch Operations: Bulk database operations
 """
 
-from performance.cache import CacheLayer, CacheConfig, InMemoryCache
-from performance.parallel import ParallelIndicatorEngine
+from .cache import CacheLayer, CacheConfig, InMemoryCache
+from .parallel import ParallelIndicatorEngine
 
 __all__ = [
     'CacheLayer',

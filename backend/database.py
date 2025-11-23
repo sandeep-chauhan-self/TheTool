@@ -1,11 +1,23 @@
 import os
 import sqlite3
+import logging
+import time
 from flask import g
 from config import config
+
+# Setup module logger
+logger = logging.getLogger(__name__)
 
 # Database type detection
 DB_PATH = config.DB_PATH
 DATABASE_TYPE = config.DATABASE_TYPE
+
+# Module-level initialization status flag
+db_initialized = False
+
+# Retry configuration
+DB_INIT_MAX_ATTEMPTS = 3
+DB_INIT_BACKOFF_BASE = 2  # seconds (exponential backoff: 2, 4, 8)
 
 # Import PostgreSQL support if needed
 if DATABASE_TYPE == 'postgres':
@@ -175,16 +187,126 @@ def register_teardown(app):
             db.close()
 
 def init_db():
-    """Initialize database schema for both SQLite and PostgreSQL"""
-    try:
-        if DATABASE_TYPE == 'postgres':
-            _init_postgres_db()
-        else:
-            _init_sqlite_db()
-    except Exception as e:
-        print(f"WARNING: Database initialization encountered an issue: {e}")
-        # Don't re-raise - allow app to continue; may retry on next startup or request
-        # This is important for multi-worker deployments where one worker may initialize first
+    """
+    Initialize database schema for both SQLite and PostgreSQL with retry logic.
+    
+    Implements exponential backoff for transient failures (connection timeouts, 
+    temporary unavailability). Re-raises critical non-transient errors immediately
+    (authentication failures, invalid credentials, configuration errors).
+    
+    Sets module-level db_initialized flag on success for other code to check.
+    
+    Raises:
+        Exception: For critical non-transient errors (auth failures, config errors)
+    """
+    global db_initialized
+    
+    logger.info(f"Initializing {DATABASE_TYPE} database (max {DB_INIT_MAX_ATTEMPTS} attempts with {DB_INIT_BACKOFF_BASE}s backoff base)")
+    
+    last_error = None
+    
+    for attempt in range(1, DB_INIT_MAX_ATTEMPTS + 1):
+        try:
+            if DATABASE_TYPE == 'postgres':
+                _init_postgres_db()
+            else:
+                _init_sqlite_db()
+            
+            # Success: set initialization flag and log
+            db_initialized = True
+            logger.info(f"Database initialization successful on attempt {attempt}")
+            return
+        
+        except (ConnectionError, TimeoutError, OSError, sqlite3.OperationalError) as e:
+            # Transient failures: connection timeouts, temporary unavailability
+            last_error = e
+            if attempt < DB_INIT_MAX_ATTEMPTS:
+                backoff_seconds = DB_INIT_BACKOFF_BASE ** (attempt - 1)
+                logger.warning(
+                    f"Transient database error on attempt {attempt}/{DB_INIT_MAX_ATTEMPTS}: {type(e).__name__}: {e}. "
+                    f"Retrying in {backoff_seconds}s..."
+                )
+                time.sleep(backoff_seconds)
+            else:
+                logger.error(
+                    f"Database initialization failed after {DB_INIT_MAX_ATTEMPTS} attempts due to transient errors. "
+                    f"Last error: {type(e).__name__}: {e}"
+                )
+                db_initialized = False
+                raise
+        
+        except (psycopg2.OperationalError if DATABASE_TYPE == 'postgres' else Exception) as e:
+            # PostgreSQL connection errors (transient)
+            if DATABASE_TYPE == 'postgres' and 'could not connect' in str(e).lower():
+                last_error = e
+                if attempt < DB_INIT_MAX_ATTEMPTS:
+                    backoff_seconds = DB_INIT_BACKOFF_BASE ** (attempt - 1)
+                    logger.warning(
+                        f"PostgreSQL connection error on attempt {attempt}/{DB_INIT_MAX_ATTEMPTS}: {e}. "
+                        f"Retrying in {backoff_seconds}s..."
+                    )
+                    time.sleep(backoff_seconds)
+                else:
+                    logger.error(
+                        f"Database initialization failed after {DB_INIT_MAX_ATTEMPTS} attempts. "
+                        f"Last error: {e}"
+                    )
+                    db_initialized = False
+                    raise
+            else:
+                # Non-transient error: re-raise immediately
+                _raise_critical_error(e)
+        
+        except Exception as e:
+            # Critical non-transient errors: authentication, configuration, etc.
+            _raise_critical_error(e)
+
+
+def _raise_critical_error(error):
+    """
+    Detect and log critical non-transient database errors, then re-raise.
+    
+    Identifies authentication failures, invalid credentials, configuration errors,
+    and other errors that should cause the app to fail fast rather than retry.
+    
+    Args:
+        error: The exception to analyze and re-raise
+        
+    Raises:
+        The original exception after logging details
+    """
+    global db_initialized
+    db_initialized = False
+    
+    error_str = str(error).lower()
+    error_type = type(error).__name__
+    
+    # Detect critical error patterns
+    critical_patterns = [
+        'password',
+        'authentication',
+        'permission denied',
+        'invalid user',
+        'role does not exist',
+        'could not determine',
+        'unknown database',
+        'access denied',
+        'invalid credentials',
+    ]
+    
+    is_critical = any(pattern in error_str for pattern in critical_patterns)
+    
+    if is_critical or 'psycopg2' in str(type(error).__module__):
+        log_level = logging.CRITICAL if is_critical else logging.ERROR
+        logger.log(
+            log_level,
+            f"CRITICAL database error (non-transient): {error_type}: {error}. "
+            f"Check database credentials and configuration. Failing fast."
+        )
+    else:
+        logger.error(f"Database initialization error: {error_type}: {error}")
+    
+    raise error
 
 
 def _init_sqlite_db():
@@ -266,8 +388,8 @@ def _init_sqlite_db():
     conn.commit()
     conn.close()
     
-    # Use print for startup feedback (before logger is initialized)
-    print("SQLite database initialized successfully")
+    # Use structured logging for initialization feedback
+    logger.debug("SQLite database initialized successfully")
 
 
 def _init_postgres_db():
@@ -346,9 +468,9 @@ def _init_postgres_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
         
         conn.commit()
-        print("PostgreSQL database schema initialized successfully")
+        logger.debug("PostgreSQL database schema initialized successfully")
     except Exception as e:
-        print(f"ERROR initializing PostgreSQL database: {e}")
+        logger.error(f"ERROR initializing PostgreSQL database: {e}")
         if conn:
             try:
                 conn.rollback()
@@ -460,12 +582,14 @@ def init_db_if_needed():
     Returns:
         bool: True if DB already existed, False if newly created
     """
-    db_existed = os.path.exists(DB_PATH)
+    global db_initialized
+    
+    db_existed = os.path.exists(DB_PATH) if DATABASE_TYPE == 'sqlite' else True
     try:
         init_db()
         return db_existed
     except Exception as e:
-        print(f"ERROR: init_db_if_needed failed: {e}")
+        logger.error(f"ERROR: init_db_if_needed failed: {e}")
         raise
 
 
@@ -482,4 +606,4 @@ def close_db(exception=None):
         try:
             db.close()
         except Exception as e:
-            print(f"ERROR closing database: {e}")
+            logger.error(f"ERROR closing database: {e}")

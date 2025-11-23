@@ -23,10 +23,13 @@ def add_postgres_constraints():
         print("   Locally, set it with: export DATABASE_URL='postgresql://user:pass@host/db'")
         return False
     
-    conn = psycopg2.connect(DATABASE_URL)
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
     
     try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        
         print("[PostgreSQL] Adding constraints and indices...")
         
         # ============================================================
@@ -247,10 +250,23 @@ def add_postgres_constraints():
         
     except Exception as e:
         print(f"\n❌ PostgreSQL migration failed: {e}")
-        conn.rollback()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
         raise
     finally:
-        conn.close()
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 
 def run_migration():

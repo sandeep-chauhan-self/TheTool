@@ -81,14 +81,12 @@ class TickerAnalysisRequest(BaseModel):
             # Blacklist dangerous patterns
             dangerous_patterns = [
                 '--', ';', '/*', '*/', 'xp_', 'sp_',
-                '..', '../', '..\\', 'union', 'select', 'drop', 'insert', 'update', 'delete'
+                '..', '../', '..\\'
             ]
             ticker_lower = ticker.lower()
             for pattern in dangerous_patterns:
                 if pattern in ticker_lower:
-                    raise ValueError(f"Ticker contains prohibited pattern: {pattern}")
-            
-            validated.append(ticker)
+                    raise ValueError(f"Ticker contains prohibited pattern: {pattern}")            validated.append(ticker)
         
         return validated
     
