@@ -34,7 +34,11 @@ def create_app(config_object=None):
     Application factory for creating Flask app.
     
     Args:
-        config_object: Optional config object (defaults to config.py)
+        config_object: Optional config object/dict to override defaults.
+                      Accepts:
+                      - Module or class with config attributes (uses app.config.from_object)
+                      - Dict with config keys (uses app.config.update)
+                      - None: uses default config from config module
     
     Returns:
         Flask application instance
@@ -43,20 +47,40 @@ def create_app(config_object=None):
     # Create Flask app
     app = Flask(__name__)
     
-    # Configure app
-    app.config.update(
-        DEBUG=config.DEBUG,
-        TESTING=False,
-        JSON_SORT_KEYS=False,
-        JSONIFY_PRETTYPRINT_REGULAR=True
-    )
+    # Load configuration
+    if config_object is not None:
+        # Load provided config object or dict
+        if isinstance(config_object, dict):
+            app.config.update(config_object)
+        else:
+            # Assume it's a module or class with config attributes
+            app.config.from_object(config_object)
+    else:
+        # Fall back to default config module
+        app.config.update(
+            DEBUG=config.DEBUG,
+            TESTING=False,
+            JSON_SORT_KEYS=False,
+            JSONIFY_PRETTYPRINT_REGULAR=True
+        )
+    
+    # Ensure critical Flask defaults are set if not provided
+    if 'TESTING' not in app.config:
+        app.config['TESTING'] = False
+    if 'JSON_SORT_KEYS' not in app.config:
+        app.config['JSON_SORT_KEYS'] = False
+    if 'JSONIFY_PRETTYPRINT_REGULAR' not in app.config:
+        app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
     
     # Setup logging (idempotent, setup_logger handles deduplication)
     logger = setup_logger()
     
+    # Determine active config for CORS and rate limiting
+    active_config = config_object if isinstance(config_object, dict) else config
+    
     # Configure CORS using centralized configuration
     # config.CORS_ORIGINS uses CORS_CONFIG from constants.py
-    cors_origins = config.CORS_ORIGINS
+    cors_origins = active_config.get('CORS_ORIGINS', config.CORS_ORIGINS) if isinstance(active_config, dict) else getattr(active_config, 'CORS_ORIGINS', config.CORS_ORIGINS)
     
     logger.info(f"CORS enabled for origins: {cors_origins}")
     
@@ -74,11 +98,15 @@ def create_app(config_object=None):
         from flask_limiter import Limiter
         from flask_limiter.util import get_remote_address
         
-        if config.RATE_LIMIT_ENABLED:
+        rate_limit_enabled = active_config.get('RATE_LIMIT_ENABLED', config.RATE_LIMIT_ENABLED) if isinstance(active_config, dict) else getattr(active_config, 'RATE_LIMIT_ENABLED', config.RATE_LIMIT_ENABLED)
+        
+        if rate_limit_enabled:
+            rate_limit_per_minute = active_config.get('RATE_LIMIT_PER_MINUTE', config.RATE_LIMIT_PER_MINUTE) if isinstance(active_config, dict) else getattr(active_config, 'RATE_LIMIT_PER_MINUTE', config.RATE_LIMIT_PER_MINUTE)
+            
             limiter = Limiter(
                 app=app,
                 key_func=get_remote_address,
-                default_limits=[f"{config.RATE_LIMIT_PER_MINUTE} per minute"],
+                default_limits=[f"{rate_limit_per_minute} per minute"],
                 storage_uri="memory://",
             )
             # Attach limiter to app so it can be accessed via current_app.limiter
@@ -98,8 +126,9 @@ def create_app(config_object=None):
     # Initialize database on app startup (CRITICAL for Railway PostgreSQL)
     try:
         init_db()
+        database_type = active_config.get('DATABASE_TYPE', config.DATABASE_TYPE) if isinstance(active_config, dict) else getattr(active_config, 'DATABASE_TYPE', config.DATABASE_TYPE)
         if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
-            logger.info(f"[OK] Database initialized on startup ({config.DATABASE_TYPE.upper()})")
+            logger.info(f"[OK] Database initialized on startup ({database_type.upper()})")
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
     
@@ -132,9 +161,13 @@ def create_app(config_object=None):
     
     # Log initialization only once (main process)
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
-        logger.info(f"Application created - Environment: {config.FLASK_ENV}")
-        logger.info(f"Database: {config.DATABASE_TYPE}")
-        logger.info(f"Debug: {config.DEBUG}")
+        flask_env = active_config.get('FLASK_ENV', config.FLASK_ENV) if isinstance(active_config, dict) else getattr(active_config, 'FLASK_ENV', config.FLASK_ENV)
+        database_type = active_config.get('DATABASE_TYPE', config.DATABASE_TYPE) if isinstance(active_config, dict) else getattr(active_config, 'DATABASE_TYPE', config.DATABASE_TYPE)
+        debug = active_config.get('DEBUG', config.DEBUG) if isinstance(active_config, dict) else getattr(active_config, 'DEBUG', config.DEBUG)
+        
+        logger.info(f"Application created - Environment: {flask_env}")
+        logger.info(f"Database: {database_type}")
+        logger.info(f"Debug: {debug}")
         logger.info(f"CORS Origins: {len(cors_origins)} configured")
     
     return app
