@@ -26,8 +26,38 @@ def get_db():
             g.db.execute('PRAGMA synchronous=NORMAL')
     return g.db
 
+def _convert_query_params(query, args, database_type=None):
+    """
+    Convert SQL query parameters between SQLite (?) and PostgreSQL (%s) formats.
+    
+    This function ensures queries work with both databases by converting
+    SQLite placeholder style (?) to the correct format for the target database.
+    
+    Args:
+        query: SQL query with placeholders
+        args: Tuple of query arguments
+        database_type: 'sqlite' or 'postgres' (auto-detected if None)
+    
+    Returns:
+        (converted_query, args): Query with correct placeholders and args
+    """
+    if database_type is None:
+        database_type = DATABASE_TYPE
+    
+    if database_type == 'postgres':
+        # Convert ? placeholders to %s for PostgreSQL
+        # This is safe as long as ? doesn't appear in string literals
+        converted = query.replace('?', '%s')
+        return converted, args
+    else:
+        # SQLite already uses ?, no conversion needed
+        return query, args
+
+
 def query_db(query, args=(), one=False):
     """Query database and return results"""
+    # Convert query parameters for current database
+    query, args = _convert_query_params(query, args)
     cur = get_db().execute(query, args)
     rv = cur.fetchall()
     cur.close()
@@ -35,6 +65,8 @@ def query_db(query, args=(), one=False):
 
 def execute_db(query, args=()):
     """Execute database modification and return last row ID"""
+    # Convert query parameters for current database
+    query, args = _convert_query_params(query, args)
     db = get_db()
     cur = db.execute(query, args)
     db.commit()
@@ -70,6 +102,31 @@ def get_db_session():
         finally:
             conn.close()
     return session()
+
+
+def execute_query(query, args=(), fetch_one=False):
+    """
+    Execute a database query using correct parameter style for current database.
+    
+    Converts SQLite-style (?) placeholders to PostgreSQL-style (%s) automatically.
+    Useful for standalone queries outside of Flask request context.
+    
+    Args:
+        query: SQL query with ? placeholders
+        args: Tuple of query arguments
+        fetch_one: If True, return single row; if False, return all rows
+    
+    Returns:
+        Query result (single row, all rows, or None)
+    """
+    query, args = _convert_query_params(query, args)
+    
+    with get_db_session() as (conn, cursor):
+        cursor.execute(query, args)
+        if fetch_one:
+            return cursor.fetchone()
+        else:
+            return cursor.fetchall()
 
 
 def close_thread_connection():
@@ -299,7 +356,7 @@ def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):
     with get_db_session() as (conn, cursor):
         if ticker:
             # Cleanup by ticker (watchlist-style, backward compatible)
-            cursor.execute('''
+            query = '''
                 DELETE FROM analysis_results
                 WHERE ticker = ?
                 AND id NOT IN (
@@ -308,10 +365,12 @@ def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):
                     ORDER BY created_at DESC
                     LIMIT ?
                 )
-            ''', (ticker, ticker, keep_last))
+            '''
+            query, args = _convert_query_params(query, (ticker, ticker, keep_last))
+            cursor.execute(query, args)
         elif symbol:
             # Cleanup by symbol (bulk analysis style, preferred for unified table)
-            cursor.execute('''
+            query = '''
                 DELETE FROM analysis_results
                 WHERE symbol = ?
                 AND id NOT IN (
@@ -320,14 +379,18 @@ def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):
                     ORDER BY created_at DESC
                     LIMIT ?
                 )
-            ''', (symbol, symbol, keep_last))
+            '''
+            query, args = _convert_query_params(query, (symbol, symbol, keep_last))
+            cursor.execute(query, args)
         else:
             # Cleanup all symbols (works for both ticker and symbol)
-            cursor.execute('SELECT DISTINCT COALESCE(symbol, ticker) FROM analysis_results')
+            query = 'SELECT DISTINCT COALESCE(symbol, ticker) FROM analysis_results'
+            query, args = _convert_query_params(query, ())
+            cursor.execute(query, args)
             identifiers = [row[0] for row in cursor.fetchall()]
             
             for identifier in identifiers:
-                cursor.execute('''
+                delete_query = '''
                     DELETE FROM analysis_results
                     WHERE (symbol = ? OR ticker = ?)
                     AND id NOT IN (
@@ -336,7 +399,9 @@ def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):
                         ORDER BY created_at DESC
                         LIMIT ?
                     )
-                ''', (identifier, identifier, identifier, identifier, keep_last))
+                '''
+                delete_query, delete_args = _convert_query_params(delete_query, (identifier, identifier, identifier, identifier, keep_last))
+                cursor.execute(delete_query, delete_args)
         
         deleted = cursor.rowcount
     

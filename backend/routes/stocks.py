@@ -344,10 +344,7 @@ def get_all_stocks_progress():
     """Get progress of bulk analysis jobs"""
     try:
         # Get all non-completed jobs
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
+        jobs_rows = query_db("""
             SELECT job_id, status, total, completed, successful, errors
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
@@ -362,7 +359,7 @@ def get_all_stocks_progress():
         total_analyzing = 0
         total_errors = 0
         
-        for row in cursor.fetchall():
+        for row in jobs_rows:
             try:
                 errors_list = json.loads(row[5]) if row[5] else []
             except (json.JSONDecodeError, TypeError):
@@ -387,9 +384,6 @@ def get_all_stocks_progress():
             total_successful += row[4]
             total_analyzing += row[2] - row[3]  # pending = total - completed
             total_errors += len(errors_list)
-        
-        cursor.close()
-        conn.close()
         
         # Calculate overall progress
         is_analyzing = len(jobs) > 0
@@ -453,15 +447,12 @@ def get_all_analysis_results():
             per_page = 50
         
         # Get total count
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM analysis_results WHERE status = 'completed'")
-        total = cursor.fetchone()[0]
+        total_result = query_db("SELECT COUNT(*) FROM analysis_results WHERE status = 'completed'", one=True)
+        total = total_result[0] if total_result else 0
         
         # Get paginated results
         offset = (page - 1) * per_page
-        cursor.execute("""
+        rows = query_db("""
             SELECT id, ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, created_at
             FROM analysis_results
             WHERE status = 'completed'
@@ -470,7 +461,7 @@ def get_all_analysis_results():
         """, (per_page, offset))
         
         results = []
-        for row in cursor.fetchall():
+        for row in rows:
             results.append({
                 "id": row[0],
                 "ticker": row[1],
@@ -484,9 +475,6 @@ def get_all_analysis_results():
                 "target": row[9],
                 "created_at": row[10]
             })
-        
-        cursor.close()
-        conn.close()
         
         logger.info(f"[RESULTS] Retrieved {len(results)} analysis results (page {page})")
         
@@ -553,62 +541,60 @@ def initialize_all_stocks():
         logger.info(f"Initializing {len(normalized_stocks)} stocks from CSV")
         
         # Check for existing data
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM analysis_results")
-        existing_bulk_count = cursor.fetchone()[0]
+        existing_count_result = query_db("SELECT COUNT(*) FROM analysis_results", one=True)
+        existing_bulk_count = existing_count_result[0] if existing_count_result else 0
         
         if existing_bulk_count > 0 and not force:
-            cursor.close()
-            conn.close()
             return jsonify({
                 "message": "Stocks already initialized",
                 "exists": True,
                 "hint": "Use force=true to reinitialize"
             }), 200
         
-        # Insert stocks
-        inserted = 0
-        skipped_duplicates = 0
-        other_errors = []
-        
-        for stock in normalized_stocks:
-            try:
-                ticker = stock["ticker"]
-                
-                # Check if exists
-                cursor.execute(
-                    "SELECT id FROM analysis_results WHERE ticker = ? LIMIT 1",
-                    (ticker,)
-                )
-                if cursor.fetchone():
-                    skipped_duplicates += 1
-                    continue
-                
-                # Insert stock
-                cursor.execute(
-                    """
-                    INSERT INTO analysis_results (ticker, symbol, verdict, score, status)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (ticker, stock.get("symbol", ""), "HOLD", 0.0, "initialized")
-                )
-                inserted += 1
-                
-            except Exception as e:
-                other_errors.append(str(e))
-                if len(other_errors) > 100:
-                    break
-        
+        # Insert stocks using database abstraction
+        from database import get_db_connection, _convert_query_params
+        conn = get_db_connection()
         try:
+            cursor = conn.cursor()
+            inserted = 0
+            skipped_duplicates = 0
+            other_errors = []
+            
+            for stock in normalized_stocks:
+                try:
+                    ticker = stock["ticker"]
+                    
+                    # Check if exists - use parameterized query
+                    check_query = "SELECT id FROM analysis_results WHERE ticker = ? LIMIT 1"
+                    check_query, check_args = _convert_query_params(check_query, (ticker,))
+                    cursor.execute(check_query, check_args)
+                    if cursor.fetchone():
+                        skipped_duplicates += 1
+                        continue
+                    
+                    # Insert stock with parameterized query
+                    insert_query = """
+                        INSERT INTO analysis_results (ticker, symbol, verdict, score, status)
+                        VALUES (?, ?, ?, ?, ?)
+                    """
+                    insert_query, insert_args = _convert_query_params(insert_query, (
+                        ticker, stock.get("symbol", ""), "HOLD", 0.0, "initialized"
+                    ))
+                    cursor.execute(insert_query, insert_args)
+                    inserted += 1
+                    
+                except Exception as e:
+                    other_errors.append(str(e))
+                    if len(other_errors) > 100:
+                        break
+            
             conn.commit()
-        except Exception as e:
+        except Exception as db_error:
             conn.rollback()
-            logger.error(f"DB commit failed: {e}")
-            return jsonify({"error": "DB commit failed", "details": str(e)}), 500
-        
-        conn.close()
+            logger.error(f"DB operation failed: {db_error}")
+            return jsonify({"error": "DB operation failed", "details": str(db_error)}), 500
+        finally:
+            conn.close()
         
         # Final response
         total_candidates = len(normalized_stocks)
