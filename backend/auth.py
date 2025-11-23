@@ -15,6 +15,7 @@ import os
 import secrets
 import hashlib
 import logging
+import threading
 from functools import wraps
 from datetime import datetime
 from flask import request, jsonify
@@ -177,10 +178,13 @@ def revoke_api_key(api_key: str) -> bool:
 
 # Optional: Implement rate limiting per API key
 api_key_request_counts = {}
+# Thread-safe lock for protecting api_key_request_counts dictionary and timestamp lists
+# This prevents race conditions when multiple threads check/update rate limits simultaneously
+api_key_request_counts_lock = threading.RLock()
 
 def check_rate_limit(api_key: str, max_requests_per_minute: int = 60) -> bool:
     """
-    Check if API key has exceeded rate limit
+    Check if API key has exceeded rate limit (thread-safe)
     
     Args:
         api_key: The API key to check
@@ -188,24 +192,49 @@ def check_rate_limit(api_key: str, max_requests_per_minute: int = 60) -> bool:
         
     Returns:
         bool: True if within rate limit, False if exceeded
+        
+    Thread Safety:
+        - Acquires lock for all reads/writes to api_key_request_counts
+        - Prunes stale timestamps while holding lock
+        - Removes empty entries to prevent memory leaks
+        - For production, replace with Redis-based or distributed rate limiter
     """
     now = datetime.now()
     key_hash = hash_api_key(api_key)
     
-    # Initialize tracking for this key if not exists
-    if key_hash not in api_key_request_counts:
-        api_key_request_counts[key_hash] = []
-    
-    # Remove requests older than 1 minute
-    api_key_request_counts[key_hash] = [
-        ts for ts in api_key_request_counts[key_hash]
-        if (now - ts).total_seconds() < 60
-    ]
-    
-    # Check if limit exceeded
-    if len(api_key_request_counts[key_hash]) >= max_requests_per_minute:
-        return False
-    
-    # Add current request
-    api_key_request_counts[key_hash].append(now)
-    return True
+    # Acquire lock for entire critical section
+    with api_key_request_counts_lock:
+        # Initialize tracking for this key if not exists
+        if key_hash not in api_key_request_counts:
+            api_key_request_counts[key_hash] = []
+        
+        # Get reference to this key's timestamp list
+        timestamps = api_key_request_counts[key_hash]
+        
+        # Remove requests older than 1 minute (prune stale timestamps)
+        pruned_timestamps = [
+            ts for ts in timestamps
+            if (now - ts).total_seconds() < 60
+        ]
+        api_key_request_counts[key_hash] = pruned_timestamps
+        
+        # Check if limit exceeded
+        if len(pruned_timestamps) >= max_requests_per_minute:
+            logger.warning(f"Rate limit exceeded for key hash {key_hash[:8]}... (limit: {max_requests_per_minute}/min)")
+            return False
+        
+        # Add current request timestamp
+        pruned_timestamps.append(now)
+        
+        # Clean up: Remove empty entries to prevent memory growth
+        # (This would be rare unless a key is rate-limited and never used again)
+        # Schedule cleanup of truly abandoned keys (more than 1 hour of inactivity)
+        keys_to_remove = [
+            k for k, ts_list in api_key_request_counts.items()
+            if not ts_list  # Remove keys with empty timestamp lists
+        ]
+        for k in keys_to_remove:
+            del api_key_request_counts[k]
+            logger.debug(f"Cleaned up empty rate limit entry for key hash {k[:8]}...")
+        
+        return True

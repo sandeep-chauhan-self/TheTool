@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Progress Tracker - Monitor refactoring project progress
 
@@ -407,7 +408,7 @@ class ProgressTracker:
         lines.append("-" * 80)
         for phase in self.phases.values():
             progress = phase.get_progress()
-            status = "? COMPLETE" if phase.is_complete() else "? IN PROGRESS"
+            status = "✓ COMPLETE" if phase.is_complete() else "⏳ IN PROGRESS"
             lines.append(f"{phase.name}: {progress['percentage']:.1f}% {status}")
             lines.append(f"  Tasks: {progress['completed']}/{progress['total']}")
             lines.append(f"  Effort: {progress['completed_effort']:.1f}/{progress['total_effort']:.1f} days")
@@ -420,7 +421,7 @@ class ProgressTracker:
             lines.append("BLOCKED TASKS:")
             lines.append("-" * 80)
             for task in blocked:
-                lines.append(f"? {task.name} (Phase: {task.phase})")
+                lines.append(f"⚠️  {task.name} (Phase: {task.phase})")
                 lines.append(f"  Reason: {task.blocked_reason}")
                 lines.append("")
         
@@ -430,7 +431,7 @@ class ProgressTracker:
             lines.append("READY TO START:")
             lines.append("-" * 80)
             for task in ready[:5]:  # Show top 5
-                lines.append(f"? {task.name} (Phase: {task.phase}, {task.effort_days} days)")
+                lines.append(f"▶️  {task.name} (Phase: {task.phase}, {task.effort_days} days)")
             if len(ready) > 5:
                 lines.append(f"  ... and {len(ready) - 5} more")
             lines.append("")
@@ -440,7 +441,7 @@ class ProgressTracker:
             lines.append("MILESTONES:")
             lines.append("-" * 80)
             for milestone in self.milestones:
-                status = "?" if milestone.is_achieved else "?"
+                status = "✓" if milestone.is_achieved else "⏱️ "
                 date = milestone.achieved_date or milestone.target_date
                 lines.append(f"{status} {milestone.name} ({date.strftime('%Y-%m-%d')})")
             lines.append("")
