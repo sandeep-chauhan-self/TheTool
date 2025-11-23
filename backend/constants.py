@@ -397,6 +397,32 @@ def validate_urls() -> tuple[bool, list[str]]:
     return len(messages) == 0, messages
 
 
+
+
+# =============================================================================
+# TRADING STRATEGY CONFIGURATION CONSTANTS
+# =============================================================================
+
+# Breakout Strategy - Technical Indicator Periods
+DEFAULT_LOOKBACK_PERIOD = 20           # Bars to analyze for consolidation
+DEFAULT_ATR_PERIOD = 14                # Average True Range period
+DEFAULT_EMA_PERIOD = 12                # Exponential Moving Average period
+
+# Breakout Strategy - Trade Parameters
+DEFAULT_VOLUME_FACTOR = 1.25           # Volume must be > average * this factor
+DEFAULT_ATR_MULTIPLIER = 1.0           # Stop loss buffer in ATR multiples
+DEFAULT_RISK_REWARD_RATIO = 2.0        # Target = risk * this ratio
+DEFAULT_ENTRY_OFFSET_PCT = 0.5         # Entry offset as % above/below breakout
+MIN_CONSOLIDATION_PCT = 2.0            # Min 2% range for valid consolidation
+
+# Technical Indicator Thresholds
+RSI_NEUTRAL_THRESHOLD = 50             # RSI threshold for directional bias
+RSI_OVERBOUGHT_THRESHOLD = 70          # RSI overbought level
+RSI_OVERSOLD_THRESHOLD = 30            # RSI oversold level
+MACD_SIGNAL_THRESHOLD = 0              # MACD must cross signal line
+SUPERTREND_SENSITIVITY = 3.0           # Supertrend multiplier for ATR
+
+
 # =============================================================================
 # INITIALIZATION & DEBUGGING
 # =============================================================================

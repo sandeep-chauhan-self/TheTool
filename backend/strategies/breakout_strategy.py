@@ -8,7 +8,7 @@ with multiple confirmation filters including volume, Supertrend, RSI, and MACD.
 Entry/Exit Logic:
 - Consolidation: Identifies support (min lows) and resistance (max highs) over rolling window
 - Breakout: Price closes above resistance (bullish) or below support (bearish)
-- Volume: Requires volume > average volume × 1.25 for confirmation
+- Volume: Requires volume > average volume ï¿½ 1.25 for confirmation
 - Supertrend Filter: Only takes trades aligned with Supertrend direction
 - RSI Filter: BULLISH requires RSI > 50, BEARISH requires RSI < 50
 - MACD Filter: BULLISH requires MACD > Signal, BEARISH requires MACD < Signal
@@ -18,7 +18,7 @@ Entry/Exit Logic:
 
 Configuration:
 - Lookback period: 20 bars (configurable)
-- Volume factor: 1.25× average (configurable)
+- Volume factor: 1.25ï¿½ average (configurable)
 - ATR multiplier: 1.0 for stop loss (configurable)
 - Supertrend: period=10, multiplier=3 (from indicators)
 - RSI threshold: 50 (configurable)
@@ -37,14 +37,26 @@ import pandas as pd
 import numpy as np
 import logging
 
+from constants import (
+    DEFAULT_LOOKBACK_PERIOD,
+    DEFAULT_ATR_PERIOD,
+    DEFAULT_EMA_PERIOD,
+    DEFAULT_VOLUME_FACTOR,
+    DEFAULT_ATR_MULTIPLIER,
+    DEFAULT_RISK_REWARD_RATIO,
+    DEFAULT_ENTRY_OFFSET_PCT,
+    MIN_CONSOLIDATION_PCT,
+    RSI_NEUTRAL_THRESHOLD,
+)
+
 logger = logging.getLogger(__name__)
 
 # Strategy configuration (using extracted constants)
 CONFIG = {
     'lookback_period': DEFAULT_LOOKBACK_PERIOD,      # Bars to analyze for consolidation
-    'volume_factor': DEFAULT_VOLUME_FACTOR,          # Volume must be > avg × this factor
-    'atr_multiplier': DEFAULT_ATR_MULTIPLIER,        # Stop loss buffer (ATR × multiplier)
-    'risk_reward_ratio': DEFAULT_RISK_REWARD_RATIO,  # Target = risk × this ratio
+    'volume_factor': DEFAULT_VOLUME_FACTOR,          # Volume must be > avg ï¿½ this factor
+    'atr_multiplier': DEFAULT_ATR_MULTIPLIER,        # Stop loss buffer (ATR ï¿½ multiplier)
+    'risk_reward_ratio': DEFAULT_RISK_REWARD_RATIO,  # Target = risk ï¿½ this ratio
     'entry_offset_pct': DEFAULT_ENTRY_OFFSET_PCT,    # 0.5% above/below breakout close
     'min_consolidation_pct': MIN_CONSOLIDATION_PCT,  # Min 2% range for valid consolidation
     
