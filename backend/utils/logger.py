@@ -1,9 +1,10 @@
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 
 def setup_logger():
-    """Setup application logger with rotation"""
+    """Setup application logger with rotation (idempotent)"""
     log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
     os.makedirs(log_dir, exist_ok=True)
     
@@ -13,6 +14,10 @@ def setup_logger():
     logger = logging.getLogger('trading_analyzer')
     logger.setLevel(getattr(logging, os.getenv('LOG_LEVEL', 'INFO')))
     
+    # Prevent duplicate handlers if logger already configured
+    if logger.hasHandlers():
+        return logger
+    
     # Create rotating file handler (10MB max, keep 5 backups)
     file_handler = RotatingFileHandler(
         log_file,
@@ -20,8 +25,8 @@ def setup_logger():
         backupCount=5
     )
     
-    # Create console handler
-    console_handler = logging.StreamHandler()
+    # Create console handler (explicit stdout to avoid buffering issues)
+    console_handler = logging.StreamHandler(sys.stdout)
     
     # Create formatter
     formatter = logging.Formatter(

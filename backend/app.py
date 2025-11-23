@@ -3,12 +3,12 @@ TheTool - Stock Analysis Application
 Flask application factory with modular blueprint architecture
 """
 import os
-import logging
 import sys
 from pathlib import Path
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -51,17 +51,8 @@ def create_app(config_object=None):
         JSONIFY_PRETTYPRINT_REGULAR=True
     )
     
-    # Setup logging
+    # Setup logging (idempotent, setup_logger handles deduplication)
     logger = setup_logger()
-    logger.setLevel('DEBUG' if config.DEBUG else 'INFO')
-    
-    # Add console handler if not already present
-    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
-        console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.DEBUG if config.DEBUG else logging.INFO)
-        formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
-        console.setFormatter(formatter)
-        logger.addHandler(console)
     
     # Configure CORS
     cors_origins = getattr(config, "CORS_ORIGINS", [
@@ -78,7 +69,7 @@ def create_app(config_object=None):
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     )
     
-    # Configure rate limiting if available
+    # Configure rate limiting if available (log only in main process)
     try:
         from flask_limiter import Limiter
         from flask_limiter.util import get_remote_address
@@ -90,7 +81,9 @@ def create_app(config_object=None):
                 default_limits=[f"{config.RATE_LIMIT_PER_MINUTE} per minute"],
                 storage_uri="memory://",
             )
-            logger.info("Rate limiting enabled")
+            # Log only once in main/non-worker process
+            if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
+                logger.info("Rate limiting enabled")
     except ImportError:
         logger.debug("Flask-Limiter not available, skipping rate limiting")
     
@@ -106,10 +99,12 @@ def create_app(config_object=None):
     # Close database connection
     app.teardown_appcontext(close_db)
     
-    # Run migrations on startup (idempotent, safe in multi-worker)
+    # Run migrations on startup (idempotent, safe in multi-worker; log only once)
     try:
         run_migrations()
-        logger.info("[OK] Database migrations completed")
+        # Log only in main/non-worker process
+        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
+            logger.info("[OK] Database migrations completed")
     except Exception as e:
         logger.warning(f"Migration warning (may already be initialized): {e}")
     
@@ -119,10 +114,12 @@ def create_app(config_object=None):
     app.register_blueprint(watchlist_bp)
     app.register_blueprint(stocks_bp)
     
-    logger.info(f"Application created - Environment: {config.FLASK_ENV}")
-    logger.info(f"Database: {config.DATABASE_TYPE}")
-    logger.info(f"Debug: {config.DEBUG}")
-    logger.info(f"CORS Origins: {len(cors_origins)} configured")
+    # Log initialization only once (main process)
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
+        logger.info(f"Application created - Environment: {config.FLASK_ENV}")
+        logger.info(f"Database: {config.DATABASE_TYPE}")
+        logger.info(f"Debug: {config.DEBUG}")
+        logger.info(f"CORS Origins: {len(cors_origins)} configured")
     
     return app
 
