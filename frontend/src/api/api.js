@@ -13,8 +13,8 @@ const api = axios.create({
   },
 });
 
-export const analyzeStocks = async (tickers, indicators = null) => {
-  const response = await api.post('/api/analysis/analyze', { tickers, indicators });
+export const analyzeStocks = async (tickers, indicators = null, capital = 100000) => {
+  const response = await api.post('/api/analysis/analyze', { tickers, capital, indicators });
   return response.data;
 };
 

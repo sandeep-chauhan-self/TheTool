@@ -138,7 +138,8 @@ function Dashboard() {
       setAnalyzing(true);
       setAnalysisProgress(0);
 
-      const result = await analyzeStocks(selectedStocks);
+      const capital = 100000; // Default capital for analysis
+      const result = await analyzeStocks(selectedStocks, null, capital);
       const newJobId = result.job_id;
       setJobId(newJobId);
       
