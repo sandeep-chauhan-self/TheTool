@@ -12,7 +12,7 @@ import multiprocessing
 import logging
 
 # Basic settings
-bind = f"0.0.0.0:{os.getenv('PORT', 8000)}"
+bind = f"0.0.0.0:{os.getenv('PORT', 5000)}"
 workers = max(2, multiprocessing.cpu_count())
 worker_class = "sync"  # Use sync worker (safer for SQLite/Postgres)
 worker_connections = 1000
