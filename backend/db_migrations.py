@@ -18,7 +18,7 @@ from config import config
 logger = logging.getLogger(__name__)
 
 DB_PATH = config.DB_PATH
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 def get_migration_conn():
@@ -148,6 +148,30 @@ def migration_v1(conn):
     return apply_migration(conn, 1, "Initial unified schema", migration_sql)
 
 
+def migration_v2(conn):
+    """
+    Migration V2: Add ticker and notes columns to watchlist table
+    
+    Adds:
+    - ticker column (copy from symbol for existing rows)
+    - notes column (for user annotations)
+    
+    This migration ensures backward compatibility with routes expecting ticker field.
+    """
+    migration_sql = '''
+    -- Add ticker column if it doesn't exist
+    ALTER TABLE watchlist ADD COLUMN ticker TEXT;
+    
+    -- Add notes column if it doesn't exist
+    ALTER TABLE watchlist ADD COLUMN notes TEXT;
+    
+    -- Copy symbol to ticker for existing rows
+    UPDATE watchlist SET ticker = symbol WHERE ticker IS NULL;
+    '''
+    
+    return apply_migration(conn, 2, "Add ticker and notes to watchlist", migration_sql)
+
+
 def run_migrations():
     """
     Run all pending migrations
@@ -168,6 +192,9 @@ def run_migrations():
         
         if current_version < 1:
             migration_v1(conn)
+        
+        if current_version < 2:
+            migration_v2(conn)
         
         current_version = get_current_version(conn)
         if current_version == CURRENT_SCHEMA_VERSION:
