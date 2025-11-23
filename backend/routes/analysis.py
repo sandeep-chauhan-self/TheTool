@@ -24,27 +24,33 @@ bp = Blueprint("analysis", __name__, url_prefix="/api/analysis")
 
 def _get_active_job_for_tickers(tickers: list) -> dict:
     """
-    Check if an identical or very similar job is already running.
+    Check if an identical job (same tickers) is already running.
     Returns the existing job info or None if safe to create new job.
+    Tickers are normalized (sorted, uppercased) for reliable matching.
     """
     try:
         from datetime import datetime, timedelta
+        
+        # Normalize tickers for comparison: sort and uppercase
+        normalized_tickers = json.dumps(sorted([t.upper().strip() for t in tickers]))
         five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
         
-        active_jobs = query_db("""
+        # Look for exact same tickers in queued/processing jobs from last 5 minutes
+        active_job = query_db("""
             SELECT job_id, status, total, completed, created_at
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
+              AND tickers_json = ?
               AND created_at > ?
             ORDER BY created_at DESC
-            LIMIT 10
-        """, (five_min_ago,))
+            LIMIT 1
+        """, (normalized_tickers, five_min_ago), one=True)
         
-        if not active_jobs:
+        if not active_job:
             return None
         
-        job_id, status, total, completed, created_at = active_jobs[0]
-        logger.info(f"Found active job {job_id} with status {status}")
+        job_id, status, total, completed, created_at = active_job
+        logger.info(f"Found active job {job_id} with status {status} for tickers {tickers}")
         
         return {
             "job_id": job_id,
@@ -54,7 +60,7 @@ def _get_active_job_for_tickers(tickers: list) -> dict:
             "created_at": created_at
         }
     except Exception as e:
-        logger.error(f"Error checking for active jobs: {e}")
+        logger.exception(f"Error checking for active jobs with tickers {tickers}")
         return None
 
 
@@ -129,7 +135,8 @@ def analyze():
                     job_id=job_id,
                     status="queued",
                     total=len(tickers),
-                    description=f"Analyze {len(tickers)} ticker(s) with capital {capital}"
+                    description=f"Analyze {len(tickers)} ticker(s) with capital {capital}",
+                    tickers=tickers
                 )
                 if created:
                     break
@@ -138,7 +145,7 @@ def analyze():
                     import time
                     time.sleep(0.1 * (attempt + 1))
             except Exception as e:
-                logger.error(f"Exception during job creation (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.exception(f"Exception during job creation (attempt {attempt + 1}/{max_retries})")
                 if attempt == max_retries - 1:
                     return StandardizedErrorResponse.format(
                         "JOB_CREATION_FAILED",
@@ -163,7 +170,7 @@ def analyze():
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
-            logger.error(f"Failed to start analysis job {job_id}: {e}")
+            logger.exception(f"Failed to start analysis job {job_id}")
         
         logger.info(f"Analysis job created: {job_id} for {tickers}")
         return jsonify({

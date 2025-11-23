@@ -41,7 +41,8 @@ class JobStateTransactions:
         job_id: str,
         status: str,
         total: int,
-        description: str = ""
+        description: str = "",
+        tickers: Optional[List[str]] = None
     ) -> bool:
         """
         Create a job record atomically.
@@ -54,11 +55,17 @@ class JobStateTransactions:
             status: Initial status (usually 'queued')
             total: Total items to process
             description: Optional job description
+            tickers: List of tickers being analyzed (for duplicate detection)
             
         Returns:
             True if created, False if failed or duplicate
         """
         from database import get_db_session, _convert_query_params, DATABASE_TYPE
+        
+        # Normalize tickers: sort and JSON dump for consistent duplicate detection
+        tickers_json = None
+        if tickers:
+            tickers_json = json.dumps(sorted([t.upper().strip() for t in tickers]))
         
         # Use get_db_session() for proper transaction handling with rollback
         try:
@@ -69,8 +76,8 @@ class JobStateTransactions:
                 query = '''
                     INSERT INTO analysis_jobs 
                     (job_id, status, total, completed, progress, errors,
-                     created_at, updated_at, successful)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     tickers_json, created_at, updated_at, successful)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     job_id,
@@ -79,6 +86,7 @@ class JobStateTransactions:
                     0,  # completed
                     0,  # progress
                     '[]',  # errors
+                    tickers_json,  # normalized tickers
                     now,
                     now,
                     0  # successful

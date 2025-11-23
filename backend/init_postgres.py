@@ -101,6 +101,7 @@ def main():
                 completed INTEGER DEFAULT 0,
                 successful INTEGER DEFAULT 0,
                 errors TEXT,
+                tickers_json TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 started_at TIMESTAMP,
@@ -125,6 +126,7 @@ def main():
             ('idx_source_symbol', 'analysis_results(analysis_source, symbol)'),
             ('idx_updated_at', 'analysis_results(updated_at)'),
             ('idx_job_status', 'analysis_jobs(status)'),
+            ('idx_job_tickers', 'analysis_jobs(tickers_json, status)'),
         ]
         
         for idx_name, idx_def in indexes:
