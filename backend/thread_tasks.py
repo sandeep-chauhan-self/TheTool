@@ -105,7 +105,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         result.get('score', 0),
                         result.get('verdict', 'Neutral'),
                         result.get('entry'),
-                        result.get('stop_loss'),
+                        result.get('stop'),  # Note: key is 'stop' not 'stop_loss'
                         result.get('target'),
                         result.get('entry_method', 'Market Order'),
                         result.get('data_source', 'real'),
@@ -290,7 +290,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 result.get('score', 0),
                 result.get('verdict', 'Neutral'),
                 result.get('entry'),
-                result.get('stop_loss'),
+                result.get('stop'),  # Note: key is 'stop' not 'stop_loss'
                 result.get('target'),
                 result.get('entry_method', 'Market Order'),
                 result.get('data_source', 'real'),
