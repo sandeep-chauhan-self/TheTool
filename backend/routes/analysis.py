@@ -105,7 +105,7 @@ def analyze():
 
 
 @bp.route("/status/<job_id>", methods=["GET"])
-def get_job_status(job_id):
+def get_analysis_job_status(job_id):
     """Get status of a specific analysis job"""
     try:
         status = get_job_status(job_id)
