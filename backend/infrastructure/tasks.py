@@ -4,7 +4,7 @@ Celery Tasks for Background Stock Analysis
 
 from celery_config import celery_app
 from utils.compute_score import analyze_ticker
-from database import get_db_connection, cleanup_old_analyses
+from database import get_db_connection, cleanup_old_analyses, _convert_query_params
 from datetime import datetime
 import logging
 import json
@@ -62,16 +62,20 @@ def analyze_stocks_batch(self, job_id, tickers, indicators=None, capital=100000,
         if status == 'completed' or status == 'failed':
             update_data['completed_at'] = datetime.now().isoformat()
         
-        # Build UPDATE query
+        # Build parameterized UPDATE query
         set_clause = ', '.join([f"{key} = ?" for key in update_data.keys()])
         values = list(update_data.values()) + [job_id]
         
-        cursor.execute(f'''
+        sql = f'''
             UPDATE analysis_jobs
             SET {set_clause}
             WHERE job_id = ?
-        ''', values)
+        '''
         
+        # Convert placeholders for database driver
+        sql, params = _convert_query_params(sql, tuple(values))
+        
+        cursor.execute(sql, params)
         conn.commit()
         conn.close()
     
