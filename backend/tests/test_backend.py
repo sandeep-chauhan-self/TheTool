@@ -5,6 +5,32 @@ Backend Test Script - Verify All Components
 from database import get_db_connection, init_db
 import os
 import json
+import config
+
+def get_table_columns(cursor, table_name):
+    """
+    Get table columns in a database-agnostic way.
+    Returns a set of column names.
+    """
+    try:
+        if config.DATABASE_TYPE == 'postgresql':
+            # PostgreSQL: Query information_schema
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s
+                ORDER BY ordinal_position
+            """, (table_name,))
+            columns = {row[0] for row in cursor.fetchall()}
+        else:
+            # SQLite: Use PRAGMA
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = {row[1] for row in cursor.fetchall()}
+        
+        return columns
+    except Exception as e:
+        print(f"  [ERROR] Failed to get columns for {table_name}: {e}")
+        return set()
 
 print("=" * 60)
 print("BACKEND COMPONENT TEST")
@@ -15,8 +41,17 @@ print("\n[Test 1] Checking Database Tables...")
 try:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    tables = [row[0] for row in cursor.fetchall()]
+    
+    if config.DATABASE_TYPE == 'postgresql':
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+        """)
+        tables = [row[0] for row in cursor.fetchall()]
+    else:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
     
     required_tables = ['watchlist', 'analysis_results', 'analysis_jobs', 'all_stocks_analysis']
     missing = [t for t in required_tables if t not in tables]
@@ -26,6 +61,7 @@ try:
     else:
         print(f"  [PASS] All required tables exist: {required_tables}")
     
+    cursor.close()
     conn.close()
 except Exception as e:
     print(f"  [ERROR] {e}")
@@ -35,12 +71,12 @@ print("\n[Test 2] Checking all_stocks_analysis Table Structure...")
 try:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(all_stocks_analysis)")
-    columns = [row[1] for row in cursor.fetchall()]
     
-    required_columns = ['id', 'symbol', 'name', 'yahoo_symbol', 'status', 'score', 'verdict', 
-                       'entry', 'stop_loss', 'target', 'created_at', 'updated_at']
-    missing_cols = [c for c in required_columns if c not in columns]
+    columns = get_table_columns(cursor, 'all_stocks_analysis')
+    
+    required_columns = {'id', 'symbol', 'name', 'yahoo_symbol', 'status', 'score', 'verdict', 
+                       'entry', 'stop_loss', 'target', 'created_at', 'updated_at'}
+    missing_cols = required_columns - columns
     
     if missing_cols:
         print(f"  [FAIL] Missing columns: {missing_cols}")
@@ -48,6 +84,7 @@ try:
         print(f"  [PASS] All required columns exist")
     
     print(f"  Total columns: {len(columns)}")
+    cursor.close()
     conn.close()
 except Exception as e:
     print(f"  [ERROR] {e}")
@@ -57,14 +94,15 @@ print("\n[Test 3] Checking watchlist Table for user_id...")
 try:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(watchlist)")
-    columns = {row[1]: row[2] for row in cursor.fetchall()}  # name: type
+    
+    columns = get_table_columns(cursor, 'watchlist')
     
     if 'user_id' in columns:
-        print(f"  [PASS] user_id column exists (type: {columns['user_id']})")
+        print(f"  [PASS] user_id column exists")
     else:
         print(f"  [FAIL] user_id column missing")
     
+    cursor.close()
     conn.close()
 except Exception as e:
     print(f"  [ERROR] {e}")
@@ -118,6 +156,7 @@ try:
         for row in cursor.fetchall():
             print(f"    - {row[0]}: {row[1]}")
     
+    cursor.close()
     conn.close()
 except Exception as e:
     print(f"  [ERROR] {e}")
@@ -127,8 +166,17 @@ print("\n[Test 6] Checking Database Indexes...")
 try:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_all_stocks%'")
-    indexes = [row[0] for row in cursor.fetchall()]
+    
+    if config.DATABASE_TYPE == 'postgresql':
+        cursor.execute("""
+            SELECT indexname 
+            FROM pg_indexes 
+            WHERE schemaname = 'public' AND indexname LIKE 'idx_all_stocks%'
+        """)
+        indexes = [row[0] for row in cursor.fetchall()]
+    else:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_all_stocks%'")
+        indexes = [row[0] for row in cursor.fetchall()]
     
     if indexes:
         print(f"  [PASS] Found {len(indexes)} indexes for all_stocks_analysis")
@@ -137,6 +185,7 @@ try:
     else:
         print(f"  [WARN] No indexes found (may affect performance)")
     
+    cursor.close()
     conn.close()
 except Exception as e:
     print(f"  [ERROR] {e}")
