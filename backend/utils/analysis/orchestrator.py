@@ -96,15 +96,46 @@ def export_to_excel(result):
     
     Returns:
         Path to generated Excel file
+    
+    Raises:
+        ValueError: If result dict is missing required keys or has invalid structure
     """
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
     import os
     
+    # Validate top-level required keys
+    required_keys = {'ticker', 'verdict', 'score', 'entry', 'stop', 'target', 'indicators'}
+    missing_keys = required_keys - set(result.keys())
+    if missing_keys:
+        raise ValueError(
+            f"Result dictionary missing required keys: {sorted(missing_keys)}. "
+            f"Required keys: {sorted(required_keys)}"
+        )
+    
+    # Validate 'indicators' is a list
+    if not isinstance(result['indicators'], list):
+        raise ValueError(
+            f"'indicators' must be a list, got {type(result['indicators']).__name__}"
+        )
+    
+    # Validate each indicator has required keys
+    indicator_required_keys = {'name', 'vote', 'confidence', 'category'}
+    for i, indicator in enumerate(result['indicators']):
+        if not isinstance(indicator, dict):
+            raise ValueError(
+                f"Indicator at index {i} must be a dict, got {type(indicator).__name__}"
+            )
+        
+        missing_indicator_keys = indicator_required_keys - set(indicator.keys())
+        if missing_indicator_keys:
+            raise ValueError(
+                f"Indicator at index {i} missing required keys: {sorted(missing_indicator_keys)}. "
+                f"Required keys: {sorted(indicator_required_keys)}"
+            )
+    
     wb = openpyxl.Workbook()
     ws = wb.active
-    if ws is None:
-        raise ValueError("Failed to create worksheet")
     
     ws.title = "Analysis Report"
     
