@@ -50,13 +50,21 @@ def _get_watchlist():
             ORDER BY created_at DESC
         """)
         
+        items_dict = [dict(item) for item in items]
+        logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
+        
+        # Log items with empty ticker for debugging
+        empty_ticker_items = [item for item in items_dict if not item.get('ticker') or item.get('ticker').strip() == '']
+        if empty_ticker_items:
+            logger.warning(f"[WATCHLIST_GET] Found {len(empty_ticker_items)} items with empty ticker: {empty_ticker_items}")
+        
         return jsonify({
-            "watchlist": [dict(item) for item in items],
-            "count": len(items)
+            "watchlist": items_dict,
+            "count": len(items_dict)
         }), 200
         
     except Exception as e:
-        logger.error(f"Failed to get watchlist: {e}")
+        logger.error(f"[WATCHLIST_GET] Failed to get watchlist: {e}")
         return StandardizedErrorResponse.format(
             "WATCHLIST_FETCH_ERROR",
             "Failed to retrieve watchlist",
@@ -70,19 +78,34 @@ def _add_to_watchlist():
     try:
         data = request.get_json() or {}
         
+        logger.info(f"[WATCHLIST_ADD] Incoming request: {data}")
+        
         # Validate request
         validated_data, error_response = validate_request(
             data,
             RequestValidator.WatchlistAddRequest
         )
         if error_response:
+            logger.warning(f"[WATCHLIST_ADD] Validation failed: {error_response}")
             return error_response
         
-        ticker = validated_data.get("ticker", "").strip()
-        symbol = validated_data.get("symbol", "").strip()
-        notes = validated_data.get("notes", "").strip()
+        symbol = validated_data.get("symbol", "").strip().upper()
+        name = validated_data.get("name", "").strip()
+        notes = data.get("notes", "").strip()
         
-        # Check if already exists
+        logger.info(f"[WATCHLIST_ADD] Validated symbol: {symbol}, name: {name}")
+        
+        # Convert symbol to ticker format (add .NS as default exchange)
+        # If symbol already contains an exchange code, use it as-is
+        if '.' in symbol:
+            ticker = symbol
+        else:
+            # Default to .NS (NSE) if no exchange code provided
+            ticker = f"{symbol}.NS"
+        
+        logger.info(f"[WATCHLIST_ADD] Generated ticker: {ticker}")
+        
+        # Check if already exists (search by ticker)
         existing = query_db(
             "SELECT id FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
             (ticker,),
@@ -90,6 +113,7 @@ def _add_to_watchlist():
         )
         
         if existing:
+            logger.warning(f"[WATCHLIST_ADD] Duplicate ticker: {ticker}")
             return StandardizedErrorResponse.format(
                 "WATCHLIST_DUPLICATE",
                 f"Ticker {ticker} already in watchlist",
@@ -105,7 +129,7 @@ def _add_to_watchlist():
             (ticker, symbol, notes)
         )
         
-        logger.info(f"Added {ticker} to watchlist")
+        logger.info(f"[WATCHLIST_ADD] Successfully added - ID: {item_id}, ticker: {ticker}, symbol: {symbol}")
         
         return jsonify({
             "id": item_id,
@@ -116,7 +140,7 @@ def _add_to_watchlist():
         }), 201
         
     except Exception as e:
-        logger.error(f"Failed to add to watchlist: {e}")
+        logger.error(f"[WATCHLIST_ADD] Failed to add to watchlist: {e}")
         return StandardizedErrorResponse.format(
             "WATCHLIST_ADD_ERROR",
             "Failed to add to watchlist",
@@ -130,10 +154,13 @@ def _remove_from_watchlist():
     try:
         data = request.get_json() or {}
         
+        logger.info(f"[WATCHLIST_DELETE] Incoming request: {data}")
+        
         item_id = data.get("id")
         ticker = data.get("ticker")
         
         if not item_id and not ticker:
+            logger.warning("[WATCHLIST_DELETE] No id or ticker provided")
             return StandardizedErrorResponse.format(
                 "INVALID_REQUEST",
                 "Provide either 'id' or 'ticker'",
@@ -148,6 +175,7 @@ def _remove_from_watchlist():
                 one=True
             )
             if not result:
+                logger.warning(f"[WATCHLIST_DELETE] Item {item_id} not found")
                 return StandardizedErrorResponse.format(
                     "WATCHLIST_NOT_FOUND",
                     f"Watchlist item {item_id} not found",
@@ -155,14 +183,14 @@ def _remove_from_watchlist():
                 )
             ticker_name = result['ticker']
             execute_db("DELETE FROM watchlist WHERE id = ?", (item_id,))
+            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, ticker: {ticker_name}")
         else:
             ticker_name = ticker
             execute_db(
                 "DELETE FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
                 (ticker,)
             )
-        
-        logger.info(f"Removed {ticker_name} from watchlist")
+            logger.info(f"[WATCHLIST_DELETE] Removed by ticker: {ticker_name}")
         
         return jsonify({
             "message": "Removed from watchlist",
@@ -170,7 +198,7 @@ def _remove_from_watchlist():
         }), 200
         
     except Exception as e:
-        logger.error(f"Failed to remove from watchlist: {e}")
+        logger.error(f"[WATCHLIST_DELETE] Failed to remove from watchlist: {e}")
         return StandardizedErrorResponse.format(
             "WATCHLIST_DELETE_ERROR",
             "Failed to remove from watchlist",

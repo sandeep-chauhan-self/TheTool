@@ -68,12 +68,12 @@ export const getWatchlist = async () => {
 };
 
 export const addToWatchlist = async (symbol, name = '') => {
-  // Backend expects: ticker (full yahoo symbol), symbol (short symbol), notes (company name)
-  // Frontend passes: symbol (full yahoo_symbol like "20MICRONS.NS"), name (company name)
+  // Backend RequestValidator.WatchlistAddRequest expects: symbol, name (optional)
+  // The backend converts symbol to ticker format (adds .NS if no exchange code)
+  // Frontend passes: symbol (ticker or short symbol), name (company name)
   const response = await api.post('/api/watchlist', { 
-    ticker: symbol,      // Full yahoo symbol like "20MICRONS.NS"
-    symbol: symbol.split('.')[0],  // Short symbol like "20MICRONS"
-    notes: name          // Company name
+    symbol: symbol,      // Can be "RELIANCE" or "RELIANCE.NS"
+    name: name           // Company name (optional)
   });
   return response.data;
 };
