@@ -58,9 +58,21 @@ def query_db(query, args=(), one=False):
     """Query database and return results"""
     # Convert query parameters for current database
     query, args = _convert_query_params(query, args)
-    cur = get_db().execute(query, args)
-    rv = cur.fetchall()
-    cur.close()
+    db = get_db()
+    
+    # Handle both SQLite and PostgreSQL connection types
+    if DATABASE_TYPE == 'postgres':
+        # PostgreSQL: need to create cursor explicitly
+        cur = db.cursor()
+        cur.execute(query, args)
+        rv = cur.fetchall()
+        cur.close()
+    else:
+        # SQLite: can call execute directly on connection
+        cur = db.execute(query, args)
+        rv = cur.fetchall()
+        cur.close()
+    
     return (rv[0] if rv else None) if one else rv
 
 def execute_db(query, args=()):
@@ -68,9 +80,21 @@ def execute_db(query, args=()):
     # Convert query parameters for current database
     query, args = _convert_query_params(query, args)
     db = get_db()
-    cur = db.execute(query, args)
-    db.commit()
-    return cur.lastrowid
+    
+    # Handle both SQLite and PostgreSQL connection types
+    if DATABASE_TYPE == 'postgres':
+        # PostgreSQL: need to create cursor explicitly
+        cur = db.cursor()
+        cur.execute(query, args)
+        db.commit()
+        cur.close()
+        # Note: PostgreSQL doesn't have lastrowid; return None or use RETURNING clause
+        return None
+    else:
+        # SQLite: can call execute directly on connection
+        cur = db.execute(query, args)
+        db.commit()
+        return cur.lastrowid
 
 
 # Thread-safe database functions for background tasks
