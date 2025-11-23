@@ -428,7 +428,6 @@ def analyze(data, indicators_result=None):
         
         # Step 1: Calculate indicators
         atr = calculate_atr(data)
-        ema20 = calculate_ema(data, period=DEFAULT_EMA_PERIOD)
         
         # Step 2: Detect consolidation range
         consolidation = detect_consolidation(data, CONFIG['lookback_period'])
