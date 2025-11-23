@@ -51,14 +51,24 @@ Just redeploy your app and the schema will be created automatically.
 ### Option B: Manual Initialization (If Option A Fails)
 
 1. **Locally (if you have DATABASE_URL):**
+   
+   **Windows (Command Prompt):**
    ```bash
    cd backend
    pip install -r requirements.txt
    set DATABASE_URL=postgresql://postgres:<password>@<host>:<port>/<database>
    python init_postgres.py
    ```
+   
+   **Linux/Mac (Bash/Zsh):**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   export DATABASE_URL=postgresql://postgres:<password>@<host>:<port>/<database>
+   python init_postgres.py
+   ```
 
-2. **Via Railway CLI:**
+2. **Via Railway CLI (works on all platforms):**
    ```bash
    railway login
    railway link  # (select your TheTool project)
