@@ -35,17 +35,23 @@ class Config:
     # DATABASE CONFIGURATION
     # =============================================================================
     
-    # Railway support: Postgres via DATABASE_URL env var
+    # Railway support: Postgres via DATABASE_URL env var (REQUIRED for persistence on Railway)
+    # Local development: SQLite at ./data/trading_app.db
     DATABASE_URL = os.getenv('DATABASE_URL', None)
     DATABASE_TYPE = 'postgres' if DATABASE_URL else 'sqlite'
     
-    # SQLite configuration (local development)
+    # SQLite configuration (local development only)
     DATA_PATH = os.getenv('DATA_PATH', './data')
     DB_NAME = os.getenv('DB_NAME', 'trading_app.db')
     
     @property
     def DB_PATH(self) -> str:
-        """Full path to database file (SQLite only)"""
+        """
+        Full path to database file (SQLite only)
+        
+        IMPORTANT: On Railway, do NOT use SQLite unless you have a persistent volume mounted.
+        Use PostgreSQL instead by setting DATABASE_URL environment variable.
+        """
         return os.path.join(self.DATA_PATH, self.DB_NAME) if self.DATABASE_TYPE == 'sqlite' else None
     
     # =============================================================================
