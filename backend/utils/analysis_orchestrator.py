@@ -538,7 +538,7 @@ class AnalysisOrchestrator:
                 'score': score
             }
 
-            fixed_result, was_fixed, fixes = TradeValidator.validate_and_fix(result_dict)
+            fixed_result, was_fixed, _fixes = TradeValidator.validate_and_fix(result_dict)
             if was_fixed:
                 trade_params['entry'] = fixed_result['entry_price']
                 trade_params['stop'] = fixed_result['stop_loss']
