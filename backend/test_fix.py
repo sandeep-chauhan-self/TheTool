@@ -1,11 +1,20 @@
+"""
+Quick test for single stock analysis
+
+FOLLOW: TheTool.prompt.md Section 9 (Testing Layers & Coverage Goals)
+Uses centralized constants from backend/constants.py for URL configuration.
+"""
 import requests
 import json
 import time
 from database import get_db_connection
+from constants import get_api_base_url, API_URLS
+
+BASE_URL = get_api_base_url()
 
 # Test single stock analysis
 print("Sending analysis request...")
-response = requests.post('http://localhost:5000/analyze', 
+response = requests.post(f'{BASE_URL}{API_URLS.ANALYZE}', 
     json={'tickers': ['RELIANCE.NS'], 'capital': 100000},
     timeout=30)
 
@@ -18,7 +27,7 @@ print(f'\nJob ID: {job_id}')
 # Wait for job to complete
 print("\nWaiting for analysis to complete...")
 for i in range(30):
-    status_response = requests.get(f'http://localhost:5000/status/{job_id}')
+    status_response = requests.get(f'{BASE_URL}{API_URLS.get_status(job_id)}')
     status = status_response.json()
     print(f'Check {i+1}: {status["status"]} - {status["completed"]}/{status["total"]} completed')
     

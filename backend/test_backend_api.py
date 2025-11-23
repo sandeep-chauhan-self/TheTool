@@ -1,11 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 Test backend API endpoints with unified table
+
+FOLLOW: TheTool.prompt.md Section 9 (Testing Layers & Coverage Goals)
+Uses centralized constants from backend/constants.py for URL configuration.
 """
 import requests
 import json
+from constants import get_api_base_url, API_URLS
 
-BASE_URL = "http://localhost:5000"
+BASE_URL = get_api_base_url()
 API_KEY = "_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI"
 
 headers = {

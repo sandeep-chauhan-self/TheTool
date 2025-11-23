@@ -57,6 +57,8 @@ def create_app(config_object=None):
     # Configure CORS
     cors_origins = getattr(config, "CORS_ORIGINS", [
         "https://the-tool-theta.vercel.app",
+        "https://thetool-production.up.railway.app",
+        "http://192.168.57.1:3000",
         "http://localhost:3000"
     ])
     

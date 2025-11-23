@@ -6,11 +6,17 @@ to eliminate hardcoded values throughout the codebase.
 
 All configuration values are read from environment variables with
 sensible defaults for development.
+
+FOLLOW: TheTool.prompt.md Section 2.1 (Application Factory & Configuration)
+- All external service initializations tolerate missing dependencies
+- CORS must list explicit origins; never use wildcard in production
+- Do not embed secrets directly—rely on env variables
 """
 
 import os
 from typing import List
 from dotenv import load_dotenv
+from constants import CORS_CONFIG, REDIS_CONFIG, DATABASE_CONFIG, get_api_base_url
 
 # Load environment variables from .env file
 load_dotenv()
@@ -57,12 +63,13 @@ class Config:
     
     @property
     def CORS_ORIGINS(self) -> List[str]:
-        """Parse CORS origins from comma-separated string"""
-        origins_str = os.getenv(
-            'CORS_ORIGINS',
-            'http://localhost:3000,http://192.168.57.1:3000,https://the-tool-theta.vercel.app'
-        )
-        return [origin.strip() for origin in origins_str.split(',')]
+        """
+        Get CORS allowed origins from centralized constants.
+        
+        Delegates to CORS_CONFIG from constants module for single source of truth.
+        This can be overridden with CORS_ORIGINS environment variable.
+        """
+        return CORS_CONFIG.get_allowed_origins()
     
     # =============================================================================
     # THREADING CONFIGURATION
@@ -108,13 +115,13 @@ class Config:
     # REDIS CONFIGURATION (EVOLUTIONARY_RISK_001 - Message Queue System)
     # =============================================================================
     
-    # Railway support: Redis via REDIS_URL env var
-    REDIS_URL = os.getenv('REDIS_URL', None)
+    # Use centralized Redis configuration from constants module
+    REDIS_URL = REDIS_CONFIG.get_url()
     
     # Fallback to individual host/port config
     REDIS_ENABLED = os.getenv('REDIS_ENABLED', 'False').lower() in ('true', '1', 'yes') or bool(REDIS_URL)
-    REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-    REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
+    REDIS_HOST = REDIS_CONFIG.get_host()
+    REDIS_PORT = REDIS_CONFIG.get_port()
     REDIS_DB = int(os.getenv('REDIS_DB', '0'))
     REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', None)
     REDIS_MAX_CONNECTIONS = int(os.getenv('REDIS_MAX_CONNECTIONS', '50'))

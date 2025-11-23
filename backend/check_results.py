@@ -1,8 +1,15 @@
+"""
+Check analysis results script
+
+FOLLOW: TheTool.prompt.md Section 9 (Testing Layers & Coverage Goals)
+Uses centralized constants from backend/constants.py for URL configuration.
+"""
 import requests
+from constants import get_api_base_url, API_URLS
 
 print('Checking analysis results for all stocks...')
 for ticker in ['21STCENMGM.NS', 'INFY.NS']:
-    response = requests.get(f'http://localhost:5000/history/{ticker}')
+    response = requests.get(f'{get_api_base_url()}{API_URLS.get_history(ticker)}')
     if response.status_code == 200:
         data = response.json()
         if data['history']:

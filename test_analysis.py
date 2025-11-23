@@ -1,10 +1,21 @@
 #!/usr/bin/env python
-"""Test script for analysis backend"""
+"""
+Test script for analysis backend
+
+FOLLOW: TheTool.prompt.md Section 9 (Testing Layers & Coverage Goals)
+Uses centralized constants from backend/constants.py for URL configuration.
+"""
 import requests
 import time
 import json
+import sys
+import os
 
-BASE_URL = 'http://localhost:5000'
+# Add backend to path to import constants
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+from constants import get_api_base_url
+
+BASE_URL = get_api_base_url()
 
 # Test 1: Single stock analysis
 print("=" * 60)
