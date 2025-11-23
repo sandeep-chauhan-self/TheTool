@@ -207,7 +207,7 @@ def get_stock_history(symbol):
             )
         
         results = query_db("""
-            SELECT id, ticker, symbol, analysis_data, created_at, job_id
+            SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at
             FROM analysis_results
             WHERE LOWER(symbol) = LOWER(?)
             ORDER BY created_at DESC
@@ -475,10 +475,10 @@ def initialize_all_stocks():
                 # Insert stock
                 cursor.execute(
                     """
-                    INSERT INTO analysis_results (ticker, symbol, analysis_data, status)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO analysis_results (ticker, symbol, verdict, score, status)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (ticker, stock.get("symbol", ""), "{}", "initialized")
+                    (ticker, stock.get("symbol", ""), "HOLD", 0.0, "initialized")
                 )
                 inserted += 1
                 

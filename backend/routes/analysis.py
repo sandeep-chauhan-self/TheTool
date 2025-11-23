@@ -122,11 +122,12 @@ def get_job_status(job_id):
             try:
                 results = query_db(
                     """
-                    SELECT ticker, symbol, analysis_data 
+                    SELECT ticker, symbol, verdict, score, entry, stop_loss, target, created_at
                     FROM analysis_results 
-                    WHERE job_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT 50
                     """,
-                    (job_id,)
+                    ()
                 )
                 status["results"] = [dict(r) for r in results]
             except Exception as e:
@@ -209,7 +210,7 @@ def get_history(ticker):
         # Query analysis results
         results = query_db(
             """
-            SELECT id, ticker, symbol, analysis_data, created_at, job_id
+            SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -253,7 +254,7 @@ def get_report(ticker):
         # Get latest analysis
         result = query_db(
             """
-            SELECT analysis_data, created_at, job_id
+            SELECT verdict, score, entry, stop_loss, target, created_at
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -270,16 +271,18 @@ def get_report(ticker):
                 404
             )
         
-        try:
-            analysis_data = json.loads(result['analysis_data'])
-        except (json.JSONDecodeError, TypeError):
-            analysis_data = result['analysis_data']
+        analysis_data = {
+            "verdict": result['verdict'],
+            "score": result['score'],
+            "entry": result['entry'],
+            "stop_loss": result['stop_loss'],
+            "target": result['target']
+        }
         
         return jsonify({
             "ticker": ticker,
             "analysis": analysis_data,
-            "created_at": result['created_at'],
-            "job_id": result['job_id']
+            "created_at": result['created_at']
         }), 200
         
     except Exception as e:
@@ -306,7 +309,7 @@ def download_report(ticker):
         # Get latest analysis
         result = query_db(
             """
-            SELECT analysis_data, created_at
+            SELECT verdict, score, entry, stop_loss, target, created_at
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -323,10 +326,13 @@ def download_report(ticker):
                 404
             )
         
-        try:
-            analysis_data = json.loads(result['analysis_data'])
-        except (json.JSONDecodeError, TypeError):
-            analysis_data = result['analysis_data']
+        analysis_data = {
+            "verdict": result['verdict'],
+            "score": result['score'],
+            "entry": result['entry'],
+            "stop_loss": result['stop_loss'],
+            "target": result['target']
+        }
         
         # Export to Excel
         analyze_ticker, export_to_excel = get_analyze_ticker()
