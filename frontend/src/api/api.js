@@ -58,7 +58,8 @@ export const getConfig = async () => {
 
 export const getWatchlist = async () => {
   const response = await api.get('/api/watchlist');
-  return response.data;
+  // The backend returns { count, watchlist }, but we only need the watchlist array
+  return response.data.watchlist || [];
 };
 
 export const addToWatchlist = async (symbol, name = '') => {
