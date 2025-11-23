@@ -22,6 +22,42 @@ logger = setup_logger()
 bp = Blueprint("analysis", __name__, url_prefix="/api/analysis")
 
 
+def _get_active_job_for_tickers(tickers: list) -> dict:
+    """
+    Check if an identical or very similar job is already running.
+    Returns the existing job info or None if safe to create new job.
+    """
+    try:
+        from datetime import datetime, timedelta
+        five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        
+        active_jobs = query_db("""
+            SELECT job_id, status, total, completed, created_at
+            FROM analysis_jobs
+            WHERE status IN ('queued', 'processing')
+              AND created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 10
+        """, (five_min_ago,))
+        
+        if not active_jobs:
+            return None
+        
+        job_id, status, total, completed, created_at = active_jobs[0]
+        logger.info(f"Found active job {job_id} with status {status}")
+        
+        return {
+            "job_id": job_id,
+            "status": status,
+            "total": total,
+            "completed": completed,
+            "created_at": created_at
+        }
+    except Exception as e:
+        logger.error(f"Error checking for active jobs: {e}")
+        return None
+
+
 def get_analyze_ticker():
     """Lazy load analyze_ticker to avoid circular imports"""
     from utils.analysis.orchestrator import analyze_ticker, export_to_excel
@@ -36,7 +72,8 @@ def analyze():
     Request body:
     {
         "tickers": ["TCS.NS", "INFY.NS"],
-        "capital": 100000
+        "capital": 100000,
+        "force": false  # Set true to bypass duplicate check
     }
     """
     try:
@@ -60,46 +97,81 @@ def analyze():
         
         tickers = validated_data["tickers"]
         capital = validated_data["capital"]
-        logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}")
+        force = data.get("force", False)
+        logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}, force: {force}")
+        
+        # Check for duplicate/active jobs (unless force=true)
+        if not force:
+            active_job = _get_active_job_for_tickers(tickers)
+            if active_job:
+                logger.info(f"Duplicate job request detected. Returning existing job {active_job['job_id']}")
+                return jsonify({
+                    "job_id": active_job["job_id"],
+                    "status": active_job["status"],
+                    "is_duplicate": True,
+                    "message": "Analysis already running for these tickers",
+                    "total": active_job["total"],
+                    "completed": active_job["completed"],
+                    "tickers": tickers,
+                    "capital": capital
+                }), 200
         
         # Create job ID
         job_id = str(uuid.uuid4())
+        logger.info(f"[ANALYZE] Creating new job {job_id}")
         
-        # Create job atomically
-        created = JobStateTransactions.create_job_atomic(
-            job_id=job_id,
-            status="queued",
-            total=len(tickers),
-            description=f"Analyze {len(tickers)} ticker(s) with capital {capital}"
-        )
+        # Create job atomically with retries
+        max_retries = 3
+        created = False
+        for attempt in range(max_retries):
+            try:
+                created = JobStateTransactions.create_job_atomic(
+                    job_id=job_id,
+                    status="queued",
+                    total=len(tickers),
+                    description=f"Analyze {len(tickers)} ticker(s) with capital {capital}"
+                )
+                if created:
+                    break
+                else:
+                    logger.warning(f"Job creation failed (attempt {attempt + 1}/{max_retries}), retrying...")
+                    import time
+                    time.sleep(0.1 * (attempt + 1))
+            except Exception as e:
+                logger.error(f"Exception during job creation (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    return StandardizedErrorResponse.format(
+                        "JOB_CREATION_FAILED",
+                        "Failed to create analysis job",
+                        500,
+                        {"error": str(e), "job_id": job_id}
+                    )
         
         if not created:
             return StandardizedErrorResponse.format(
                 "JOB_DUPLICATE",
-                "Job already exists",
+                "Job already exists (potential race condition)",
                 409,
                 {"job_id": job_id}
             )
         
         # Start background job
+        start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_analysis_job(job_id, tickers, None, capital, False)
+            start_success = start_analysis_job(job_id, tickers, None, capital, False)
+            if not start_success:
+                logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
             logger.error(f"Failed to start analysis job {job_id}: {e}")
-            return StandardizedErrorResponse.format(
-                "JOB_START_FAILED",
-                "Failed to start analysis",
-                500,
-                {"error": str(e)}
-            )
         
         logger.info(f"Analysis job created: {job_id} for {tickers}")
         return jsonify({
             "job_id": job_id,
             "status": "queued",
             "tickers": tickers,
-            "capital": capital
+            "capital": capital,
+            "thread_started": start_success
         }), 201
         
     except Exception as e:

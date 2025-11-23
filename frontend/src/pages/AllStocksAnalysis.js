@@ -151,7 +151,15 @@ function AllStocksAnalysis() {
     if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
       try {
         setAnalyzing(true);
-        await analyzeAllStocks([]); // Empty array means all stocks
+        const response = await analyzeAllStocks([]); // Empty array means all stocks
+        
+        // Handle both new job and duplicate job responses
+        if (response.is_duplicate) {
+          alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
+                `Progress: ${response.completed}/${response.total} (${response.completed}/${response.total}%)`);
+        } else {
+          alert(`Analysis started. Job ID: ${response.job_id}`);
+        }
       } catch (error) {
         console.error('Failed to start analysis:', error);
         alert('Failed to start analysis. Please try again.');
@@ -169,7 +177,15 @@ function AllStocksAnalysis() {
     if (window.confirm(`Analyze ${selectedStocks.length} selected stocks?`)) {
       try {
         setAnalyzing(true);
-        await analyzeAllStocks(selectedStocks);
+        const response = await analyzeAllStocks(selectedStocks);
+        
+        // Handle both new job and duplicate job responses
+        if (response.is_duplicate) {
+          alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
+                `Progress: ${response.completed}/${response.total}`);
+        } else {
+          alert(`Analysis started. Job ID: ${response.job_id}`);
+        }
       } catch (error) {
         console.error('Failed to start analysis:', error);
         alert('Failed to start analysis. Please try again.');

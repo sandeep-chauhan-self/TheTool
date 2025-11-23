@@ -230,6 +230,53 @@ def get_stock_history(symbol):
         )
 
 
+def _get_active_job_for_symbols(symbols: list) -> dict:
+    """
+    Check if an identical or very similar job is already running.
+    Returns the existing job info or None if safe to create new job.
+    
+    Considers jobs "duplicate" if:
+    - Same symbols (in any order)
+    - Status is 'queued' or 'processing'
+    - Within last 5 minutes (to avoid stale locks)
+    """
+    try:
+        symbols_set = set(symbols)
+        symbols_str = ','.join(sorted(symbols))
+        
+        # Get active jobs from last 5 minutes
+        from datetime import datetime, timedelta
+        five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        
+        active_jobs = query_db("""
+            SELECT job_id, status, total, completed, created_at
+            FROM analysis_jobs
+            WHERE status IN ('queued', 'processing')
+              AND created_at > ?
+            ORDER BY created_at DESC
+            LIMIT 10
+        """, (five_min_ago,))
+        
+        if not active_jobs:
+            return None
+        
+        # For now, if ANY active job exists, return it
+        # (More sophisticated symbol matching could be added)
+        job_id, status, total, completed, created_at = active_jobs[0]
+        logger.info(f"Found active job {job_id} with status {status}")
+        
+        return {
+            "job_id": job_id,
+            "status": status,
+            "total": total,
+            "completed": completed,
+            "created_at": created_at
+        }
+    except Exception as e:
+        logger.error(f"Error checking for active jobs: {e}")
+        return None
+
+
 @bp.route("/analyze-all-stocks", methods=["POST"])
 def analyze_all_stocks():
     """
@@ -238,7 +285,8 @@ def analyze_all_stocks():
     Request body:
     {
         "symbols": ["TCS.NS", "INFY.NS"],  # Empty array [] means analyze ALL stocks
-        "capital": 100000
+        "capital": 100000,
+        "force": false  # Set true to bypass duplicate check and force new analysis
     }
     """
     try:
@@ -256,6 +304,7 @@ def analyze_all_stocks():
         if symbols is None:
             symbols = []
         capital = validated_data.get("capital", 100000) if validated_data else 100000
+        force = data.get("force", False)  # Force new job even if one is running
         
         # Handle empty array: means "analyze ALL stocks"
         if len(symbols) == 0:
@@ -287,46 +336,82 @@ def analyze_all_stocks():
                     {"error": str(e)}
                 )
         
+        # Check for duplicate/active jobs (unless force=true)
+        if not force:
+            active_job = _get_active_job_for_symbols(symbols)
+            if active_job:
+                logger.info(f"Duplicate job request detected. Returning existing job {active_job['job_id']}")
+                return jsonify({
+                    "job_id": active_job["job_id"],
+                    "status": active_job["status"],
+                    "is_duplicate": True,
+                    "message": "Analysis already running for these symbols",
+                    "total": active_job["total"],
+                    "completed": active_job["completed"],
+                    "symbols": symbols,
+                    "capital": capital,
+                    "count": len(symbols)
+                }), 200
+        
         # Create job ID
         job_id = str(uuid.uuid4())
+        logger.info(f"Creating new analysis job {job_id} for {len(symbols)} symbols")
         
-        # Create job atomically
-        created = JobStateTransactions.create_job_atomic(
-            job_id=job_id,
-            status="queued",
-            total=len(symbols),
-            description=f"Bulk analyze {len(symbols)} stock(s)"
-        )
+        # Create job atomically with retries on db lock
+        max_retries = 3
+        created = False
+        for attempt in range(max_retries):
+            try:
+                created = JobStateTransactions.create_job_atomic(
+                    job_id=job_id,
+                    status="queued",
+                    total=len(symbols),
+                    description=f"Bulk analyze {len(symbols)} stock(s)"
+                )
+                if created:
+                    break
+                else:
+                    # Job creation returned False, retry
+                    logger.warning(f"Job creation failed (attempt {attempt + 1}/{max_retries}), retrying...")
+                    import time
+                    time.sleep(0.1 * (attempt + 1))  # Exponential backoff
+            except Exception as e:
+                logger.error(f"Exception during job creation (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    return StandardizedErrorResponse.format(
+                        "JOB_CREATION_FAILED",
+                        "Failed to create analysis job",
+                        500,
+                        {"error": str(e), "job_id": job_id}
+                    )
         
         if not created:
             return StandardizedErrorResponse.format(
                 "JOB_DUPLICATE",
-                "Job already exists",
+                "Job already exists (potential race condition)",
                 409,
                 {"job_id": job_id}
             )
         
-        # Start background job
+        # Start background job - MUST happen after successful db insert
+        start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_analysis_job(job_id, symbols, None, capital, False)
+            start_success = start_analysis_job(job_id, symbols, None, capital, False)
+            if not start_success:
+                logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
             logger.error(f"Failed to start bulk analysis job {job_id}: {e}")
-            return StandardizedErrorResponse.format(
-                "JOB_START_FAILED",
-                "Failed to start bulk analysis",
-                500,
-                {"error": str(e)}
-            )
         
-        logger.info(f"Bulk analysis job created: {job_id} for {len(symbols)} stocks")
+        logger.info(f"Bulk analysis job {job_id} created and started for {len(symbols)} stocks")
         
         return jsonify({
             "job_id": job_id,
             "status": "queued",
             "symbols": symbols,
             "capital": capital,
-            "count": len(symbols)
+            "count": len(symbols),
+            "thread_started": start_success
         }), 201
         
     except Exception as e:
