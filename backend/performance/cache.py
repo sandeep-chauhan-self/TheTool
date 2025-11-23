@@ -98,15 +98,43 @@ class InMemoryCache:
             return deleted
     
     def keys(self, pattern: str) -> list[str]:
-        """Get keys matching pattern (simple wildcard support)"""
+        """Get keys matching pattern (wildcard support with proper positioning)"""
         with self.lock:
-            # Simple pattern matching with * wildcard
+            # Parse pattern: split on * to get parts, track anchoring
             pattern_parts = pattern.split('*')
+            start_anchored = not pattern.startswith('*')  # Pattern starts with literal
+            end_anchored = not pattern.endswith('*')      # Pattern ends with literal
+            
             matching_keys = []
             
             for key in self.cache.keys():
-                # Check if key matches pattern
-                if all(part in key for part in pattern_parts if part):
+                # Filter empty parts
+                parts = [p for p in pattern_parts if p]
+                
+                if not parts:
+                    # Pattern is just * or **
+                    matching_keys.append(key)
+                    continue
+                
+                # Check start anchor
+                if start_anchored and not key.startswith(parts[0]):
+                    continue
+                
+                # Check end anchor
+                if end_anchored and not key.endswith(parts[-1]):
+                    continue
+                
+                # Check intermediate parts are present in order
+                cursor = 0
+                match = True
+                for i, part in enumerate(parts):
+                    idx = key.find(part, cursor)
+                    if idx == -1:
+                        match = False
+                        break
+                    cursor = idx + len(part)
+                
+                if match:
                     matching_keys.append(key)
             
             return matching_keys
