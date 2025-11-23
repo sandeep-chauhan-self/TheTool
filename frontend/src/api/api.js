@@ -68,12 +68,19 @@ export const getWatchlist = async () => {
 };
 
 export const addToWatchlist = async (symbol, name = '') => {
-  const response = await api.post('/api/watchlist', { symbol, name });
+  // Backend expects: ticker (full yahoo symbol), symbol (short symbol), notes (company name)
+  // Frontend passes: symbol (full yahoo_symbol like "20MICRONS.NS"), name (company name)
+  const response = await api.post('/api/watchlist', { 
+    ticker: symbol,      // Full yahoo symbol like "20MICRONS.NS"
+    symbol: symbol.split('.')[0],  // Short symbol like "20MICRONS"
+    notes: name          // Company name
+  });
   return response.data;
 };
 
 export const removeFromWatchlist = async (symbol) => {
-  const response = await api.delete('/api/watchlist', { data: { symbol } });
+  // symbol here contains the full ticker (e.g., "ACEINTEG.NS")
+  const response = await api.delete('/api/watchlist', { data: { ticker: symbol } });
   return response.data;
 };
 

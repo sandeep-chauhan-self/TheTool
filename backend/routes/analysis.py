@@ -76,7 +76,7 @@ def analyze():
         # Start background job
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_analysis_job(job_id, tickers, capital)
+            start_analysis_job(job_id, tickers, None, capital, False)
         except Exception as e:
             logger.error(f"Failed to start analysis job {job_id}: {e}")
             return StandardizedErrorResponse.format(

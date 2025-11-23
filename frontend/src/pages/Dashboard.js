@@ -81,6 +81,7 @@ function Dashboard() {
   const handleRemoveStock = async (symbol) => {
     if (window.confirm(`Remove ${symbol} from watchlist?`)) {
       try {
+        // symbol here is the ticker (full yahoo symbol)
         await removeFromWatchlist(symbol);
         loadWatchlist();
       } catch (error) {
@@ -262,7 +263,7 @@ function Dashboard() {
                     type="checkbox"
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedStocks(watchlist.map((s) => s.symbol));
+                        setSelectedStocks(watchlist.map((s) => s.ticker));
                       } else {
                         setSelectedStocks([]);
                       }
@@ -295,8 +296,8 @@ function Dashboard() {
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={selectedStocks.includes(stock.symbol)}
-                        onChange={() => handleSelectStock(stock.symbol)}
+                        checked={selectedStocks.includes(stock.ticker)}
+                        onChange={() => handleSelectStock(stock.ticker)}
                       />
                     </td>
                     <td className="px-4 py-3 font-mono">{stock.symbol}</td>
@@ -322,7 +323,7 @@ function Dashboard() {
                         <span className="text-gray-400 mr-3">No analysis</span>
                       )}
                       <button
-                        onClick={() => handleRemoveStock(stock.symbol)}
+                        onClick={() => handleRemoveStock(stock.ticker)}
                         className="text-red-600 hover:underline"
                       >
                         Remove
