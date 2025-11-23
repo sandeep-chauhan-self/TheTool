@@ -53,7 +53,9 @@ def main():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS watchlist (
                 id SERIAL PRIMARY KEY,
+                ticker TEXT NOT NULL,
                 symbol TEXT UNIQUE NOT NULL,
+                notes TEXT,
                 name TEXT,
                 user_id INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
