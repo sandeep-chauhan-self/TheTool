@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { analyzeAllStocks, getAllNSEStocks, getAllStocksProgress } from '../api/api';
+import { analyzeAllStocks, getAllNSEStocks, getAllStocksProgress, getAllAnalysisResults } from '../api/api';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 
@@ -63,16 +63,62 @@ function AllStocksAnalysis() {
         }
       }
       
-      // Map stocks to include status field for UI
-      const stocksWithStatus = allLoadedStocks.map(stock => ({
-        ...stock,
-        status: 'pending',
-        score: null,
-        verdict: '-',
-        entry: null,
-        target: null,
-        has_analysis: false
-      }));
+      // Fetch all analysis results to enrich stocks with analysis data
+      let allResults = [];
+      let resultsPage = 1;
+      let resultsHasMore = true;
+      
+      while (resultsHasMore) {
+        try {
+          const resultsData = await getAllAnalysisResults(resultsPage, 200);
+          if (resultsData && resultsData.results) {
+            allResults = [...allResults, ...resultsData.results];
+            resultsPage++;
+            resultsHasMore = resultsPage <= resultsData.total_pages;
+          } else {
+            resultsHasMore = false;
+          }
+        } catch (error) {
+          console.error('Error fetching analysis results:', error);
+          resultsHasMore = false;
+        }
+      }
+      
+      // Create a map of symbol -> analysis result for quick lookup
+      const resultsMap = {};
+      allResults.forEach(result => {
+        const key = result.symbol || result.ticker;
+        if (key) {
+          resultsMap[key.toUpperCase()] = result;
+        }
+      });
+      
+      // Map stocks to include status field for UI and enrich with analysis data
+      const stocksWithStatus = allLoadedStocks.map(stock => {
+        const result = resultsMap[stock.symbol.toUpperCase()];
+        if (result) {
+          return {
+            ...stock,
+            status: 'completed',
+            score: result.score,
+            verdict: result.verdict,
+            entry: result.entry,
+            target: result.target,
+            has_analysis: true,
+            stop_loss: result.stop_loss,
+            created_at: result.created_at
+          };
+        }
+        return {
+          ...stock,
+          status: 'pending',
+          score: null,
+          verdict: '-',
+          entry: null,
+          target: null,
+          has_analysis: false
+        };
+      });
       
       setStocks(stocksWithStatus);
       

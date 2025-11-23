@@ -109,6 +109,11 @@ export const getAllStocksProgress = async () => {
   return response.data;
 };
 
+export const getAllAnalysisResults = async (page = 1, per_page = 100) => {
+  const response = await api.get(`/api/stocks/all-stocks/results?page=${page}&per_page=${per_page}`);
+  return response.data;
+};
+
 export const cancelJob = async (jobId) => {
   const response = await api.post(`/api/analysis/cancel/${jobId}`);
   return response.data;

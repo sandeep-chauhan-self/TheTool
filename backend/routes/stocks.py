@@ -438,6 +438,77 @@ def get_all_stocks_progress():
         )
 
 
+@bp.route("/all-stocks/results", methods=["GET"])
+def get_all_analysis_results():
+    """Get all completed analysis results"""
+    try:
+        # Get pagination params
+        page = request.args.get("page", default=1, type=int)
+        per_page = request.args.get("per_page", default=50, type=int)
+        
+        # Validate pagination
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 500:
+            per_page = 50
+        
+        # Get total count
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM analysis_results WHERE status = 'completed'")
+        total = cursor.fetchone()[0]
+        
+        # Get paginated results
+        offset = (page - 1) * per_page
+        cursor.execute("""
+            SELECT id, ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, created_at
+            FROM analysis_results
+            WHERE status = 'completed'
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+        """, (per_page, offset))
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                "id": row[0],
+                "ticker": row[1],
+                "symbol": row[2],
+                "name": row[3],
+                "yahoo_symbol": row[4],
+                "score": row[5],
+                "verdict": row[6],
+                "entry": row[7],
+                "stop_loss": row[8],
+                "target": row[9],
+                "created_at": row[10]
+            })
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"[RESULTS] Retrieved {len(results)} analysis results (page {page})")
+        
+        return jsonify({
+            "results": results,
+            "count": len(results),
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
+        }), 200
+        
+    except Exception as e:
+        logger.exception("get_all_analysis_results error")
+        return StandardizedErrorResponse.format(
+            "RESULTS_ERROR",
+            "Failed to get analysis results",
+            500,
+            {"error": str(e)}
+        )
+
+
 @bp.route("/initialize-all-stocks", methods=["POST"])
 def initialize_all_stocks():
     """
