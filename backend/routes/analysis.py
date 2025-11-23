@@ -204,10 +204,11 @@ def get_analysis_job_status(job_id):
                     """
                     SELECT ticker, symbol, verdict, score, entry, stop_loss, target, created_at
                     FROM analysis_results 
+                    WHERE job_id = ?
                     ORDER BY created_at DESC
                     LIMIT 50
                     """,
-                    ()
+                    (job_id,)
                 )
                 status["results"] = [dict(r) for r in results]
             except Exception as e:

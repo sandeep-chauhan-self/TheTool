@@ -102,10 +102,11 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
                     query = '''
                         INSERT INTO analysis_results 
-                        (ticker, score, verdict, entry, stop_loss, target, entry_method, data_source, is_demo_data, raw_data, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (job_id, ticker, score, verdict, entry, stop_loss, target, entry_method, data_source, is_demo_data, raw_data, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     '''
                     query, args = _convert_query_params(query, (
+                        job_id,
                         ticker,
                         result.get('score', 0),
                         result.get('verdict', 'Neutral'),

@@ -202,12 +202,13 @@ class ResultInsertion:
     
     @staticmethod
     def insert_analysis_result(
-        ticker: str,
-        symbol: str,
-        name: str,
-        yahoo_symbol: str,
-        score: float,
-        verdict: str,
+        job_id: Optional[str] = None,
+        ticker: str = None,
+        symbol: str = None,
+        name: str = None,
+        yahoo_symbol: str = None,
+        score: float = 0,
+        verdict: str = None,
         entry: Optional[float] = None,
         stop_loss: Optional[float] = None,
         target: Optional[float] = None,
@@ -234,14 +235,14 @@ class ResultInsertion:
                 now = datetime.now().isoformat()
                 query = '''
                     INSERT INTO analysis_results
-                    (ticker, symbol, name, yahoo_symbol, score, verdict,
+                    (job_id, ticker, symbol, name, yahoo_symbol, score, verdict,
                      entry, stop_loss, target, entry_method, data_source,
                      is_demo_data, raw_data, status, error_message,
                      created_at, updated_at, analysis_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
-                    ticker, symbol, name, yahoo_symbol, score, verdict,
+                    job_id, ticker, symbol, name, yahoo_symbol, score, verdict,
                     entry, stop_loss, target, entry_method, data_source,
                     is_demo_data, raw_data, status, error_message,
                     now, now, analysis_source
