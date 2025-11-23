@@ -47,7 +47,7 @@ def on_starting(server):
     logger.info(f"Gunicorn starting with {server.cfg.workers} workers")
 
 
-def on_exit(server):
+def on_exit(_server):
     """Called when Gunicorn is exiting"""
     logger = logging.getLogger(__name__)
     logger.info("Gunicorn shutting down")
