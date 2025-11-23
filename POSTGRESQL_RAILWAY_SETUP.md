@@ -125,7 +125,7 @@ Railway will:
 - Redeploy the backend
 
 ### "Connection refused"
-- Ensure PostgreSQL service is running (check Railways logs)
+- Ensure PostgreSQL service is running (check Railway logs)
 - Verify `DATABASE_URL` format: should start with `postgresql://`
 - Try restarting both services
 
