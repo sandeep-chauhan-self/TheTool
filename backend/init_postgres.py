@@ -25,6 +25,7 @@ load_dotenv()
 def main():
     """Main initialization function"""
     import psycopg2
+    from psycopg2 import sql
     
     # Get DATABASE_URL from environment
     database_url = os.getenv('DATABASE_URL')
@@ -125,7 +126,12 @@ def main():
         ]
         
         for idx_name, idx_def in indexes:
-            cursor.execute(f'CREATE INDEX IF NOT EXISTS {idx_name} ON {idx_def}')
+            # Use sql.SQL for safe identifier quoting to prevent SQL injection
+            create_idx_sql = sql.SQL('CREATE INDEX IF NOT EXISTS {} ON {}').format(
+                sql.Identifier(idx_name),
+                sql.SQL(idx_def)  # idx_def is hardcoded and safe (not from external input)
+            )
+            cursor.execute(create_idx_sql)
             print(f"✓ {idx_name} created")
         
         # Commit all changes
