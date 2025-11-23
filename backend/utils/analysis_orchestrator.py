@@ -496,23 +496,32 @@ class AnalysisOrchestrator:
             Complete analysis result dictionary
         """
         try:
+            logger.info(f"[ORCHESTRATOR] Starting analysis for ticker: {ticker}")
+            logger.debug(f"[ORCHESTRATOR] Analysis params - capital: {capital}, use_demo: {use_demo_data}, indicators: {indicators}")
+            
             # Step 1: Fetch and validate data
             df, source, data_valid, data_message, warnings = self.data_fetcher.fetch_and_validate(
                 ticker, use_demo_data
             )
             
+            logger.info(f"[ORCHESTRATOR] Data fetch completed - ticker: {ticker}, source: {source}, valid: {data_valid}")
+            
             if df is None or not data_valid:
+                logger.warning(f"[ORCHESTRATOR] Data validation failed for {ticker}: {data_message}")
                 return self._error_result(ticker, data_message)
             
             # Step 2: Calculate indicators
             indicator_results = self.indicator_engine.calculate_indicators(df, ticker, indicators)
             
             if not indicator_results:
+                logger.warning(f"[ORCHESTRATOR] No indicators calculated for {ticker}")
                 return self._error_result(ticker, "No indicators calculated")
             
             # Step 3: Aggregate signals
             score = self.signal_aggregator.aggregate_votes(indicator_results)
             verdict = self.signal_aggregator.get_verdict(score)
+            
+            logger.info(f"[ORCHESTRATOR] Signal analysis complete - ticker: {ticker}, score: {score}, verdict: {verdict}")
             
             # Step 4: Calculate trade parameters
             trade_params = self.trade_calculator.calculate_trade_parameters(

@@ -33,10 +33,23 @@ function Dashboard() {
       setLoading(true);
       const data = await getWatchlist();
       
+      // Filter out watchlist items with empty ticker (defensive validation)
+      const validWatchlist = data.filter(stock => {
+        if (!stock.ticker || stock.ticker.trim() === '') {
+          console.warn(`Skipping watchlist item with empty ticker: ${JSON.stringify(stock)}`);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validWatchlist.length < data.length) {
+        console.error(`Found ${data.length - validWatchlist.length} invalid watchlist items with empty tickers`);
+      }
+      
       // Fetch latest analysis results for each stock
       // Fetch from history endpoint which uses analysis_results table
       const watchlistWithResults = await Promise.all(
-        data.map(async (stock) => {
+        validWatchlist.map(async (stock) => {
           try {
             // Get analysis history for this stock
             const historyData = await getStockHistory(stock.symbol);

@@ -43,16 +43,25 @@ def analyze():
     try:
         data = request.get_json() or {}
         
+        # Log incoming request for debugging
+        logger.info(f"[ANALYZE] Incoming request - raw data: {data}")
+        logger.debug(f"[ANALYZE] Request details - tickers_count: {len(data.get('tickers', []))}, "
+                    f"capital: {data.get('capital', 'not-provided')}, "
+                    f"use_demo: {data.get('use_demo_data', 'default')}")
+        logger.debug(f"[ANALYZE] Raw tickers list: {data.get('tickers', [])}")
+        
         # Validate request
         validated_data, error_response = validate_request(
             data,
             RequestValidator.AnalyzeRequest
         )
         if error_response:
+            logger.warning(f"[ANALYZE] Validation failed - response: {error_response}")
             return error_response
         
         tickers = validated_data["tickers"]
         capital = validated_data["capital"]
+        logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}")
         
         # Create job ID
         job_id = str(uuid.uuid4())

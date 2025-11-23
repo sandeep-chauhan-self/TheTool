@@ -189,7 +189,27 @@ class RequestValidator:
                 raise ValueError('tickers list cannot be empty')
             if len(v) > 100:
                 raise ValueError('tickers list cannot exceed 100 items')
-            return [t.strip().upper() for t in v]
+            
+            # Strip and uppercase
+            stripped = [t.strip().upper() for t in v]
+            
+            # Check for empty strings after stripping
+            empty_count = sum(1 for t in stripped if len(t) == 0)
+            if empty_count > 0:
+                raise ValueError(f'Found {empty_count} empty ticker(s) after stripping whitespace')
+            
+            # Check for invalid ticker format (should have exchange code like .NS or .BO)
+            invalid_format = [t for t in stripped if '.' not in t]
+            if invalid_format:
+                raise ValueError(f'Invalid ticker format (missing exchange code): {invalid_format}. Expected format like TCS.NS or INFY.BO')
+            
+            # Check for duplicates
+            unique_tickers = set(stripped)
+            if len(unique_tickers) < len(stripped):
+                duplicates = [t for t in unique_tickers if stripped.count(t) > 1]
+                raise ValueError(f'Duplicate tickers found: {duplicates}')
+            
+            return stripped
         
         @validator('capital')
         def validate_capital(cls, v):
@@ -245,16 +265,30 @@ def validate_request(request_data: Dict[str, Any], schema_class):
         return validated.dict(), None
     except ValidationError as e:
         error_details = []
+        invalid_items = []
+        
         for error in e.errors():
+            field = ".".join(str(x) for x in error["loc"])
             error_details.append({
-                "field": ".".join(str(x) for x in error["loc"]),
+                "field": field,
                 "message": error["msg"],
                 "type": error["type"]
             })
+            
+            # For tickers field, try to extract the invalid values
+            if field == "tickers" and "value" in error:
+                invalid_items.append({
+                    "value": error.get("value"),
+                    "reason": error["msg"]
+                })
         
         response, status = StandardizedErrorResponse.validation_error(
             "Request validation failed",
-            {"validation_errors": error_details}
+            {
+                "validation_errors": error_details,
+                "invalid_tickers": invalid_items if invalid_items else None,
+                "request_data": {k: v for k, v in request_data.items() if k in ["tickers", "capital"]}
+            }
         )
         return None, (response, status)
 

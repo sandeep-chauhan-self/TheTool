@@ -68,6 +68,9 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         logger.info("=" * 60)
         logger.info(f"THREAD TASK STARTED - Job ID: {job_id}")
         logger.info(f"Total stocks to analyze: {len(tickers)}")
+        logger.info(f"Tickers: {tickers}")
+        logger.info(f"Capital: {capital}")
+        logger.info(f"Indicators: {indicators if indicators else 'default'}")
         logger.info(f"Demo mode: {use_demo_data}")
         logger.info("=" * 60)
         
