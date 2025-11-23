@@ -3,6 +3,7 @@ import os
 import json
 import requests
 from datetime import datetime, timedelta
+from pathlib import Path
 
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -10,6 +11,40 @@ try:
 except ImportError:
     SCHEDULER_AVAILABLE = False
     BackgroundScheduler = None
+
+def get_log_directory():
+    """
+    Get log directory from environment variable with robust fallback.
+    
+    Priority:
+    1. LOG_DIR environment variable (if set and valid)
+    2. Fallback: project logs directory relative to this file
+    
+    Returns:
+        pathlib.Path: Resolved absolute path to log directory
+    
+    Raises:
+        ValueError: If computed path cannot be resolved or accessed
+    """
+    log_dir_env = os.getenv('LOG_DIR')
+    
+    if log_dir_env:
+        try:
+            log_dir = Path(log_dir_env).resolve()
+            logger.debug(f"Using LOG_DIR from environment: {log_dir}")
+            return log_dir
+        except Exception as e:
+            logger.warning(f"LOG_DIR environment variable invalid ({log_dir_env}): {e}. Using fallback.")
+    
+    # Fallback: construct path relative to this file
+    try:
+        # This file: backend/utils/infrastructure/scheduler.py
+        # Target: backend/logs
+        fallback_dir = Path(__file__).resolve().parent.parent.parent / 'logs'
+        logger.debug(f"Using fallback log directory: {fallback_dir}")
+        return fallback_dir
+    except Exception as e:
+        raise ValueError(f"Failed to resolve log directory: {e}")
 
 # clean_old_cache doesn't exist, will implement stub
 def clean_old_cache(days=7):
@@ -118,23 +153,43 @@ def compress_logs():
         
         logger.info("Starting log compression")
         
-        archive_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'archive'))
-        os.makedirs(archive_dir, exist_ok=True)
+        # Get log directory with environment variable support
+        log_dir = get_log_directory()
+        archive_dir = log_dir / 'archive'
         
-        log_dir = os.path.dirname(archive_dir)
-        log_file = os.path.join(log_dir, 'app.log')
+        # Create archive directory with permission error handling
+        try:
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"Archive directory ensured: {archive_dir}")
+        except PermissionError as e:
+            logger.exception(f"Permission denied creating archive directory {archive_dir}: {e}")
+            return
+        except OSError as e:
+            logger.exception(f"OS error creating archive directory {archive_dir}: {e}")
+            return
         
-        if os.path.exists(log_file):
-            # Create compressed archive
-            archive_name = f"app_{datetime.now().strftime('%Y%m%d')}.log.gz"
-            archive_path = os.path.join(archive_dir, archive_name)
-            
-            with open(log_file, 'rb') as f_in:
-                with gzip.open(archive_path, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            
-            logger.info(f"Log compressed to {archive_name}")
+        log_file = log_dir / 'app.log'
         
+        if log_file.exists():
+            try:
+                # Create compressed archive
+                archive_name = f"app_{datetime.now().strftime('%Y%m%d')}.log.gz"
+                archive_path = archive_dir / archive_name
+                
+                with open(log_file, 'rb') as f_in:
+                    with gzip.open(archive_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                
+                logger.info(f"Log compressed to {archive_name}")
+            except PermissionError as e:
+                logger.exception(f"Permission denied compressing log file {log_file}: {e}")
+            except IOError as e:
+                logger.exception(f"IO error during log compression: {e}")
+        else:
+            logger.debug(f"No log file found at {log_file}")
+        
+    except ValueError as e:
+        logger.exception(f"Failed to resolve log directory for compression: {e}")
     except Exception as e:
         logger.exception(f"Log compression failed: {str(e)}")
 
@@ -150,25 +205,40 @@ def clean_old_data():
         clean_old_cache(days=7)
         
         # Clean old logs
-        archive_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'archive'))
+        log_dir = get_log_directory()
+        archive_dir = log_dir / 'archive'
         
-        if os.path.exists(archive_dir):
-            cutoff_date = datetime.now() - timedelta(days=15)
-            removed_count = 0
-            
-            for filename in os.listdir(archive_dir):
-                filepath = os.path.join(archive_dir, filename)
-                file_time = datetime.fromtimestamp(os.path.getmtime(filepath))
+        if archive_dir.exists():
+            try:
+                cutoff_date = datetime.now() - timedelta(days=15)
+                removed_count = 0
                 
-                if file_time < cutoff_date:
-                    os.remove(filepath)
-                    removed_count += 1
-            
-            if removed_count > 0:
-                logger.info(f"Cleaned {removed_count} old log archives")
+                for filepath in archive_dir.iterdir():
+                    if filepath.is_file():
+                        try:
+                            file_time = datetime.fromtimestamp(filepath.stat().st_mtime)
+                            
+                            if file_time < cutoff_date:
+                                filepath.unlink()
+                                removed_count += 1
+                                logger.debug(f"Deleted old log archive: {filepath.name}")
+                        except (OSError, ValueError) as e:
+                            logger.warning(f"Failed to process/delete archive file {filepath.name}: {e}")
+                            continue
+                
+                if removed_count > 0:
+                    logger.info(f"Cleaned {removed_count} old log archives")
+            except PermissionError as e:
+                logger.exception(f"Permission denied accessing archive directory {archive_dir}: {e}")
+            except OSError as e:
+                logger.exception(f"OS error while cleaning archives in {archive_dir}: {e}")
+        else:
+            logger.debug(f"Archive directory does not exist: {archive_dir}")
         
         logger.info("Data cleanup completed")
         
+    except ValueError as e:
+        logger.exception(f"Failed to resolve log directory for cleanup: {e}")
     except Exception as e:
         logger.exception(f"Data cleanup failed: {str(e)}")
 
