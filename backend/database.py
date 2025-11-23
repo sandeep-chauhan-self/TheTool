@@ -88,10 +88,15 @@ def register_teardown(app):
 
 def init_db():
     """Initialize database schema for both SQLite and PostgreSQL"""
-    if DATABASE_TYPE == 'postgres':
-        _init_postgres_db()
-    else:
-        _init_sqlite_db()
+    try:
+        if DATABASE_TYPE == 'postgres':
+            _init_postgres_db()
+        else:
+            _init_sqlite_db()
+    except Exception as e:
+        print(f"WARNING: Database initialization encountered an issue: {e}")
+        # Don't re-raise - allow app to continue; may retry on next startup or request
+        # This is important for multi-worker deployments where one worker may initialize first
 
 
 def _init_sqlite_db():
@@ -179,10 +184,13 @@ def _init_sqlite_db():
 
 def _init_postgres_db():
     """Initialize PostgreSQL database schema"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
     
     try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         # Watchlist table (with user_id for future multi-user support)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS watchlist (
@@ -250,14 +258,26 @@ def _init_postgres_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
         
         conn.commit()
-        print("PostgreSQL database initialized successfully")
+        print("PostgreSQL database schema initialized successfully")
     except Exception as e:
-        conn.rollback()
         print(f"ERROR initializing PostgreSQL database: {e}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
         raise
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 
 def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):

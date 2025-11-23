@@ -90,11 +90,22 @@ def create_app(config_object=None):
     # Register error handlers (before_request, after_request, error handlers)
     register_error_handlers(app)
     
-    # Initialize database
+    # Initialize database on app startup (CRITICAL for Railway PostgreSQL)
+    try:
+        init_db()
+        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
+            logger.info(f"[OK] Database initialized on startup ({config.DATABASE_TYPE.upper()})")
+    except Exception as e:
+        logger.warning(f"Database initialization warning: {e}")
+    
+    # Initialize database on first request as fallback
     @app.before_request
     def before_request():
-        """Initialize database if needed on first request"""
-        init_db_if_needed()
+        """Initialize database if needed on first request (fallback)"""
+        try:
+            init_db_if_needed()
+        except Exception as e:
+            logger.debug(f"Fallback init_db_if_needed: {e}")
     
     # Close database connection
     app.teardown_appcontext(close_db)
