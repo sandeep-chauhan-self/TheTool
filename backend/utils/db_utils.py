@@ -46,7 +46,8 @@ class JobStateTransactions:
         """
         Create a job record atomically.
         
-        Uses a single transaction to ensure consistency.
+        Uses a fresh database connection with proper transaction handling.
+        Each call gets a new connection to avoid aborted transaction issues.
         
         Args:
             job_id: Unique job identifier
@@ -57,28 +58,39 @@ class JobStateTransactions:
         Returns:
             True if created, False if failed or duplicate
         """
+        from database import get_db_session, _convert_query_params, DATABASE_TYPE
+        
+        # Use get_db_session() for proper transaction handling with rollback
         try:
-            now = datetime.now().isoformat()
-            lastrow = execute_db('''
-                INSERT INTO analysis_jobs 
-                (job_id, status, total, completed, progress, errors,
-                 created_at, updated_at, successful)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                job_id,
-                status,
-                total,
-                0,  # completed
-                0,  # progress
-                '[]',  # errors
-                now,
-                now,
-                0  # successful
-            ))
-            logger.info(f"Job {job_id} created atomically")
-            return bool(lastrow)
+            with get_db_session() as (conn, cursor):
+                now = datetime.now().isoformat()
+                
+                # Convert query params for PostgreSQL
+                query = '''
+                    INSERT INTO analysis_jobs 
+                    (job_id, status, total, completed, progress, errors,
+                     created_at, updated_at, successful)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                '''
+                query, params = _convert_query_params(query, (
+                    job_id,
+                    status,
+                    total,
+                    0,  # completed
+                    0,  # progress
+                    '[]',  # errors
+                    now,
+                    now,
+                    0  # successful
+                ))
+                
+                cursor.execute(query, params)
+                # commit() is called automatically by context manager
+                logger.info(f"Job {job_id} created atomically")
+                return True
+                
         except Exception as e:
-            # Handle both SQLite and PostgreSQL integrity errors
+            # Transaction is automatically rolled back by context manager
             error_str = str(e).lower()
             
             # Check for duplicate key/constraint violation
