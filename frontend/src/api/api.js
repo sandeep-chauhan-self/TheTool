@@ -46,6 +46,11 @@ export const getNSEList = async () => {
   return response.data;
 };
 
+export const getAllNSEStocks = async (page = 1, per_page = 50) => {
+  const response = await api.get(`/api/stocks/all?page=${page}&per_page=${per_page}`);
+  return response.data;
+};
+
 export const getNSEStocks = async () => {
   const response = await api.get('/api/stocks/nse-stocks');
   return response.data;
@@ -74,12 +79,6 @@ export const removeFromWatchlist = async (symbol) => {
 
 export const getHealth = async () => {
   const response = await api.get('/health');
-  return response.data;
-};
-
-// All Stocks Analysis APIs
-export const initializeAllStocks = async () => {
-  const response = await api.post('/api/stocks/initialize-all-stocks');
   return response.data;
 };
 

@@ -1,6 +1,7 @@
 """
 Stocks routes - NSE stock list and bulk analysis
 """
+import csv
 import json
 import uuid
 from datetime import datetime
@@ -18,6 +19,72 @@ bp = Blueprint("stocks", __name__, url_prefix="/api/stocks")
 def _data_root() -> Path:
     """Get root data directory"""
     return Path(__file__).parent.parent / "data"
+
+
+@bp.route("/all", methods=["GET"])
+def get_all_nse_stocks():
+    """
+    Get ALL NSE stocks from CSV (2,192 stocks).
+    Used for Add Stock Modal and All Stocks Analysis page.
+    Returns stocks in pagination-friendly format.
+    """
+    try:
+        csv_path = _data_root() / "nse_stocks_complete.csv"
+        
+        if not csv_path.exists():
+            logger.warning(f"NSE CSV not found at {csv_path}")
+            return StandardizedErrorResponse.format(
+                "FILE_NOT_FOUND",
+                "NSE stock list not available",
+                404
+            )
+        
+        # Get pagination params
+        page = request.args.get("page", default=1, type=int)
+        per_page = request.args.get("per_page", default=50, type=int)
+        
+        # Validate pagination
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 500:
+            per_page = 50
+        
+        stocks = []
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                stocks.append({
+                    'symbol': row.get('symbol', '').strip(),
+                    'name': row.get('name', '').strip(),
+                    'yahoo_symbol': row.get('yahoo_symbol', '').strip(),
+                    'sector': row.get('sector', '').strip(),
+                    'industry': row.get('industry', '').strip()
+                })
+        
+        # Calculate pagination
+        total = len(stocks)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated = stocks[start_idx:end_idx]
+        
+        logger.info(f"Retrieved {len(paginated)} stocks (page {page}) from NSE list")
+        return jsonify({
+            "stocks": paginated,
+            "count": len(paginated),
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
+        }), 200
+        
+    except Exception as e:
+        logger.exception("get_all_nse_stocks error")
+        return StandardizedErrorResponse.format(
+            "NSE_LIST_ERROR",
+            "Failed to get NSE list",
+            500,
+            {"error": str(e)}
+        )
 
 
 @bp.route("/nse", methods=["GET"])

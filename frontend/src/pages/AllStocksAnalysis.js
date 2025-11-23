@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { initializeAllStocks, getAllStocks, analyzeAllStocks, getAllStocksProgress } from '../api/api';
+import { getAllNSEStocks, analyzeAllStocks, getAllStocksProgress } from '../api/api';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 
@@ -8,7 +8,6 @@ function AllStocksAnalysis() {
   const [stocks, setStocks] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,63 +47,40 @@ function AllStocksAnalysis() {
     try {
       setLoading(true);
       
-      // Check localStorage cache first
-      const cacheValid = sessionStorage.getItem('allStocksCacheValid');
-      const cached = localStorage.getItem('allStocksCache');
+      // Load all 2,192 NSE stocks from the new endpoint
+      let allLoadedStocks = [];
+      let currentPage = 1;
+      let hasMore = true;
       
-      if (cacheValid === 'true' && cached) {
-        const cachedData = JSON.parse(cached);
-        setStocks(cachedData);
-        setLoading(false);
-        
-        // Fetch fresh data in background to update status
-        const data = await getAllStocks();
+      while (hasMore) {
+        const data = await getAllNSEStocks(currentPage, 200);
         if (data && data.stocks) {
-          setStocks(data.stocks);
-          localStorage.setItem('allStocksCache', JSON.stringify(data.stocks));
+          allLoadedStocks = [...allLoadedStocks, ...data.stocks];
+          currentPage++;
+          hasMore = currentPage <= data.total_pages;
+        } else {
+          hasMore = false;
         }
-        return;
       }
       
-      // Try to load from backend
-      const data = await getAllStocks();
+      // Map stocks to include status field for UI
+      const stocksWithStatus = allLoadedStocks.map(stock => ({
+        ...stock,
+        status: 'pending',
+        score: null,
+        verdict: '-',
+        entry: null,
+        target: null,
+        has_analysis: false
+      }));
       
-      if (data && data.stocks && data.stocks.length > 0) {
-        setStocks(data.stocks);
-        // Cache the data
-        localStorage.setItem('allStocksCache', JSON.stringify(data.stocks));
-        sessionStorage.setItem('allStocksCacheValid', 'true');
-      } else {
-        // Need to initialize
-        await handleInitialize();
-      }
+      setStocks(stocksWithStatus);
       
     } catch (error) {
       console.error('Failed to load stocks:', error);
-      
-      // Try to initialize if loading failed
-      if (error.response && error.response.status === 404) {
-        await handleInitialize();
-      }
+      alert('Failed to load stocks. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleInitialize = async () => {
-    try {
-      setInitializing(true);
-      const result = await initializeAllStocks();
-      
-      if (result && result.count > 0) {
-        // Reload stocks after initialization
-        await loadAllStocks();
-      }
-    } catch (error) {
-      console.error('Failed to initialize stocks:', error);
-      alert('Failed to initialize stocks. Please try again.');
-    } finally {
-      setInitializing(false);
     }
   };
 
@@ -130,10 +106,6 @@ function AllStocksAnalysis() {
       try {
         setAnalyzing(true);
         await analyzeAllStocks([]); // Empty array means all stocks
-        
-        // Clear cache as data will be updated
-        localStorage.removeItem('allStocksCache');
-        sessionStorage.removeItem('allStocksCacheValid');
       } catch (error) {
         console.error('Failed to start analysis:', error);
         alert('Failed to start analysis. Please try again.');
@@ -152,10 +124,6 @@ function AllStocksAnalysis() {
       try {
         setAnalyzing(true);
         await analyzeAllStocks(selectedStocks);
-        
-        // Clear cache
-        localStorage.removeItem('allStocksCache');
-        sessionStorage.removeItem('allStocksCacheValid');
       } catch (error) {
         console.error('Failed to start analysis:', error);
         alert('Failed to start analysis. Please try again.');
@@ -197,21 +165,6 @@ function AllStocksAnalysis() {
   };
 
   const filteredStocks = getFilteredStocks();
-
-  if (initializing) {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        <NavigationBar />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600 text-lg">Initializing all stocks...</p>
-            <p className="text-gray-500 text-sm">This may take a moment</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -307,7 +260,7 @@ function AllStocksAnalysis() {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading stocks...</p>
+            <p className="text-gray-600">Loading all 2,192 NSE stocks...</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">

@@ -1,43 +1,62 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getNSEStocks } from '../api/api';
+import { getAllNSEStocks } from '../api/api';
 
 function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
-  const [nseStocks, setNseStocks] = useState([]);
+  const [allStocks, setAllStocks] = useState([]);
   const [filteredStocks, setFilteredStocks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStocks, setSelectedStocks] = useState([]); // Changed to array for multiple selection
+  const [selectedStocks, setSelectedStocks] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const dropdownRef = useRef(null);
 
-  // Load stocks on mount
+  // Load stocks on mount - load all pages to have complete list
   useEffect(() => {
-    const loadStocks = async () => {
+    const loadAllStocks = async () => {
       try {
-        const data = await getNSEStocks();
-        if (data && data.stocks) {
-          const available = data.stocks.filter(
-            stock => !existingSymbols.includes(stock.yahoo_symbol)
-          );
-          setNseStocks(available);
-          setFilteredStocks(available);
+        let allLoadedStocks = [];
+        let currentPage = 1;
+        let hasMore = true;
+        
+        // Load all 2,192 stocks by fetching all pages
+        while (hasMore) {
+          const data = await getAllNSEStocks(currentPage, 200);
+          if (data && data.stocks) {
+            allLoadedStocks = [...allLoadedStocks, ...data.stocks];
+            currentPage++;
+            hasMore = currentPage <= data.total_pages;
+            setTotalPages(data.total_pages);
+          } else {
+            hasMore = false;
+          }
         }
+        
+        // Filter out stocks already in watchlist
+        const available = allLoadedStocks.filter(
+          stock => !existingSymbols.includes(stock.yahoo_symbol)
+        );
+        
+        setAllStocks(available);
+        setFilteredStocks(available);
         setLoading(false);
       } catch (error) {
         console.error('Failed to load NSE stocks:', error);
         setLoading(false);
       }
     };
-    loadStocks();
+    
+    loadAllStocks();
   }, [existingSymbols]);
 
   // Filter stocks based on search
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredStocks(nseStocks);
+      setFilteredStocks(allStocks);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = nseStocks.filter(stock => {
+      const filtered = allStocks.filter(stock => {
         const symbolMatch = stock.symbol.toLowerCase().includes(query);
         const nameMatch = stock.name.toLowerCase().includes(query);
         const yahooMatch = stock.yahoo_symbol.toLowerCase().includes(query);
@@ -45,7 +64,7 @@ function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
       });
       setFilteredStocks(filtered);
     }
-  }, [searchQuery, nseStocks]);
+  }, [searchQuery, allStocks]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -75,7 +94,7 @@ function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (selectedStocks.length > 0) {
-      // Add all selected stocks
+      // Add all selected stocks to watchlist
       selectedStocks.forEach(stock => {
         onAdd(stock.yahoo_symbol, stock.name);
       });
@@ -93,7 +112,7 @@ function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
         {loading ? (
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Loading NSE stocks...</p>
+            <p className="mt-2 text-gray-600">Loading {allStocks.length === 0 ? 'all 2,192 NSE stocks' : 'stocks'}...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -118,7 +137,7 @@ function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
                   <div 
                     className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto"
                   >
-                    {filteredStocks.map((stock) => (
+                    {filteredStocks.slice(0, 50).map((stock) => (
                       <div
                         key={stock.yahoo_symbol}
                         onClick={() => handleStockSelect(stock)}
@@ -144,7 +163,7 @@ function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
               </div>
               
               <p className="text-sm text-gray-500 mt-1">
-                {nseStocks.length} NSE stocks available (excluding watchlist stocks)
+                {allStocks.length} NSE stocks available (excluding watchlist stocks)
               </p>
               
               {selectedStocks.length > 0 && (
