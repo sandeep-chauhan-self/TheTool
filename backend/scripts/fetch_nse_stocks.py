@@ -19,9 +19,6 @@ logger = logging.getLogger(__name__)
 NSE_EQUITY_LIST_URL = 'https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O'
 NSE_ALL_EQUITY_URL = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv'  # Complete equity list
 
-NSE_EQUITY_LIST_URL = 'https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O'
-NSE_ALL_EQUITY_URL = 'https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv'  # Complete equity list
-
 def fetch_all_nse_stocks_from_csv() -> List[Dict[str, str]]:
     """
     Fetch complete NSE equity list from official NSE CSV
