@@ -348,7 +348,7 @@ def get_all_stocks_progress():
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT id, job_id, status, total, completed, successful, errors
+            SELECT job_id, status, total, completed, successful, errors
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
             ORDER BY created_at DESC
@@ -358,27 +358,28 @@ def get_all_stocks_progress():
         jobs = []
         for row in cursor.fetchall():
             try:
-                errors_list = json.loads(row[6]) if row[6] else []
+                errors_list = json.loads(row[5]) if row[5] else []
             except (json.JSONDecodeError, TypeError):
                 errors_list = []
             
             progress_pct = 0
-            if row[4] > 0:
-                progress_pct = int((row[4] / row[4]) * 100)
+            if row[3] > 0 and row[2] > 0:
+                progress_pct = int((row[3] / row[2]) * 100)
             
             jobs.append({
-                "id": row[0],
-                "job_id": row[1],
-                "status": row[2],
-                "total": row[3],
-                "completed": row[4],
-                "successful": row[5],
+                "job_id": row[0],
+                "status": row[1],
+                "total": row[2],
+                "completed": row[3],
+                "successful": row[4],
                 "errors_count": len(errors_list),
                 "progress_percent": progress_pct
             })
         
         cursor.close()
         conn.close()
+        
+        logger.info(f"[PROGRESS] Retrieved {len(jobs)} active jobs")
         
         return jsonify({
             "jobs": jobs,
