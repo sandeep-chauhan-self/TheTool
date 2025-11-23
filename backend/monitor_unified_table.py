@@ -6,13 +6,15 @@ import os
 from datetime import datetime
 import json
 
+# Import config and database utilities
+from config import config, DATABASE_PATH
+from database import get_db_connection
+
 LOG_FILE = os.path.join(os.path.dirname(__file__), 'migration_monitoring.log')
 
 def log_metrics():
     """Collect and log key metrics"""
     try:
-        from database import get_db_connection
-        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -50,15 +52,31 @@ def log_metrics():
         """)
         metrics['cross_visible_stocks'] = cursor.fetchone()[0]
         
-        # Recent activity (last 6 hours)
-        cursor.execute("""
-            SELECT COUNT(*) FROM analysis_results 
-            WHERE created_at > datetime('now', '-6 hours')
-        """)
+        # Recent activity (last 6 hours) - database-agnostic
+        if config.DATABASE_TYPE == 'postgresql':
+            cursor.execute("""
+                SELECT COUNT(*) FROM analysis_results 
+                WHERE created_at > NOW() - INTERVAL '6 hours'
+            """)
+        else:
+            # SQLite
+            cursor.execute("""
+                SELECT COUNT(*) FROM analysis_results 
+                WHERE created_at > datetime('now', '-6 hours')
+            """)
         metrics['recent_analyses'] = cursor.fetchone()[0]
         
-        # Database size
-        metrics['db_size_mb'] = round(os.path.getsize(DB_PATH) / (1024 * 1024), 2)
+        # Database size - database-agnostic
+        if config.DATABASE_TYPE == 'postgresql':
+            cursor.execute("SELECT pg_database_size(current_database())")
+            db_size_bytes = cursor.fetchone()[0]
+            metrics['db_size_mb'] = round(db_size_bytes / (1024 * 1024), 2)
+        else:
+            # SQLite - use file size
+            if os.path.exists(DATABASE_PATH):
+                metrics['db_size_mb'] = round(os.path.getsize(DATABASE_PATH) / (1024 * 1024), 2)
+            else:
+                metrics['db_size_mb'] = 0
         
         # Check for errors
         cursor.execute("SELECT COUNT(*) FROM analysis_results WHERE status='failed'")
