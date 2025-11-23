@@ -1,6 +1,8 @@
 """
 Watchlist routes - User watchlist management
 """
+import csv
+from pathlib import Path
 from flask import Blueprint, request, jsonify
 from utils.logger import setup_logger
 from utils.api_utils import (
@@ -8,7 +10,7 @@ from utils.api_utils import (
     validate_request,
     RequestValidator
 )
-from database import query_db, execute_db
+from database import query_db, execute_db, get_db_connection
 import json
 
 logger = setup_logger()
@@ -175,6 +177,100 @@ def _remove_from_watchlist():
         return StandardizedErrorResponse.format(
             "WATCHLIST_DELETE_ERROR",
             "Failed to remove from watchlist",
+            500,
+            {"error": str(e)}
+        )
+
+
+@bp.route("/populate-all", methods=["POST"])
+def populate_all():
+    """
+    Bulk populate watchlist with all NSE stocks from CSV.
+    WARNING: This clears existing watchlist and loads ~2200 stocks.
+    
+    Request body:
+    {
+        "confirm": true
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        
+        if not data.get("confirm"):
+            return StandardizedErrorResponse.format(
+                "CONFIRMATION_REQUIRED",
+                "Set confirm=true to proceed with bulk population",
+                400
+            )
+        
+        # Get CSV path
+        csv_path = Path(__file__).parent.parent / "data" / "nse_stocks_complete.csv"
+        
+        if not csv_path.exists():
+            return StandardizedErrorResponse.format(
+                "FILE_NOT_FOUND",
+                "NSE stocks CSV not found",
+                404
+            )
+        
+        # Read CSV
+        stocks_to_insert = []
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                symbol = row['symbol'].strip()
+                name = row.get('name', '').strip()
+                yahoo_symbol = row.get('yahoo_symbol', '').strip()
+                
+                # Use yahoo_symbol as ticker, symbol as symbol
+                ticker = yahoo_symbol if yahoo_symbol else f"{symbol}.NS"
+                stocks_to_insert.append((ticker, symbol, name))
+        
+        logger.info(f"Read {len(stocks_to_insert)} stocks from CSV")
+        
+        # Get DB connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Clear existing watchlist
+        cursor.execute("DELETE FROM watchlist")
+        logger.info("Cleared existing watchlist")
+        
+        # Bulk insert
+        inserted = 0
+        failed = 0
+        
+        for ticker, symbol, notes in stocks_to_insert:
+            try:
+                cursor.execute(
+                    "INSERT INTO watchlist (ticker, symbol, notes) VALUES (?, ?, ?)",
+                    (ticker, symbol, notes)
+                )
+                inserted += 1
+                if inserted % 500 == 0:
+                    logger.info(f"Inserted {inserted} stocks...")
+            except Exception as e:
+                logger.warning(f"Failed to insert {ticker}: {e}")
+                failed += 1
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Watchlist population complete: {inserted} inserted, {failed} failed")
+        
+        return jsonify({
+            "message": "Watchlist populated successfully",
+            "inserted": inserted,
+            "failed": failed,
+            "total": len(stocks_to_insert)
+        }), 200
+        
+    except Exception as e:
+        logger.exception("populate_all error")
+        return StandardizedErrorResponse.format(
+            "POPULATE_ERROR",
+            "Failed to populate watchlist",
             500,
             {"error": str(e)}
         )
