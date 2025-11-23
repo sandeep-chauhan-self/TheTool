@@ -82,7 +82,7 @@ def fetch_all_nse_stocks_from_csv() -> List[Dict[str, str]]:
             logger.error(f"Failed to fetch CSV: HTTP {response.status_code}")
             
     except Exception as e:
-        logger.error(f"Failed to fetch from NSE CSV: {e}")
+        logger.exception("Failed to fetch from NSE CSV")
     finally:
         session.close()
     
@@ -156,7 +156,7 @@ def fetch_nse_stocks_from_api() -> List[Dict[str, str]]:
         return unique_stocks
         
     except Exception as e:
-        logger.error(f"Failed to fetch from NSE API: {e}")
+        logger.exception("Failed to fetch from NSE API")
         return []
     finally:
         session.close()
@@ -221,7 +221,7 @@ def save_to_csv(stocks: List[Dict[str, str]], output_file: str = 'data/nse_stock
         logger.info(f"? Saved {len(stocks)} stocks to {output_file}")
         return True
     except Exception as e:
-        logger.error(f"Failed to save CSV: {e}")
+        logger.exception("Failed to save CSV")
         return False
 
 
@@ -273,7 +273,7 @@ def save_stocks_to_files(stocks: List[Dict[str, str]]) -> bool:
         return True
         
     except Exception as e:
-        logger.error(f"Failed to save files: {e}")
+        logger.exception("Failed to save files")
         return False
 
 
