@@ -48,7 +48,7 @@ def _get_watchlist():
     """GET: Retrieve watchlist items"""
     try:
         items = query_db("""
-            SELECT id, ticker, symbol, notes, created_at
+            SELECT id, symbol, name, created_at
             FROM watchlist
             ORDER BY created_at DESC
         """)
@@ -81,40 +81,38 @@ def _add_to_watchlist():
         if error_response:
             return error_response
         
-        ticker = validated_data.get("ticker", "").strip()
         symbol = validated_data.get("symbol", "").strip()
-        notes = validated_data.get("notes", "").strip()
+        name = validated_data.get("name", "").strip()
         
         # Check if already exists
         existing = query_db(
-            "SELECT id FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
-            (ticker,),
+            "SELECT id FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
+            (symbol,),
             one=True
         )
         
         if existing:
             return StandardizedErrorResponse.format(
                 "WATCHLIST_DUPLICATE",
-                f"Ticker {ticker} already in watchlist",
+                f"Symbol {symbol} already in watchlist",
                 409
             )
         
         # Insert new item
         item_id = execute_db(
             """
-            INSERT INTO watchlist (ticker, symbol, notes)
-            VALUES (?, ?, ?)
+            INSERT INTO watchlist (symbol, name)
+            VALUES (?, ?)
             """,
-            (ticker, symbol, notes)
+            (symbol, name)
         )
         
-        logger.info(f"Added {ticker} to watchlist")
+        logger.info(f"Added {symbol} to watchlist")
         
         return jsonify({
             "id": item_id,
-            "ticker": ticker,
             "symbol": symbol,
-            "notes": notes,
+            "name": name,
             "message": "Added to watchlist"
         }), 201
         
@@ -134,19 +132,19 @@ def _remove_from_watchlist():
         data = request.get_json() or {}
         
         item_id = data.get("id")
-        ticker = data.get("ticker")
+        symbol = data.get("symbol")
         
-        if not item_id and not ticker:
+        if not item_id and not symbol:
             return StandardizedErrorResponse.format(
                 "INVALID_REQUEST",
-                "Provide either 'id' or 'ticker'",
+                "Provide either 'id' or 'symbol'",
                 400
             )
         
         # Build query
         if item_id:
             result = query_db(
-                "SELECT ticker FROM watchlist WHERE id = ?",
+                "SELECT symbol FROM watchlist WHERE id = ?",
                 (item_id,),
                 one=True
             )
@@ -156,20 +154,20 @@ def _remove_from_watchlist():
                     f"Watchlist item {item_id} not found",
                     404
                 )
-            ticker_name = result['ticker']
+            symbol_name = result['symbol']
             execute_db("DELETE FROM watchlist WHERE id = ?", (item_id,))
         else:
-            ticker_name = ticker
+            symbol_name = symbol
             execute_db(
-                "DELETE FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
-                (ticker,)
+                "DELETE FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
+                (symbol,)
             )
         
-        logger.info(f"Removed {ticker_name} from watchlist")
+        logger.info(f"Removed {symbol_name} from watchlist")
         
         return jsonify({
             "message": "Removed from watchlist",
-            "ticker": ticker_name
+            "symbol": symbol_name
         }), 200
         
     except Exception as e:
