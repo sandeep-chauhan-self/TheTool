@@ -79,10 +79,11 @@ def check_cross_visibility():
     
     # Get a stock that has both watchlist and bulk analysis
     # We'll check the database directly for this
-    import sqlite3
     import os
-    db_path = os.path.join(os.path.dirname(__file__), 'data', 'trading_app.db')
-    conn = sqlite3.connect(db_path)
+    from database import get_db_connection
+    from config import config
+    
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Find a stock that should appear in both views

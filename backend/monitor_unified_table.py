@@ -2,18 +2,18 @@
 Monitoring script for unified table migration
 Run every 6 hours for 48 hours to track stability
 """
-import sqlite3
 import os
 from datetime import datetime
 import json
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'trading_app.db')
 LOG_FILE = os.path.join(os.path.dirname(__file__), 'migration_monitoring.log')
 
 def log_metrics():
     """Collect and log key metrics"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        from database import get_db_connection
+        
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         metrics = {
