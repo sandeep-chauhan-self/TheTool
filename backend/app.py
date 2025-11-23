@@ -54,13 +54,11 @@ def create_app(config_object=None):
     # Setup logging (idempotent, setup_logger handles deduplication)
     logger = setup_logger()
     
-    # Configure CORS
-    cors_origins = getattr(config, "CORS_ORIGINS", [
-        "https://the-tool-theta.vercel.app",
-        "https://thetool-production.up.railway.app",
-        "http://192.168.57.1:3000",
-        "http://localhost:3000"
-    ])
+    # Configure CORS using centralized configuration
+    # config.CORS_ORIGINS uses CORS_CONFIG from constants.py
+    cors_origins = config.CORS_ORIGINS
+    
+    logger.info(f"CORS enabled for origins: {cors_origins}")
     
     CORS(
         app,
