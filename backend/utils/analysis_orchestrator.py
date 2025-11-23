@@ -324,7 +324,7 @@ class TradeCalculator:
             
             # Use EntryCalculator for entry levels
             entry_calculator = EntryCalculator()
-            entry_price, method, confidence = entry_calculator.calculate_strategic_entry(
+            entry_price, _method, _confidence = entry_calculator.calculate_strategic_entry(
                 df=df,
                 current_price=current_price,
                 signal=verdict
@@ -389,7 +389,7 @@ class TradeCalculator:
             }
             
         except Exception as e:
-            logger.error(f"Trade calculation failed: {e}")
+            logger.exception(f"Trade calculation failed: {e}")
             current_price = float(df['Close'].iloc[-1])
             return {
                 'entry': current_price,
@@ -401,7 +401,6 @@ class TradeCalculator:
                 'risk_valid': False,
                 'risk_message': str(e)
             }
-
 
 class ResultFormatter:
     """
