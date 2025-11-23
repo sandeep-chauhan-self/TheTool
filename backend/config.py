@@ -29,13 +29,18 @@ class Config:
     # DATABASE CONFIGURATION
     # =============================================================================
     
+    # Railway support: Postgres via DATABASE_URL env var
+    DATABASE_URL = os.getenv('DATABASE_URL', None)
+    DATABASE_TYPE = 'postgres' if DATABASE_URL else 'sqlite'
+    
+    # SQLite configuration (local development)
     DATA_PATH = os.getenv('DATA_PATH', './data')
     DB_NAME = os.getenv('DB_NAME', 'trading_app.db')
     
     @property
     def DB_PATH(self) -> str:
-        """Full path to database file"""
-        return os.path.join(self.DATA_PATH, self.DB_NAME)
+        """Full path to database file (SQLite only)"""
+        return os.path.join(self.DATA_PATH, self.DB_NAME) if self.DATABASE_TYPE == 'sqlite' else None
     
     # =============================================================================
     # APPLICATION CONFIGURATION
@@ -103,7 +108,11 @@ class Config:
     # REDIS CONFIGURATION (EVOLUTIONARY_RISK_001 - Message Queue System)
     # =============================================================================
     
-    REDIS_ENABLED = os.getenv('REDIS_ENABLED', 'False').lower() in ('true', '1', 'yes')
+    # Railway support: Redis via REDIS_URL env var
+    REDIS_URL = os.getenv('REDIS_URL', None)
+    
+    # Fallback to individual host/port config
+    REDIS_ENABLED = os.getenv('REDIS_ENABLED', 'False').lower() in ('true', '1', 'yes') or bool(REDIS_URL)
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
     REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
     REDIS_DB = int(os.getenv('REDIS_DB', '0'))
@@ -169,9 +178,18 @@ class Config:
         if self.CACHE_TTL < 60:
             messages.append(f"WARNING: CACHE_TTL={self.CACHE_TTL}s is very short. Cache effectiveness will be low.")
         
+        # Database validations
+        if self.DATABASE_TYPE == 'postgres' and not self.DATABASE_URL:
+            messages.append("ERROR: Postgres selected but DATABASE_URL not configured!")
+        
         # Redis validations
-        if self.REDIS_ENABLED and not self.REDIS_HOST:
-            messages.append("ERROR: REDIS_ENABLED=True but REDIS_HOST not configured!")
+        if self.REDIS_ENABLED:
+            if self.REDIS_URL:
+                messages.append(f"INFO: Using Redis from REDIS_URL (Railway managed)")
+            elif not self.REDIS_HOST:
+                messages.append("ERROR: REDIS_ENABLED=True but REDIS_HOST/REDIS_URL not configured!")
+            else:
+                messages.append(f"INFO: Using Redis at {self.REDIS_HOST}:{self.REDIS_PORT}")
         
         return messages
     
@@ -182,10 +200,16 @@ class Config:
         print("=" * 80)
         print(f"Environment: {self.FLASK_ENV}")
         print(f"Debug Mode: {self.DEBUG}")
-        print(f"Database: {self.DB_PATH}")
+        print(f"Database Type: {self.DATABASE_TYPE.upper()}")
+        if self.DATABASE_TYPE == 'sqlite':
+            print(f"  Path: {self.DB_PATH}")
+        else:
+            print(f"  Postgres: (via DATABASE_URL)")
         print(f"Max Threads: {self.MAX_THREADS}")
         print(f"Cache Enabled: {self.CACHE_ENABLED}")
         print(f"Rate Limiting: {self.RATE_LIMIT_ENABLED}")
+        if self.REDIS_ENABLED:
+            print(f"Redis: Enabled ({self.REDIS_HOST}:{self.REDIS_PORT})")
         print(f"Numba JIT: {self.ENABLE_NUMBA}")
         print(f"Vectorization: {self.ENABLE_VECTORIZATION}")
         print("=" * 80)

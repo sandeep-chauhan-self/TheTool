@@ -228,3 +228,38 @@ def cleanup_all_stocks_analysis(symbol=None, keep_last=10):
     It now redirects to cleanup_old_analyses() which handles the unified table.
     """
     return cleanup_old_analyses(symbol=symbol, keep_last=keep_last)
+
+
+def init_db_if_needed():
+    """
+    Safe database initialization: idempotent and gunicorn-safe.
+    
+    Checks if DB exists, creates if missing, applies schema (idempotent).
+    Safe to call on every request and in every worker process.
+    
+    Returns:
+        bool: True if DB already existed, False if newly created
+    """
+    db_existed = os.path.exists(DB_PATH)
+    try:
+        init_db()
+        return db_existed
+    except Exception as e:
+        print(f"ERROR: init_db_if_needed failed: {e}")
+        raise
+
+
+def close_db(exception=None):
+    """
+    Flask teardown function: closes DB connection at end of request.
+    Registered with app.teardown_appcontext.
+    
+    Args:
+        exception: Exception from app context (provided by Flask teardown)
+    """
+    db = g.pop('db', None)
+    if db is not None:
+        try:
+            db.close()
+        except Exception as e:
+            print(f"ERROR closing database: {e}")

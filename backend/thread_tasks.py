@@ -251,9 +251,9 @@ def cleanup_old_threads():
 def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_demo: bool):
     """
     Analyze a single stock for bulk analysis
-    Updates all_stocks_analysis table directly
+    Updates analysis_results table (unified table)
     """
-    from database import cleanup_all_stocks_analysis
+    from database import cleanup_old_analyses
     
     try:
         logger.info(f"Analyzing {symbol} for bulk analysis")
@@ -263,10 +263,10 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
         
         # Update status to 'analyzing'
         cursor.execute('''
-            UPDATE all_stocks_analysis 
+            UPDATE analysis_results 
             SET status = 'analyzing', updated_at = ?
             WHERE symbol = ? AND id = (
-                SELECT MAX(id) FROM all_stocks_analysis WHERE symbol = ?
+                SELECT MAX(id) FROM analysis_results WHERE symbol = ?
             )
         ''', (datetime.now().isoformat(), symbol, symbol))
         conn.commit()
@@ -279,7 +279,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
             
             cursor.execute('''
-                INSERT INTO all_stocks_analysis 
+                INSERT INTO analysis_results 
                 (symbol, name, yahoo_symbol, status, score, verdict, entry, stop_loss, target, 
                  entry_method, data_source, is_demo_data, raw_data, created_at, updated_at)
                 VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -302,7 +302,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             conn.commit()
             
             # Auto-cleanup old analyses (keep last 10)
-            cleanup_all_stocks_analysis(symbol, keep_last=10)
+            cleanup_old_analyses(symbol=symbol, keep_last=10)
             
             conn.close()
             
@@ -321,7 +321,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO all_stocks_analysis 
+                INSERT INTO analysis_results 
                 (symbol, name, yahoo_symbol, status, error_message, created_at, updated_at)
                 VALUES (?, ?, ?, 'failed', ?, ?, ?)
             ''', (
