@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getWatchlist, addToWatchlist, removeFromWatchlist, analyzeStocks, getJobStatus, getReport, getStockHistory, cancelJob } from '../api/api';
+import { addToWatchlist, analyzeStocks, cancelJob, getJobStatus, getStockHistory, getWatchlist, removeFromWatchlist } from '../api/api';
+import AddStockModal from '../components/AddStockModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
-import AddStockModal from '../components/AddStockModal';
 
 function Dashboard() {
   const [watchlist, setWatchlist] = useState([]);

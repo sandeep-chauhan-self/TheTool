@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllNSEStocks, analyzeAllStocks, getAllStocksProgress } from '../api/api';
+import { analyzeAllStocks, getAllNSEStocks, getAllStocksProgress } from '../api/api';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 
