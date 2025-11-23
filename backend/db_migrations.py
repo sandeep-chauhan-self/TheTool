@@ -431,21 +431,16 @@ def migration_v3(conn):
         conn.commit()
         logger.info("[OK] Migration v3 completed successfully")
         
-        # Record the migration using the correct placeholder
-        placeholder = get_db_placeholder(conn)
-        if placeholder == '?':
-            cursor.execute('''
-                INSERT INTO db_version (version, description)
-                VALUES (?, ?)
-            ''', (3, 'PostgreSQL constraints, indices, and job tracking'))
-        else:
-            cursor.execute('''
-                INSERT INTO db_version (version, description)
-                VALUES (%s, %s)
-            ''', (3, 'PostgreSQL constraints, indices, and job tracking'))
-        conn.commit()
-        
-        return True
+        # Use the centralized helper so migration bookkeeping follows the
+        # same error handling and logging as all other migrations.
+        migration_sql = """
+        -- PostgreSQL constraints, indices, and job tracking
+        -- (No-op here because we've already applied the statements above.)
+        """
+
+        # apply_migration will insert the db_version record and commit/rollback
+        # using the same param style detection implemented there.
+        return apply_migration(conn, 3, "PostgreSQL constraints, indices, and job tracking", migration_sql)
         
     except Exception as e:
         logger.error(f"Migration v3 failed: {e}")
