@@ -2,9 +2,18 @@
 Backend Test Script - Verify All Components
 """
 
-from database import get_db_connection, init_db
+import sys
 import os
 import json
+from pathlib import Path
+
+# Ensure backend module can be imported regardless of working directory
+# Add backend directory to sys.path if not already present
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+from database import get_db_connection, init_db
 import config
 
 def get_table_columns(cursor, table_name):
