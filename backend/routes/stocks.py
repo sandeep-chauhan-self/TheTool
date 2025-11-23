@@ -356,6 +356,12 @@ def get_all_stocks_progress():
         """)
         
         jobs = []
+        total_jobs = 0
+        total_completed = 0
+        total_successful = 0
+        total_analyzing = 0
+        total_errors = 0
+        
         for row in cursor.fetchall():
             try:
                 errors_list = json.loads(row[5]) if row[5] else []
@@ -375,13 +381,49 @@ def get_all_stocks_progress():
                 "errors_count": len(errors_list),
                 "progress_percent": progress_pct
             })
+            
+            total_jobs += 1
+            total_completed += row[3]
+            total_successful += row[4]
+            total_analyzing += row[2] - row[3]  # pending = total - completed
+            total_errors += len(errors_list)
         
         cursor.close()
         conn.close()
         
-        logger.info(f"[PROGRESS] Retrieved {len(jobs)} active jobs")
+        # Calculate overall progress
+        is_analyzing = len(jobs) > 0
+        overall_total = sum(j['total'] for j in jobs) if jobs else 0
+        overall_completed = sum(j['completed'] for j in jobs) if jobs else 0
+        overall_percentage = 0
+        if overall_total > 0:
+            overall_percentage = int((overall_completed / overall_total) * 100)
+        
+        # Estimate time remaining
+        estimated_remaining = "N/A"
+        if is_analyzing and overall_total > overall_completed:
+            # Rough estimate: assume 1 stock/second
+            pending = overall_total - overall_completed
+            estimated_seconds = pending
+            if estimated_seconds < 60:
+                estimated_remaining = f"{estimated_seconds}s"
+            elif estimated_seconds < 3600:
+                estimated_remaining = f"{estimated_seconds // 60}m"
+            else:
+                estimated_remaining = f"{estimated_seconds // 3600}h"
+        
+        logger.info(f"[PROGRESS] Retrieved {len(jobs)} active jobs. Total: {overall_total}, Completed: {overall_completed}, Percentage: {overall_percentage}%")
         
         return jsonify({
+            "is_analyzing": is_analyzing,
+            "analyzing": len(jobs),
+            "completed": overall_completed,
+            "total": overall_total,
+            "percentage": overall_percentage,
+            "estimated_time_remaining": estimated_remaining,
+            "pending": total_analyzing,
+            "failed": total_errors,
+            "successful": total_successful,
             "jobs": jobs,
             "active_count": len(jobs)
         }), 200
