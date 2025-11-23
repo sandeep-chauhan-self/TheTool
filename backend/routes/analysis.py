@@ -17,6 +17,7 @@ from utils.api_utils import (
 from database import query_db, execute_db, get_db_connection
 from models.job_state import get_job_state_manager
 from utils.db_utils import JobStateTransactions, get_job_status
+from utils.schemas import ResponseSchemas, validate_response
 from auth import require_auth
 
 logger = setup_logger()
@@ -225,12 +226,12 @@ def get_history(ticker):
         if not results:
             return jsonify({
                 "ticker": ticker,
-                "results": []
+                "history": []
             }), 200
         
         return jsonify({
             "ticker": ticker,
-            "results": [dict(r) for r in results]
+            "history": [dict(r) for r in results]
         }), 200
         
     except Exception as e:

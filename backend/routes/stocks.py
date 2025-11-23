@@ -154,7 +154,7 @@ def get_stock_history(symbol):
         
         return jsonify({
             "symbol": symbol,
-            "results": [dict(r) for r in results],
+            "history": [dict(r) for r in results],
             "count": len(results)
         }), 200
         
@@ -176,7 +176,7 @@ def analyze_all_stocks():
     
     Request body:
     {
-        "symbols": ["TCS.NS", "INFY.NS"],
+        "symbols": ["TCS.NS", "INFY.NS"],  # Empty array [] means analyze ALL stocks
         "capital": 100000
     }
     """
@@ -191,8 +191,40 @@ def analyze_all_stocks():
         if error_response:
             return error_response
         
-        symbols = validated_data["symbols"]
-        capital = validated_data["capital"]
+        symbols = validated_data.get("symbols") if validated_data else []
+        if symbols is None:
+            symbols = []
+        capital = validated_data.get("capital", 100000) if validated_data else 100000
+        
+        # Handle empty array: means "analyze ALL stocks"
+        if len(symbols) == 0:
+            logger.info("Empty symbols array received - analyzing ALL stocks")
+            try:
+                # Get all stocks from database
+                all_stocks = query_db("""
+                    SELECT DISTINCT ticker FROM analysis_results
+                    UNION
+                    SELECT DISTINCT ticker FROM watchlist
+                    ORDER BY ticker
+                """)
+                
+                if not all_stocks:
+                    return StandardizedErrorResponse.format(
+                        "NO_STOCKS_FOUND",
+                        "No stocks found to analyze. Add stocks to watchlist first.",
+                        400
+                    )
+                
+                symbols = [stock[0] for stock in all_stocks]
+                logger.info(f"Found {len(symbols)} stocks to analyze: {symbols[:10]}...")
+            except Exception as e:
+                logger.error(f"Failed to get all stocks: {e}")
+                return StandardizedErrorResponse.format(
+                    "STOCK_LOOKUP_ERROR",
+                    "Failed to retrieve stocks for analysis",
+                    500,
+                    {"error": str(e)}
+                )
         
         # Create job ID
         job_id = str(uuid.uuid4())
@@ -215,8 +247,8 @@ def analyze_all_stocks():
         
         # Start background job
         try:
-            from infrastructure.thread_tasks import start_bulk_analysis
-            start_bulk_analysis(job_id, symbols, capital)
+            from infrastructure.thread_tasks import start_analysis_job
+            start_analysis_job(job_id, symbols, None, capital, False)
         except Exception as e:
             logger.error(f"Failed to start bulk analysis job {job_id}: {e}")
             return StandardizedErrorResponse.format(

@@ -233,6 +233,7 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     Get current job status.
     
     Returns dict with: job_id, status, progress, completed, total, etc.
+    Includes current_ticker and message for frontend progress display.
     """
     try:
         result = query_db(
@@ -244,18 +245,59 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
             one=True
         )
         if result:
+            completed = result[3]
+            total = result[4]
+            status = result[1]
+            successful = result[5]
+            
+            # Calculate current index (1-based for display)
+            current_index = completed + 1 if completed < total else total
+            
+            # Build message based on status
+            if status == "queued":
+                message = "Queued for analysis..."
+            elif status == "processing":
+                message = f"Processing ticker {current_index}/{total}..."
+            elif status == "completed":
+                message = f"Completed! {successful}/{total} successful"
+            elif status == "failed":
+                message = "Analysis failed"
+            elif status == "cancelled":
+                message = "Analysis cancelled"
+            else:
+                message = f"Status: {status}"
+            
+            # Get the ticker currently being analyzed or the last analyzed one
+            current_ticker = None
+            try:
+                # Get most recent analysis result for this job
+                latest_result = query_db(
+                    '''SELECT ticker FROM analysis_results 
+                       WHERE job_id = ? 
+                       ORDER BY created_at DESC LIMIT 1''',
+                    (job_id,),
+                    one=True
+                )
+                if latest_result:
+                    current_ticker = latest_result[0]
+            except:
+                pass  # If query fails, current_ticker remains None
+            
             return {
                 "job_id": result[0],
-                "status": result[1],
+                "status": status,
                 "progress": result[2],
-                "completed": result[3],
-                "total": result[4],
-                "successful": result[5],
+                "completed": completed,
+                "total": total,
+                "successful": successful,
                 "errors": result[6],
                 "created_at": result[7],
                 "updated_at": result[8],
                 "started_at": result[9],
-                "completed_at": result[10]
+                "completed_at": result[10],
+                "current_index": current_index,
+                "current_ticker": current_ticker,
+                "message": message
             }
         return None
     except Exception as e:

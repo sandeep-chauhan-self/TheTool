@@ -14,22 +14,22 @@ const api = axios.create({
 });
 
 export const analyzeStocks = async (tickers, indicators = null) => {
-  const response = await api.post('/analyze', { tickers, indicators });
+  const response = await api.post('/api/analysis/analyze', { tickers, indicators });
   return response.data;
 };
 
 export const getJobStatus = async (jobId) => {
-  const response = await api.get(`/status/${jobId}`);
+  const response = await api.get(`/api/analysis/status/${jobId}`);
   return response.data;
 };
 
 export const getReport = async (ticker) => {
-  const response = await api.get(`/report/${ticker}`);
+  const response = await api.get(`/api/analysis/report/${ticker}`);
   return response.data;
 };
 
 export const downloadReport = async (ticker) => {
-  const response = await api.get(`/report/${ticker}/download`, {
+  const response = await api.get(`/api/analysis/report/${ticker}/download`, {
     responseType: 'blob',
   });
   const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -42,12 +42,12 @@ export const downloadReport = async (ticker) => {
 };
 
 export const getNSEList = async () => {
-  const response = await api.get('/nse');
+  const response = await api.get('/api/stocks/nse');
   return response.data;
 };
 
 export const getNSEStocks = async () => {
-  const response = await api.get('/nse-stocks');
+  const response = await api.get('/api/stocks/nse-stocks');
   return response.data;
 };
 
@@ -57,17 +57,17 @@ export const getConfig = async () => {
 };
 
 export const getWatchlist = async () => {
-  const response = await api.get('/watchlist');
+  const response = await api.get('/api/watchlist');
   return response.data;
 };
 
 export const addToWatchlist = async (symbol, name = '') => {
-  const response = await api.post('/watchlist', { symbol, name });
+  const response = await api.post('/api/watchlist', { symbol, name });
   return response.data;
 };
 
 export const removeFromWatchlist = async (symbol) => {
-  const response = await api.delete('/watchlist', { data: { symbol } });
+  const response = await api.delete('/api/watchlist', { data: { symbol } });
   return response.data;
 };
 
@@ -78,32 +78,32 @@ export const getHealth = async () => {
 
 // All Stocks Analysis APIs
 export const initializeAllStocks = async () => {
-  const response = await api.post('/initialize-all-stocks');
+  const response = await api.post('/api/stocks/initialize-all-stocks');
   return response.data;
 };
 
 export const getAllStocks = async () => {
-  const response = await api.get('/all-stocks');
+  const response = await api.get('/api/stocks/all-stocks');
   return response.data;
 };
 
 export const getStockHistory = async (symbol) => {
-  const response = await api.get(`/all-stocks/${symbol}/history`);
+  const response = await api.get(`/api/stocks/all-stocks/${symbol}/history`);
   return response.data;
 };
 
 export const analyzeAllStocks = async (symbols = []) => {
-  const response = await api.post('/analyze-all-stocks', { symbols });
+  const response = await api.post('/api/stocks/analyze-all-stocks', { symbols });
   return response.data;
 };
 
 export const getAllStocksProgress = async () => {
-  const response = await api.get('/all-stocks/progress');
+  const response = await api.get('/api/stocks/all-stocks/progress');
   return response.data;
 };
 
 export const cancelJob = async (jobId) => {
-  const response = await api.post(`/cancel-job/${jobId}`);
+  const response = await api.post(`/api/analysis/cancel/${jobId}`);
   return response.data;
 };
 
