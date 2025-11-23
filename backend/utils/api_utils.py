@@ -229,8 +229,6 @@ class RequestValidator:
         def validate_symbols(cls, v):
             if v is None:
                 return v
-            if len(v) > 500:
-                raise ValueError('symbols list cannot exceed 500 items')
             return [s.strip().upper() for s in v]
         
         @validator('max_workers')
