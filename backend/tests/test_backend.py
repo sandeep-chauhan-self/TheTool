@@ -14,7 +14,7 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from database import get_db_connection, init_db
-import config
+from config import config
 
 def get_table_columns(cursor, table_name):
     """
@@ -22,7 +22,7 @@ def get_table_columns(cursor, table_name):
     Returns a set of column names.
     """
     try:
-        if config.DATABASE_TYPE == 'postgresql':
+        if config.DATABASE_TYPE == 'postgres':
             # PostgreSQL: Query information_schema
             cursor.execute("""
                 SELECT column_name 
@@ -51,7 +51,7 @@ try:
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    if config.DATABASE_TYPE == 'postgresql':
+    if config.DATABASE_TYPE == 'postgres':
         cursor.execute("""
             SELECT table_name 
             FROM information_schema.tables 
@@ -176,26 +176,33 @@ try:
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    if config.DATABASE_TYPE == 'postgresql':
-        cursor.execute("""
-            SELECT indexname 
-            FROM pg_indexes 
-            WHERE schemaname = 'public' AND indexname LIKE 'idx_all_stocks%'
-        """)
-        indexes = [row[0] for row in cursor.fetchall()]
-    else:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_all_stocks%'")
-        indexes = [row[0] for row in cursor.fetchall()]
-    
-    if indexes:
-        print(f"  [PASS] Found {len(indexes)} indexes for all_stocks_analysis")
-        for idx in indexes:
-            print(f"    - {idx}")
-    else:
-        print(f"  [WARN] No indexes found (may affect performance)")
-    
-    cursor.close()
-    conn.close()
+    try:
+        if config.DATABASE_TYPE == 'postgres':
+            cursor.execute("""
+                SELECT indexname 
+                FROM pg_indexes 
+                WHERE schemaname = 'public' AND tablename = 'all_stocks_analysis' 
+                AND indexname LIKE 'idx_all_stocks%'
+            """)
+            indexes = [row[0] for row in cursor.fetchall()]
+        else:
+            # SQLite: Use sqlite_master
+            cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='index' AND tbl_name='all_stocks_analysis' 
+                AND name LIKE 'idx_all_stocks%'
+            """)
+            indexes = [row[0] for row in cursor.fetchall()]
+        
+        if indexes:
+            print(f"  [PASS] Found {len(indexes)} indexes for all_stocks_analysis")
+            for idx in indexes:
+                print(f"    - {idx}")
+        else:
+            print(f"  [WARN] No indexes found (may affect performance)")
+    finally:
+        cursor.close()
+        conn.close()
 except Exception as e:
     print(f"  [ERROR] {e}")
 
