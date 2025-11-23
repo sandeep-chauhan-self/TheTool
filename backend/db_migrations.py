@@ -20,6 +20,49 @@ DB_PATH = config.DB_PATH
 CURRENT_SCHEMA_VERSION = 3
 
 
+def get_db_placeholder(conn):
+    """
+    Get the correct parameter placeholder for the active database driver.
+    
+    DB-API 2.0 specifies that connections have a paramstyle attribute:
+    - 'qmark': Question mark style (SQLite)
+    - 'format': ANSI C printf format codes (PostgreSQL uses %s)
+    - 'pyformat': Python extended format codes (:name)
+    - 'numeric': Numeric positional style (:1, :2)
+    - 'named': Named style (:name)
+    
+    Returns:
+        str: The correct placeholder for this database driver
+    """
+    try:
+        # Use the paramstyle from the DB-API 2.0 connection
+        import sqlite3
+        import psycopg2
+        
+        if isinstance(conn, sqlite3.Connection):
+            return '?'
+        elif isinstance(conn, psycopg2.extensions.connection):
+            return '%s'
+        else:
+            # Fallback: try to read paramstyle
+            if hasattr(conn, 'paramstyle'):
+                paramstyle = conn.paramstyle
+                if paramstyle == 'qmark':
+                    return '?'
+                elif paramstyle == 'format':
+                    return '%s'
+                elif paramstyle == 'pyformat':
+                    return '%(name)s'  # Would need to be handled specially
+                else:
+                    logger.warning(f"Unknown paramstyle: {paramstyle}, defaulting to %s")
+                    return '%s'
+    except Exception as e:
+        logger.warning(f"Could not determine paramstyle: {e}, defaulting to %s")
+    
+    # Default to %s (PostgreSQL) as it's more common in production
+    return '%s'
+
+
 def get_migration_conn():
     """Get a database connection for migrations"""
     from database import get_db_connection
@@ -62,15 +105,45 @@ def get_current_version(conn):
 
 
 def apply_migration(conn, version: int, description: str, migration_sql: str):
-    """Apply a single migration"""
+    """Apply a single migration
+    
+    Handles both SQLite and PostgreSQL by:
+    - Using executescript for SQLite (handles multiple statements)
+    - Splitting and executing individually for PostgreSQL
+    - Using the correct parameter placeholder for each driver
+    """
     cursor = conn.cursor()
     try:
         logger.info(f"Applying migration v{version}: {description}")
-        cursor.executescript(migration_sql)
-        cursor.execute('''
-            INSERT INTO db_version (version, description)
-            VALUES (?, ?)
-        ''', (version, description))
+        
+        # SQLite has executescript, PostgreSQL doesn't
+        if config.DATABASE_TYPE == 'sqlite':
+            cursor.executescript(migration_sql)
+        else:
+            # PostgreSQL: execute statements individually
+            # Split by ';' but be careful with strings containing ';'
+            statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
+            for stmt in statements:
+                if stmt:
+                    cursor.execute(stmt)
+            conn.commit()
+        
+        # Use the correct placeholder for the active database driver
+        placeholder = get_db_placeholder(conn)
+        
+        if placeholder == '?':
+            # SQLite: question mark style
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (?, ?)
+            ''', (version, description))
+        else:
+            # PostgreSQL and others: format style (%s)
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (%s, %s)
+            ''', (version, description))
+        
         conn.commit()
         logger.info(f"[OK] Migration v{version} applied successfully")
         return True
@@ -358,11 +431,18 @@ def migration_v3(conn):
         conn.commit()
         logger.info("[OK] Migration v3 completed successfully")
         
-        # Record the migration
-        cursor.execute('''
-            INSERT INTO db_version (version, description)
-            VALUES (3, 'PostgreSQL constraints, indices, and job tracking')
-        ''')
+        # Record the migration using the correct placeholder
+        placeholder = get_db_placeholder(conn)
+        if placeholder == '?':
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (?, ?)
+            ''', (3, 'PostgreSQL constraints, indices, and job tracking'))
+        else:
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (%s, %s)
+            ''', (3, 'PostgreSQL constraints, indices, and job tracking'))
         conn.commit()
         
         return True
