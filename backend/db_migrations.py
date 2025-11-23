@@ -206,8 +206,10 @@ def migration_v3(conn):
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_ticker_date
                 ON analysis_results(ticker, CAST(created_at AS DATE))
             ''')
+            conn.commit()
             logger.info("  ✓ UNIQUE INDEX created on (ticker, date)")
         except Exception as e:
+            conn.rollback()
             logger.debug(f"  Index may already exist: {e}")
         
         # 2. Add basic indices
@@ -228,8 +230,10 @@ def migration_v3(conn):
                 CREATE INDEX IF NOT EXISTS idx_analysis_source
                 ON analysis_results(analysis_source, created_at DESC)
             ''')
+            conn.commit()
             logger.info("  ✓ Basic indices created")
         except Exception as e:
+            conn.rollback()
             logger.debug(f"  Indices may already exist: {e}")
         
         # 3. Add columns to existing tables
@@ -252,7 +256,11 @@ def migration_v3(conn):
             if 'last_status' not in existing_cols:
                 cursor.execute('ALTER TABLE watchlist ADD COLUMN last_status TEXT')
                 logger.info("  ✓ Added last_status column to watchlist")
+            
+            conn.commit()
+            logger.info("  ✓ All watchlist columns added")
         except Exception as e:
+            conn.rollback()
             logger.debug(f"  Watchlist columns may already exist: {e}")
         
         try:
@@ -274,7 +282,11 @@ def migration_v3(conn):
             if 'completed_at' not in existing_cols:
                 cursor.execute('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP')
                 logger.info("  ✓ Added completed_at column to analysis_results")
+            
+            conn.commit()
+            logger.info("  ✓ All analysis_results columns added")
         except Exception as e:
+            conn.rollback()
             logger.debug(f"  Analysis results columns may already exist: {e}")
         
         # 4. Create new tables
@@ -304,8 +316,10 @@ def migration_v3(conn):
                 ON analysis_jobs_details(ticker)
             ''')
             
+            conn.commit()
             logger.info("  ✓ Created analysis_jobs_details table")
         except Exception as e:
+            conn.rollback()
             logger.debug(f"  analysis_jobs_details table may already exist: {e}")
         
         try:
@@ -325,8 +339,10 @@ def migration_v3(conn):
                 ON analysis_raw_data(analysis_result_id)
             ''')
             
+            conn.commit()
             logger.info("  ✓ Created analysis_raw_data table")
         except Exception as e:
+            conn.rollback()
             logger.debug(f"  analysis_raw_data table may already exist: {e}")
         
         # 5. Add composite indices
@@ -365,7 +381,10 @@ def run_migrations():
     Safe to call multiple times (idempotent).
     """
     import os
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
+    # Only create directories for SQLite
+    if config.DATABASE_TYPE == 'sqlite' and DB_PATH:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = get_migration_conn()
     try:
