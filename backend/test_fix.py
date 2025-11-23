@@ -27,15 +27,16 @@ print(f'\nJob ID: {job_id}')
 # Wait for job to complete
 print("\nWaiting for analysis to complete...")
 for i in range(30):
-    status_response = requests.get(f'{BASE_URL}{API_URLS.get_status(job_id)}')
-    status = status_response.json()
-    print(f'Check {i+1}: {status["status"]} - {status["completed"]}/{status["total"]} completed')
-    
-    if status['status'] == 'completed':
-        print('\n✓ Job completed!')
-        print('Errors:', status.get('errors'))
-        break
-    time.sleep(1)
+    for i in range(30):
+        status_response = requests.get(f'{BASE_URL}{API_URLS.get_status(job_id)}', timeout=10)
+        status = status_response.json()    status = status_response.json()
+        print(f'Check {i+1}: {status["status"]} - {status["completed"]}/{status["total"]} completed')
+        
+        if status['status'] == 'completed':
+            print('\n✓ Job completed!')
+            print('Errors:', status.get('errors'))
+            break
+        time.sleep(1)
 
 # Now check if result is in database
 print('\n--- Checking Database ---')

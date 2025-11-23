@@ -9,8 +9,7 @@ import json
 from constants import get_api_base_url, API_URLS
 
 BASE_URL = get_api_base_url()
-API_KEY = "_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI"
-
+API_KEY = os.getenv("API_KEY", "test_key_for_local_dev_only")
 headers = {
     "X-API-Key": API_KEY,
     "Content-Type": "application/json"

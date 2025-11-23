@@ -40,11 +40,14 @@ class Config:
     _raw_database_url = os.getenv('DATABASE_URL', None)
     
     # Fix PostgreSQL URL format (Railway might use postgres:// instead of postgresql://)
-    if _raw_database_url and _raw_database_url.startswith('postgres://'):
-        DATABASE_URL = _raw_database_url.replace('postgres://', 'postgresql://', 1)
+    if _raw_database_url:
+        # Only replace at the start (scheme), not in password/username
+        if _raw_database_url.startswith('postgres://'):
+            DATABASE_URL = 'postgresql://' + _raw_database_url[11:]
+        else:
+            DATABASE_URL = _raw_database_url
     else:
-        DATABASE_URL = _raw_database_url
-    
+        DATABASE_URL = None    
     DATABASE_TYPE = 'postgres' if DATABASE_URL else 'sqlite'
     
     # SQLite configuration (local development only)
@@ -187,7 +190,10 @@ class Config:
         
         # Critical validations
         if not self.MASTER_API_KEY:
-            messages.append("WARNING: MASTER_API_KEY not set. API will generate a temporary key.")
+            if self.FLASK_ENV == 'production':
+                messages.append("ERROR: MASTER_API_KEY must be set in production!")
+            else:
+                messages.append("WARNING: MASTER_API_KEY not set. API will generate a temporary key.")
         
         if self.DEBUG and self.FLASK_ENV == 'production':
             messages.append("ERROR: DEBUG mode enabled in production environment!")
@@ -199,8 +205,9 @@ class Config:
             messages.append(f"WARNING: CACHE_TTL={self.CACHE_TTL}s is very short. Cache effectiveness will be low.")
         
         # Database validations
-        if self.DATABASE_TYPE == 'postgres' and not self.DATABASE_URL:
-            messages.append("ERROR: Postgres selected but DATABASE_URL not configured!")
+        # Validate that production environments must have DATABASE_URL configured (independent of DATABASE_TYPE derivation)
+        if self.FLASK_ENV in ('production', 'prod') and not self.DATABASE_URL:
+            messages.append("ERROR: DATABASE_URL must be configured in production environment!")
         
         # Redis validations
         if self.REDIS_ENABLED:

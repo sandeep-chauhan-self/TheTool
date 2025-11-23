@@ -19,6 +19,7 @@ from project_management import (
     MetricsCollector,
     TechnicalMetric,
     BusinessMetric,
+    MetricDirection,
     ROICalculator,
     Investment,
     Benefit,
@@ -245,7 +246,8 @@ class TestMetricsCollector:
             baseline=5.0,
             current=0.4,
             target=0.5,
-            unit="seconds"
+            unit="seconds",
+            direction=MetricDirection.LOWER_IS_BETTER
         )
         metric = collector.technical_metrics["response_time"]
         assert metric.get_status().value in ["at_target", "above_target"]
@@ -257,7 +259,8 @@ class TestMetricsCollector:
             baseline=40.0,
             current=92.0,
             target=90.0,
-            unit="percent"
+            unit="percent",
+            direction=MetricDirection.HIGHER_IS_BETTER
         )
         metric = collector.technical_metrics["test_coverage"]
         assert metric.get_status().value == "above_target"

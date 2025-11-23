@@ -7,7 +7,7 @@ CROSS_CUTTING_001: Structured Logging with Correlation IDs
 JSON-formatted logs with request correlation for distributed tracing.
 """
 
-from app_logging.structured_logging import (
+from .structured_logging import (
     CorrelationFilter,
     JSONFormatter,
     setup_logging,
@@ -15,7 +15,6 @@ from app_logging.structured_logging import (
     get_correlation_id,
     correlation_id
 )
-
 __all__ = [
     'CorrelationFilter',
     'JSONFormatter',

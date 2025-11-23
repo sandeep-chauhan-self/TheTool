@@ -31,6 +31,7 @@ Usage:
     report = collector.generate_report()
 """
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, Literal
@@ -44,6 +45,12 @@ class MetricCategory(Enum):
     RELIABILITY = "reliability"
     BUSINESS = "business"
     SYSTEM = "system"
+
+
+class MetricDirection(Enum):
+    """Metric direction: whether higher or lower values are better"""
+    HIGHER_IS_BETTER = "higher_is_better"
+    LOWER_IS_BETTER = "lower_is_better"
 
 
 class MetricStatus(Enum):
@@ -66,6 +73,7 @@ class TechnicalMetric:
         current: Current measured value
         target: Target value after refactoring
         unit: Unit of measurement
+        direction: Whether higher or lower values are better (defaults to LOWER_IS_BETTER)
         timestamp: When metric was collected
         measurement_method: How metric is measured
     """
@@ -75,6 +83,7 @@ class TechnicalMetric:
     current: float
     target: float
     unit: str
+    direction: MetricDirection = MetricDirection.LOWER_IS_BETTER
     timestamp: datetime = field(default_factory=datetime.now)
     measurement_method: Optional[str] = None
     
@@ -93,18 +102,17 @@ class TechnicalMetric:
         return min(max(progress * 100, 0.0), 100.0)
     
     def get_status(self) -> MetricStatus:
-        """Determine if metric is on target"""
-        # For "lower is better" metrics (response time, errors)
-        if "time" in self.name.lower() or "error" in self.name.lower():
+        """Determine if metric is on target based on explicit direction"""
+        if self.direction == MetricDirection.LOWER_IS_BETTER:
+            # For "lower is better" metrics (response time, errors)
             if self.current <= self.target:
                 return MetricStatus.AT_TARGET
             elif self.current > self.baseline:
                 return MetricStatus.DEGRADED
             else:
                 return MetricStatus.BELOW_TARGET
-        
-        # For "higher is better" metrics (throughput, coverage)
         else:
+            # For "higher is better" metrics (throughput, coverage)
             if self.current >= self.target:
                 return MetricStatus.ABOVE_TARGET
             elif self.current < self.baseline:
@@ -216,7 +224,8 @@ class MetricsCollector:
     
     def collect_technical_metric(self, name: str, category: str,
                                  baseline: float, current: float, target: float,
-                                 unit: str, measurement_method: Optional[str] = None):
+                                 unit: str, direction: Optional[MetricDirection] = None,
+                                 measurement_method: Optional[str] = None):
         """
         Collect a technical metric
         
@@ -227,8 +236,12 @@ class MetricsCollector:
             current: Current value
             target: Target value
             unit: Unit (e.g., "seconds", "percent")
+            direction: Whether higher or lower is better (defaults to LOWER_IS_BETTER)
             measurement_method: How metric is measured
         """
+        if direction is None:
+            direction = MetricDirection.LOWER_IS_BETTER
+        
         metric = TechnicalMetric(
             name=name,
             category=MetricCategory(category),
@@ -236,6 +249,7 @@ class MetricsCollector:
             current=current,
             target=target,
             unit=unit,
+            direction=direction,
             measurement_method=measurement_method
         )
         self.technical_metrics[name] = metric
@@ -278,8 +292,8 @@ class MetricsCollector:
         """Take a snapshot of all current metrics"""
         snapshot = MetricSnapshot(
             timestamp=datetime.now(),
-            technical_metrics=self.technical_metrics.copy(),
-            business_metrics=self.business_metrics.copy(),
+            technical_metrics=deepcopy(self.technical_metrics),
+            business_metrics=deepcopy(self.business_metrics),
             notes=notes
         )
         self.snapshots.append(snapshot)
@@ -393,11 +407,13 @@ class MetricsCollector:
         degraded = len(self.get_degraded_metrics())
         
         lines.append(f"Technical Metrics: {total_tech}")
-        lines.append(f"  Targets Achieved: {achieved}/{total_tech} ({achieved/total_tech*100:.1f}%)")
+        if total_tech > 0:
+            lines.append(f"  Targets Achieved: {achieved}/{total_tech} ({achieved/total_tech*100:.1f}%)")
+        else:
+            lines.append(f"  Targets Achieved: N/A (no metrics)")
         lines.append(f"  Degraded: {degraded}")
         lines.append(f"Business Metrics: {len(self.business_metrics)}")
-        lines.append("")
-        
+        lines.append("")        
         lines.append("=" * 80)
         return "\n".join(lines)
 
