@@ -105,7 +105,8 @@ def get_db_connection():
     if DATABASE_TYPE == 'postgres':
         return psycopg2.connect(config.DATABASE_URL)
     else:
-        return sqlite3.connect(DB_PATH, check_same_thread=False)
+        # ✅ FIX #13: Add timeout for sqlite3 (wait up to 5 seconds for locks)
+        return sqlite3.connect(DB_PATH, check_same_thread=False, timeout=5.0)
 
 
 def get_db_session():
@@ -120,6 +121,8 @@ def get_db_session():
             cursor = conn.cursor()
             cursor.execute('PRAGMA journal_mode=WAL')
             cursor.execute('PRAGMA synchronous=NORMAL')
+            # ✅ FIX #13b: Add PRAGMA busy_timeout to handle lock contention (5 second timeout)
+            cursor.execute('PRAGMA busy_timeout=5000')
             cursor.close()
         try:
             yield conn, conn.cursor()

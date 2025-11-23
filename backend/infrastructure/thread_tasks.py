@@ -74,13 +74,29 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         logger.info(f"Demo mode: {use_demo_data}")
         logger.info("=" * 60)
         
-        # Mark job as processing using thread-safe connection
-        with get_db_session() as (conn, cursor):
-            cursor.execute('''
-                UPDATE analysis_jobs 
-                SET status = 'processing', started_at = ?
-                WHERE job_id = ?
-            ''', (datetime.now().isoformat(), job_id))
+        # ✅ FIX #11: Add retry logic for status update with exponential backoff
+        max_retries = 3
+        status_updated = False
+        for attempt in range(max_retries):
+            try:
+                with get_db_session() as (conn, cursor):
+                    cursor.execute('''
+                        UPDATE analysis_jobs 
+                        SET status = 'processing', started_at = ?
+                        WHERE job_id = ?
+                    ''', (datetime.now().isoformat(), job_id))
+                status_updated = True
+                logger.info(f"✓ Job {job_id} status updated to 'processing'")
+                break
+            except Exception as update_error:
+                logger.warning(f"[RETRY] Failed to update status for {job_id} (attempt {attempt + 1}/{max_retries}): {update_error}")
+                if attempt < max_retries - 1:
+                    time.sleep(0.5 * (attempt + 1))  # Exponential backoff: 0.5s, 1.0s
+                else:
+                    logger.error(f"✗ FAILED to update job {job_id} to processing after {max_retries} attempts")
+        
+        if not status_updated:
+            logger.warning(f"⚠️  Job {job_id}: Proceeding despite status update failure (will rely on memory state)")
         
         total = len(tickers)
         completed = 0
@@ -89,7 +105,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         
         # Create job state in Redis/memory
         job_state.create_job(job_id, {
-            'status': 'processing',
+            'status': 'processing' if status_updated else 'queued',
             'total': total,
             'completed': 0,
             'successful': 0,
@@ -129,43 +145,58 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     else:
                         symbol = ticker
                     
-                    with get_db_session() as (conn, cursor):
-                        cursor.execute('''
-                            INSERT INTO analysis_results 
-                            (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
-                             entry_method, data_source, is_demo_data, raw_data, status, 
-                             created_at, updated_at, analysis_source)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (
-                            ticker,
-                            symbol,
-                            None,  # name not available from watchlist analysis
-                            ticker,  # yahoo_symbol same as ticker
-                            result.get('score', 0),
-                            result.get('verdict', 'Neutral'),
-                            result.get('entry'),
-                            result.get('stop'),  # Note: key is 'stop' not 'stop_loss'
-                            result.get('target'),
-                            result.get('entry_method', 'Market Order'),
-                            result.get('data_source', 'real'),
-                            result.get('is_demo_data', 0),
-                            raw_data,
-                            'completed',
-                            datetime.now().isoformat(),
-                            datetime.now().isoformat(),
-                            'watchlist'  # Mark as watchlist analysis
-                        ))
-                    successful += 1
+                    # ✅ FIX #12: Add dedicated try/except for INSERT with retry logic
+                    insert_success = False
+                    for insert_attempt in range(3):
+                        try:
+                            with get_db_session() as (conn, cursor):
+                                cursor.execute('''
+                                    INSERT INTO analysis_results 
+                                    (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                                     entry_method, data_source, is_demo_data, raw_data, status, 
+                                     created_at, updated_at, analysis_source)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ''', (
+                                    ticker,
+                                    symbol,
+                                    None,  # name not available from watchlist analysis
+                                    ticker,  # yahoo_symbol same as ticker
+                                    result.get('score', 0),
+                                    result.get('verdict', 'Neutral'),
+                                    result.get('entry'),
+                                    result.get('stop'),  # Note: key is 'stop' not 'stop_loss'
+                                    result.get('target'),
+                                    result.get('entry_method', 'Market Order'),
+                                    result.get('data_source', 'real'),
+                                    result.get('is_demo_data', 0),
+                                    raw_data,
+                                    'completed',
+                                    datetime.now().isoformat(),
+                                    datetime.now().isoformat(),
+                                    'watchlist'  # Mark as watchlist analysis
+                                ))
+                            insert_success = True
+                            break
+                        except Exception as insert_error:
+                            logger.warning(f"[RETRY] Failed to insert result for {ticker} (attempt {insert_attempt + 1}/3): {insert_error}")
+                            if insert_attempt < 2:
+                                time.sleep(0.3 * (insert_attempt + 1))
+                            else:
+                                logger.error(f"✗ Failed to store result for {ticker} after 3 attempts: {insert_error}")
+                                errors.append({'ticker': ticker, 'error': f"DB insert failed: {str(insert_error)}"})
                     
-                    # Log status - check if success flag exists
-                    if result.get('success'):
-                        logger.info(f"✓ {ticker} COMPLETED - Score: {result.get('score')}, Verdict: {result.get('verdict')}")
-                    else:
-                        # Still log as completed even if validation failed - we still have analysis data
-                        error_msg = result.get('error', 'Trade validation failed')
-                        if result.get('trade_issues'):
-                            error_msg = f"Validation: {', '.join(result.get('trade_issues', []))}"
-                        logger.warning(f"✓ {ticker} ANALYZED (Validation failed) - Score: {result.get('score')}, Reason: {error_msg}")
+                    if insert_success:
+                        successful += 1
+                        
+                        # Log status - check if success flag exists
+                        if result.get('success'):
+                            logger.info(f"✓ {ticker} COMPLETED - Score: {result.get('score')}, Verdict: {result.get('verdict')}")
+                        else:
+                            # Still log as completed even if validation failed - we still have analysis data
+                            error_msg = result.get('error', 'Trade validation failed')
+                            if result.get('trade_issues'):
+                                error_msg = f"Validation: {', '.join(result.get('trade_issues', []))}"
+                            logger.warning(f"✓ {ticker} ANALYZED (Validation failed) - Score: {result.get('score')}, Reason: {error_msg}")
                 else:
                     error_msg = 'No result returned from analyzer'
                     errors.append({'ticker': ticker, 'error': error_msg})
@@ -179,20 +210,32 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             completed += 1
             progress = int((completed / total) * 100)
             
-            # Update progress in database using thread-safe connection
-            with get_db_session() as (conn, cursor):
-                cursor.execute('''
-                    UPDATE analysis_jobs 
-                    SET progress = ?, completed = ?, successful = ?, errors = ?
-                    WHERE job_id = ?
-                ''', (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
+            # ✅ FIX #12b: Add retry logic for progress updates with backoff
+            progress_updated = False
+            for progress_attempt in range(3):
+                try:
+                    with get_db_session() as (conn, cursor):
+                        cursor.execute('''
+                            UPDATE analysis_jobs 
+                            SET progress = ?, completed = ?, successful = ?, errors = ?
+                            WHERE job_id = ?
+                        ''', (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
+                    progress_updated = True
+                    break
+                except Exception as progress_error:
+                    logger.warning(f"[RETRY] Failed to update progress for {job_id} (attempt {progress_attempt + 1}/3): {progress_error}")
+                    if progress_attempt < 2:
+                        time.sleep(0.3 * (progress_attempt + 1))
+                    else:
+                        logger.error(f"✗ Failed to update progress for {job_id} after 3 attempts")
             
-            # Update job state (Redis/memory)
+            # Update job state (Redis/memory) - always succeeds since it's in-process
             job_state.update_job(job_id, {
                 'completed': completed,
                 'successful': successful,
                 'progress': progress,
-                'errors': errors
+                'errors': errors,
+                'db_updated': progress_updated
             })
             
             # Log progress
