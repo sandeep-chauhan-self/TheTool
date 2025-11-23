@@ -2,7 +2,7 @@ import logging
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -118,10 +118,10 @@ def compress_logs():
         
         logger.info("Starting log compression")
         
-        log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
-        archive_dir = os.path.join(log_dir, 'archive')
+        archive_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'archive'))
         os.makedirs(archive_dir, exist_ok=True)
         
+        log_dir = os.path.dirname(archive_dir)
         log_file = os.path.join(log_dir, 'app.log')
         
         if os.path.exists(log_file):
@@ -136,7 +136,7 @@ def compress_logs():
             logger.info(f"Log compressed to {archive_name}")
         
     except Exception as e:
-        logger.error(f"Log compression failed: {str(e)}")
+        logger.exception(f"Log compression failed: {str(e)}")
 
 def clean_old_data():
     """
@@ -150,9 +150,7 @@ def clean_old_data():
         clean_old_cache(days=7)
         
         # Clean old logs
-        from datetime import timedelta
-        log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
-        archive_dir = os.path.join(log_dir, 'archive')
+        archive_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'archive'))
         
         if os.path.exists(archive_dir):
             cutoff_date = datetime.now() - timedelta(days=15)
@@ -172,7 +170,7 @@ def clean_old_data():
         logger.info("Data cleanup completed")
         
     except Exception as e:
-        logger.error(f"Data cleanup failed: {str(e)}")
+        logger.exception(f"Data cleanup failed: {str(e)}")
 
 def start_scheduler():
     """Start background scheduler for cron jobs"""
