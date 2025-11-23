@@ -1,6 +1,5 @@
 import logging
 import pandas as pd
-from utils.data.fetcher import fetch_ticker_data
 
 # Import all indicators
 from indicators import rsi, macd, adx, psar, ema, stochastic, cci, williams, atr, bollinger, obv, cmf
