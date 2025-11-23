@@ -8,12 +8,19 @@ import json
 import csv
 import logging
 from pathlib import Path
+from typing import List, Dict
 import time
 import pandas as pd
 from io import StringIO
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+NSE_REQUEST_TIMEOUT_SHORT = 5  # Timeout for quick NSE requests
+NSE_REQUEST_TIMEOUT_LONG = 30  # Timeout for large file downloads
+NSE_REQUEST_DELAY = 1  # Delay between requests to avoid rate limiting
+JSON_INDENT = 2  # JSON indentation for pretty-printing
 
 # NSE API endpoints for complete equity list
 NSE_EQUITY_LIST_URL = 'https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O'
