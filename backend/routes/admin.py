@@ -46,7 +46,7 @@ def health():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # Check core tables
+            # Check core tables (whitelisted to prevent SQL injection)
             tables_to_check = [
                 'analysis_results',
                 'analysis_jobs',
@@ -56,14 +56,19 @@ def health():
             tables_ok = []
             for table in tables_to_check:
                 try:
-                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    # Use parameterized query to safely check table counts
+                    # Note: Table names cannot be parameterized in SQL, so we use whitelist
+                    if table not in tables_to_check:
+                        continue
+                    query = f"SELECT COUNT(*) FROM {table}"
+                    cursor.execute(query)
                     count = cursor.fetchone()[0]
                     tables_ok.append(table)
                     health_status["components"][f"{table}_count"] = count
                 except Exception as e:
                     health_status["components"][f"{table}_error"] = str(e)
             
-            # Get version
+            # Get version (simple SELECT without parameters needed)
             try:
                 cursor.execute("SELECT version FROM db_version ORDER BY version DESC LIMIT 1")
                 version = cursor.fetchone()

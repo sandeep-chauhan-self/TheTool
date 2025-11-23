@@ -21,9 +21,11 @@ def get_db():
         else:
             g.db = sqlite3.connect(DB_PATH, check_same_thread=False)
             g.db.row_factory = sqlite3.Row
-            # Enable WAL mode for better concurrency
-            g.db.execute('PRAGMA journal_mode=WAL')
-            g.db.execute('PRAGMA synchronous=NORMAL')
+            # Enable WAL mode for better concurrency (SQLite only)
+            cursor = g.db.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            cursor.close()
     return g.db
 
 def _convert_query_params(query, args, database_type=None):
@@ -115,8 +117,10 @@ def get_db_session():
         conn = get_db_connection()
         if DATABASE_TYPE == 'sqlite':
             conn.row_factory = sqlite3.Row
-            conn.execute('PRAGMA journal_mode=WAL')
-            conn.execute('PRAGMA synchronous=NORMAL')
+            cursor = conn.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            cursor.close()
         try:
             yield conn, conn.cursor()
             conn.commit()

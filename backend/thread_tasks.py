@@ -10,7 +10,7 @@ import json
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from database import get_db_connection
+from database import get_db_connection, _convert_query_params
 from utils.compute_score import analyze_ticker
 
 logger = logging.getLogger('thread_tasks')
@@ -52,11 +52,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         # Mark job as processing
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('''
+        query = '''
             UPDATE analysis_jobs 
             SET status = 'processing', started_at = ?
             WHERE job_id = ?
-        ''', (datetime.now().isoformat(), job_id))
+        '''
+        query, args = _convert_query_params(query, (datetime.now().isoformat(), job_id))
+        cursor.execute(query, args)
         conn.commit()
         
         total = len(tickers)
@@ -78,11 +80,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             # Check if job was cancelled
             if active_jobs.get(job_id, {}).get('cancelled'):
                 logger.warning(f"Job {job_id}: CANCELLED by user at {completed}/{total}")
-                cursor.execute('''
+                query = '''
                     UPDATE analysis_jobs 
                     SET status = 'cancelled', completed_at = ?
                     WHERE job_id = ?
-                ''', (datetime.now().isoformat(), job_id))
+                '''
+                query, args = _convert_query_params(query, (datetime.now().isoformat(), job_id))
+                cursor.execute(query, args)
                 conn.commit()
                 break
             
@@ -96,11 +100,12 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     # Store analysis result regardless of success/failure
                     # This ensures we capture all analysis data, even if trade validation failed
                     raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
-                    cursor.execute('''
+                    query = '''
                         INSERT INTO analysis_results 
                         (ticker, score, verdict, entry, stop_loss, target, entry_method, data_source, is_demo_data, raw_data, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
+                    '''
+                    query, args = _convert_query_params(query, (
                         ticker,
                         result.get('score', 0),
                         result.get('verdict', 'Neutral'),
@@ -113,6 +118,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         raw_data,
                         datetime.now().isoformat()
                     ))
+                    cursor.execute(query, args)
                     conn.commit()
                     successful += 1
                     
@@ -139,11 +145,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             progress = int((completed / total) * 100)
             
             # Update progress in database
-            cursor.execute('''
+            query = '''
                 UPDATE analysis_jobs 
                 SET progress = ?, completed = ?, successful = ?, errors = ?
                 WHERE job_id = ?
-            ''', (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
+            '''
+            query, args = _convert_query_params(query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
+            cursor.execute(query, args)
             conn.commit()
             
             # Update active_jobs tracker
@@ -159,11 +167,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         
         # Mark as completed
         final_status = 'cancelled' if active_jobs.get(job_id, {}).get('cancelled') else 'completed'
-        cursor.execute('''
+        query = '''
             UPDATE analysis_jobs 
             SET status = ?, completed_at = ?, errors = ?
             WHERE job_id = ?
-        ''', (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id))
+        '''
+        query, args = _convert_query_params(query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id))
+        cursor.execute(query, args)
         conn.commit()
         conn.close()
         
@@ -180,11 +190,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute('''
+            query = '''
                 UPDATE analysis_jobs 
                 SET status = 'failed', completed_at = ?, errors = ?
                 WHERE job_id = ?
-            ''', (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id))
+            '''
+            query, args = _convert_query_params(query, (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id))
+            cursor.execute(query, args)
             conn.commit()
             conn.close()
         except:
@@ -262,13 +274,15 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
         cursor = conn.cursor()
         
         # Update status to 'analyzing'
-        cursor.execute('''
+        query = '''
             UPDATE analysis_results 
             SET status = 'analyzing', updated_at = ?
             WHERE symbol = ? AND id = (
                 SELECT MAX(id) FROM analysis_results WHERE symbol = ?
             )
-        ''', (datetime.now().isoformat(), symbol, symbol))
+        '''
+        query, args = _convert_query_params(query, (datetime.now().isoformat(), symbol, symbol))
+        cursor.execute(query, args)
         conn.commit()
         
         # Run analysis
@@ -278,12 +292,13 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             # Store all analysis results (regardless of validation status)
             raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
             
-            cursor.execute('''
+            query = '''
                 INSERT INTO analysis_results 
                 (symbol, name, yahoo_symbol, status, score, verdict, entry, stop_loss, target, 
                  entry_method, data_source, is_demo_data, raw_data, created_at, updated_at)
                 VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
+            '''
+            query, args = _convert_query_params(query, (
                 symbol,
                 name,
                 yahoo_symbol,
@@ -299,6 +314,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 datetime.now().isoformat(),
                 datetime.now().isoformat()
             ))
+            cursor.execute(query, args)
             conn.commit()
             
             # Auto-cleanup old analyses (keep last 10)
@@ -320,11 +336,12 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute('''
+            query = '''
                 INSERT INTO analysis_results 
                 (symbol, name, yahoo_symbol, status, error_message, created_at, updated_at)
                 VALUES (?, ?, ?, 'failed', ?, ?, ?)
-            ''', (
+            '''
+            query, args = _convert_query_params(query, (
                 symbol,
                 name,
                 yahoo_symbol,
@@ -332,6 +349,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 datetime.now().isoformat(),
                 datetime.now().isoformat()
             ))
+            cursor.execute(query, args)
             conn.commit()
             conn.close()
         except:

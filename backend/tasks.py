@@ -4,7 +4,7 @@ Celery Tasks for Background Stock Analysis
 
 from celery_config import celery_app
 from utils.compute_score import analyze_ticker
-from database import get_db_connection, cleanup_old_analyses
+from database import get_db_connection, cleanup_old_analyses, _convert_query_params
 from datetime import datetime
 import logging
 import json
@@ -62,15 +62,19 @@ def analyze_stocks_batch(self, job_id, tickers, indicators=None, capital=100000,
         if status == 'completed' or status == 'failed':
             update_data['completed_at'] = datetime.now().isoformat()
         
-        # Build UPDATE query
+        # Build UPDATE query with parameter conversion
         set_clause = ', '.join([f"{key} = ?" for key in update_data.keys()])
         values = list(update_data.values()) + [job_id]
         
-        cursor.execute(f'''
+        query = f'''
             UPDATE analysis_jobs
             SET {set_clause}
             WHERE job_id = ?
-        ''', values)
+        '''
+        
+        # Convert query parameters for database compatibility
+        query, values = _convert_query_params(query, values)
+        cursor.execute(query, values)
         
         conn.commit()
         conn.close()
@@ -133,12 +137,13 @@ def analyze_stocks_batch(self, job_id, tickers, indicators=None, capital=100000,
                     logger.debug(f"Job {job_id}: Storing {ticker} results in database")
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    cursor.execute('''
+                    query = '''
                         INSERT INTO analysis_results 
                         (ticker, score, verdict, entry, stop_loss, target, entry_method, 
                          data_source, is_demo_data, raw_data, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
+                    '''
+                    query, args = _convert_query_params(query, (
                         ticker,
                         result['score'],
                         result['verdict'],
@@ -151,6 +156,7 @@ def analyze_stocks_batch(self, job_id, tickers, indicators=None, capital=100000,
                         str(result.get('indicators', [])),
                         datetime.now().isoformat()
                     ))
+                    cursor.execute(query, args)
                     conn.commit()
                     conn.close()
                     logger.debug(f"Job {job_id}: {ticker} saved to database")

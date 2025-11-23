@@ -8,7 +8,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from database import get_db_connection
+from database import get_db_connection, _convert_query_params
 from utils.logger import setup_logger
 
 logger = setup_logger()
@@ -50,10 +50,9 @@ def populate_watchlist():
     
     for ticker, symbol, notes in stocks_to_insert:
         try:
-            cursor.execute(
-                "INSERT INTO watchlist (ticker, symbol, notes) VALUES (?, ?, ?)",
-                (ticker, symbol, notes)
-            )
+            query = "INSERT INTO watchlist (ticker, symbol, notes) VALUES (?, ?, ?)"
+            query, args = _convert_query_params(query, (ticker, symbol, notes))
+            cursor.execute(query, args)
             inserted += 1
             if inserted % 100 == 0:
                 logger.info(f"Inserted {inserted} stocks...")
