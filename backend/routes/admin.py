@@ -82,6 +82,10 @@ def health():
             health_status["database"] = "connected" if tables_ok else "error"
             health_status["components"]["tables_checked"] = len(tables_ok)
             
+            # If tables check failed, mark overall status as degraded
+            if not tables_ok:
+                health_status["status"] = "degraded"
+            
         except Exception as e:
             health_status["status"] = "degraded"
             health_status["database"] = "disconnected"

@@ -32,6 +32,9 @@ def main():
     
     # Try PostgreSQL connection
     print(f"\n2. Attempting PostgreSQL Connection...")
+    conn = None
+    cursor = None
+    
     try:
         import psycopg2
         
@@ -72,9 +75,6 @@ def main():
         watchlist_count = cursor.fetchone()[0]
         print(f"   Total stocks in watchlist: {watchlist_count}")
         
-        cursor.close()
-        conn.close()
-        
         print("\n" + "=" * 80)
         print("✓ PostgreSQL is properly configured and working!")
         print("=" * 80)
@@ -91,7 +91,25 @@ def main():
         print("\nTo set DATABASE_URL in Railway:")
         print("  Railway Dashboard → Backend Service → Variables")
         print("  Add: DATABASE_URL = ${Postgres.DATABASE_URL}")
-        sys.exit(1)
+    finally:
+        # Ensure cursor and connection are closed
+        if cursor is not None:
+            try:
+                cursor.close()
+            except Exception as close_error:
+                print(f"   Warning: Error closing cursor: {close_error}")
+        
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_error:
+                print(f"   Warning: Error closing connection: {close_error}")
+        
+        # Exit with error code if exception occurred
+        if cursor is None or conn is None:
+            # If we get here after an exception, exit with error
+            if 'e' in locals():
+                sys.exit(1)
 
 
 if __name__ == '__main__':

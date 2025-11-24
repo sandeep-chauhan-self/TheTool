@@ -4,14 +4,14 @@ Centralized response schema definitions for API validation.
 Used to validate and document API response formats before returning to client.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, ClassVar
 
 
 class ResponseSchemas:
     """Standard response schema definitions"""
     
     # Job Status Response
-    JOB_STATUS = {
+    JOB_STATUS: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["job_id", "status", "progress", "completed", "total"],
         "properties": {
@@ -33,7 +33,7 @@ class ResponseSchemas:
     }
     
     # Analysis History Response
-    ANALYSIS_HISTORY = {
+    ANALYSIS_HISTORY: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["ticker", "history"],
         "properties": {
@@ -56,7 +56,7 @@ class ResponseSchemas:
     }
     
     # Stock History Response
-    STOCK_HISTORY = {
+    STOCK_HISTORY: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["symbol", "history", "count"],
         "properties": {
@@ -80,7 +80,7 @@ class ResponseSchemas:
     }
     
     # Watchlist Response
-    WATCHLIST = {
+    WATCHLIST: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["watchlist"],
         "properties": {
@@ -103,7 +103,7 @@ class ResponseSchemas:
     }
     
     # Analysis Job Created Response
-    JOB_CREATED = {
+    JOB_CREATED: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["job_id", "status"],
         "properties": {
@@ -118,7 +118,7 @@ class ResponseSchemas:
     }
     
     # Error Response
-    ERROR_RESPONSE = {
+    ERROR_RESPONSE: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["error"],
         "properties": {
@@ -136,7 +136,7 @@ class ResponseSchemas:
     }
     
     # NSE Stocks List Response
-    NSE_STOCKS_LIST = {
+    NSE_STOCKS_LIST: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["stocks"],
         "properties": {
@@ -157,7 +157,7 @@ class ResponseSchemas:
     }
     
     # All Stocks Response (paginated)
-    ALL_STOCKS = {
+    ALL_STOCKS: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["stocks"],
         "properties": {
@@ -181,7 +181,7 @@ class ResponseSchemas:
     }
     
     # Health Check Response
-    HEALTH_CHECK = {
+    HEALTH_CHECK: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["status"],
         "properties": {
@@ -194,7 +194,7 @@ class ResponseSchemas:
     }
     
     # Configuration Response
-    CONFIG = {
+    CONFIG: ClassVar[Dict[str, Any]] = {
         "type": "object",
         "required": ["flask_env"],
         "properties": {

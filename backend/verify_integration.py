@@ -10,6 +10,9 @@ import time
 from database import get_db_connection
 from constants import get_api_base_url, API_URLS
 
+# Timeout for API requests (seconds)
+TIMEOUT_SECONDS = 10
+
 print("1. Adding stock to watchlist...")
 response = requests.post(f'{get_api_base_url()}{API_URLS.WATCHLIST}', 
     json={'symbol': 'INFY.NS', 'name': 'Infosys Limited'},
@@ -17,7 +20,7 @@ response = requests.post(f'{get_api_base_url()}{API_URLS.WATCHLIST}',
 print(f"   Status: {response.status_code}")
 
 print("\n2. Getting watchlist...")
-response = requests.get(f'{get_api_base_url()}{API_URLS.WATCHLIST}')
+response = requests.get(f'{get_api_base_url()}{API_URLS.WATCHLIST}', timeout=TIMEOUT_SECONDS)
 print(f"   Stocks in watchlist: {len(response.json())}")
 print(f"   Symbols: {[s['symbol'] for s in response.json()]}")
 
@@ -31,7 +34,7 @@ print(f"   Job ID: {job_id}")
 
 # Wait for completion
 for i in range(30):
-    status_response = requests.get(f'{get_api_base_url()}{API_URLS.get_status(job_id)}')
+    status_response = requests.get(f'{get_api_base_url()}{API_URLS.get_status(job_id)}', timeout=TIMEOUT_SECONDS)
     status = status_response.json()
     
     if status['status'] == 'completed':
@@ -41,7 +44,7 @@ for i in range(30):
     time.sleep(1)
 
 print("\n4. Fetching analysis history for INFY.NS...")
-response = requests.get(f'{get_api_base_url()}{API_URLS.get_history("INFY.NS")}')
+response = requests.get(f'{get_api_base_url()}{API_URLS.get_history("INFY.NS")}', timeout=TIMEOUT_SECONDS)
 print(f"   Status: {response.status_code}")
 if response.status_code == 200:
     data = response.json()

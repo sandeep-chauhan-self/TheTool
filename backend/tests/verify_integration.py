@@ -3,6 +3,9 @@ import json
 import time
 from database import get_db_connection
 
+# Timeout for API requests (seconds)
+TIMEOUT_SECONDS = 5
+
 print("1. Adding stock to watchlist...")
 response = requests.post('http://localhost:5000/watchlist', 
     json={'symbol': 'INFY.NS', 'name': 'Infosys Limited'},
@@ -10,7 +13,7 @@ response = requests.post('http://localhost:5000/watchlist',
 print(f"   Status: {response.status_code}")
 
 print("\n2. Getting watchlist...")
-response = requests.get('http://localhost:5000/watchlist')
+response = requests.get('http://localhost:5000/watchlist', timeout=TIMEOUT_SECONDS)
 print(f"   Stocks in watchlist: {len(response.json())}")
 print(f"   Symbols: {[s['symbol'] for s in response.json()]}")
 
@@ -24,7 +27,7 @@ print(f"   Job ID: {job_id}")
 
 # Wait for completion
 for i in range(30):
-    status_response = requests.get(f'http://localhost:5000/status/{job_id}')
+    status_response = requests.get(f'http://localhost:5000/status/{job_id}', timeout=TIMEOUT_SECONDS)
     status = status_response.json()
     
     if status['status'] == 'completed':
@@ -34,7 +37,7 @@ for i in range(30):
     time.sleep(1)
 
 print("\n4. Fetching analysis history for INFY.NS...")
-response = requests.get('http://localhost:5000/history/INFY.NS')
+response = requests.get('http://localhost:5000/history/INFY.NS', timeout=TIMEOUT_SECONDS)
 print(f"   Status: {response.status_code}")
 if response.status_code == 200:
     data = response.json()

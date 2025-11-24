@@ -2,7 +2,7 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'trading_app.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'trading_app.db')
 
 if os.path.exists(DB_PATH):
     print(f"Migrating database: {DB_PATH}")

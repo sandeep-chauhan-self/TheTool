@@ -73,7 +73,13 @@ class OBVIndicator(VolumeIndicator):
         return obv_current, obv_prev
     
     def _get_vote(self, value: tuple, df: pd.DataFrame) -> int:
-        """Determine vote based on OBV and price direction (MLRM-001)"""
+        """Determine vote based on OBV and price direction (MLRM-001)
+        
+        OBV voting logic:
+        - OBV increasing & price increasing: Buy (+1) - confirming uptrend
+        - OBV decreasing & price decreasing: Sell (-1) - confirming downtrend  
+        - Divergence or flat: Neutral (0) - conflicting signals or no movement
+        """
         obv_current, obv_prev = value
         price_current = df['Close'].iloc[-1]
         price_prev = df['Close'].iloc[-2]
@@ -82,19 +88,25 @@ class OBVIndicator(VolumeIndicator):
         price_change = price_current - price_prev
         
         if obv_change > 0 and price_change > 0:
-            return VOTE_BUY  # Confirming uptrend
+            return VOTE_BUY
         elif obv_change < 0 and price_change < 0:
-            return VOTE_SELL  # Confirming downtrend
-        return VOTE_NEUTRAL  # Divergence or flat
+            return VOTE_SELL
+        else:
+            return VOTE_NEUTRAL
     
     def _get_confidence(self, value: tuple, df: pd.DataFrame) -> float:
-        """Calculate confidence based on OBV change magnitude (MLRM-001)"""
+        """Calculate confidence based on OBV change magnitude (MLRM-001)
+        
+        Confidence = min(|OBV_change| / (multiplier * avg_volume), 1.0)
+        This normalizes OBV momentum relative to typical volume without scaling
+        down confidence artificially as dataset size grows.
+        """
         obv_current, obv_prev = value
         avg_volume = df['Volume'].mean()
         obv_change = obv_current - obv_prev
         
         if avg_volume > 0:
-            return min(abs(obv_change) / (OBV_CONFIDENCE_MULTIPLIER * avg_volume * len(df)), 1.0)
+            return min(abs(obv_change) / (OBV_CONFIDENCE_MULTIPLIER * avg_volume), 1.0)
         return 0.0
 
 

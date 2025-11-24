@@ -184,21 +184,74 @@ class PSARIndicator(TrendIndicator):
         return calculate_psar(df, af_start, af_increment, af_max)
     
     def _get_vote(self, value: tuple, df) -> int:
-        """Determine vote based on price vs PSAR (MLRM-001)"""
+        """
+        Determine vote based on price vs PSAR and trend direction.
+        
+        Voting logic:
+        - Bullish trend (is_bull=True) + price >= SAR: VOTE_BUY (strong)
+        - Bearish trend (is_bull=False) + price <= SAR: VOTE_SELL (strong)
+        - Bullish trend + price < SAR: VOTE_NEUTRAL (trend breaking)
+        - Bearish trend + price > SAR: VOTE_NEUTRAL (trend breaking)
+        
+        Args:
+            value: tuple of (psar_value, is_bullish)
+            df: DataFrame with price data
+            
+        Returns:
+            int: VOTE_BUY (1), VOTE_SELL (-1), or VOTE_NEUTRAL (0)
+        """
         psar, is_bull = value
         close_price = df['Close'].iloc[-1]
         
-        if close_price > psar:
-            return VOTE_BUY  # Bullish
-        elif close_price < psar:
-            return VOTE_SELL  # Bearish
-        return VOTE_NEUTRAL
+        if is_bull:
+            # In bullish trend: price above SAR is bullish
+            if close_price >= psar:
+                return VOTE_BUY
+            else:
+                # Price below SAR in bullish trend = potential reversal
+                return VOTE_NEUTRAL
+        else:
+            # In bearish trend: price below SAR is bearish
+            if close_price <= psar:
+                return VOTE_SELL
+            else:
+                # Price above SAR in bearish trend = potential reversal
+                return VOTE_NEUTRAL
     
     def _get_confidence(self, value: tuple, df) -> float:
-        """Calculate confidence based on distance from PSAR (MLRM-001)"""
+        """
+        Calculate confidence based on distance from PSAR and trend agreement.
+        
+        Confidence calculation:
+        - Base: distance from SAR (higher distance = higher confidence)
+        - Trend agreement boost: +20% if price direction matches trend direction
+        - Trend disagreement penalty: -50% if price breaks trend
+        
+        Args:
+            value: tuple of (psar_value, is_bullish)
+            df: DataFrame with price data
+            
+        Returns:
+            float: Confidence score (0.0 to 1.0)
+        """
         psar, is_bull = value
         close_price = df['Close'].iloc[-1]
-        return min(abs(close_price - psar) / (PSAR_CONFIDENCE_MULTIPLIER * close_price), 1.0)
+        
+        # Base confidence: distance from SAR normalized by price
+        base_confidence = min(abs(close_price - psar) / (PSAR_CONFIDENCE_MULTIPLIER * close_price), 1.0)
+        
+        # Adjust based on trend agreement
+        if is_bull and close_price >= psar:
+            # Bullish trend and price above SAR: high confidence
+            return min(base_confidence * 1.2, 1.0)
+        elif not is_bull and close_price <= psar:
+            # Bearish trend and price below SAR: high confidence
+            return min(base_confidence * 1.2, 1.0)
+        elif (is_bull and close_price < psar) or (not is_bull and close_price > psar):
+            # Trend disagrees with price: low confidence (potential reversal)
+            return base_confidence * 0.5
+        
+        return base_confidence
 
 
 def vote_and_confidence(df):

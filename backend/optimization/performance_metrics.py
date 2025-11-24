@@ -118,7 +118,6 @@ def measure_performance(func: Optional[Callable] = None, *, measure_memory: bool
             # Measure memory
             peak_memory = None
             if measure_memory:
-                import tracemalloc
                 _, peak = tracemalloc.get_traced_memory()
                 tracemalloc.stop()
                 peak_memory = peak

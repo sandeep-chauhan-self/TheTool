@@ -278,9 +278,9 @@ def cached_indicator(indicator_name: str, ttl: Optional[int] = None):
                 'kwargs': {k: v for k, v in kwargs.items() if k != 'ticker' and k != 'df'}
             }
             
-            # Try to get from cache
+            # Try to get from cache using full cache_params
             try:
-                cached_value = _indicator_cache.get(ticker, indicator_name, args=args)
+                cached_value = _indicator_cache.get(ticker, indicator_name, args=args, **cache_params['kwargs'])
                 if cached_value is not None:
                     return cached_value
             except (TypeError, ValueError):
@@ -290,9 +290,9 @@ def cached_indicator(indicator_name: str, ttl: Optional[int] = None):
             # Calculate result
             result = func(df, *args, **kwargs)
             
-            # Store in cache
+            # Store in cache using full cache_params
             try:
-                _indicator_cache.set(ticker, indicator_name, result, ttl=ttl, args=args)
+                _indicator_cache.set(ticker, indicator_name, result, ttl=ttl, args=args, **cache_params['kwargs'])
             except (TypeError, ValueError):
                 # If cache storage fails, continue without caching
                 pass

@@ -46,7 +46,7 @@ class EntryCalculator:
             tech_entry = EntryCalculator._technical_level_entry(df, current_price)
             if tech_entry:
                 entry, reason = tech_entry
-                # Ensure entry is within reasonable range (±15%)
+                # Ensure entry is within reasonable range (ï¿½15%)
                 if 0.85 * current_price <= entry <= 1.15 * current_price:
                     return entry, f"TECHNICAL_LEVEL: {reason}", "HIGH"
             
@@ -90,7 +90,6 @@ class EntryCalculator:
             support_20 = df['Low'].rolling(window=20).min().iloc[-1]
             support_50 = df['Low'].rolling(window=50).min().iloc[-1]
             resistance_20 = df['High'].rolling(window=20).max().iloc[-1]
-            resistance_50 = df['High'].rolling(window=50).max().iloc[-1]
             
             # Recent high/low (5 days)
             recent_high = df['High'].tail(5).max()
@@ -117,7 +116,14 @@ class EntryCalculator:
                     return entry, "Bottom of consolidation range"
             
             # Strategy 4: Enter between support and current (safer)
-            if support_50 < current_price:
+            # Only if price is meaningfully above support and market is not too tight
+            range_size = recent_high - recent_low
+            price_gap = current_price - support_50
+            gap_percentage = price_gap / current_price
+            consolidation_ratio = range_size / current_price
+            
+            # Require at least 2-3% gap above support and at least 5% range (not tight consolidation)
+            if gap_percentage >= 0.025 and consolidation_ratio >= 0.05:
                 entry = (support_50 + current_price) / 2
                 return entry, "Mid-point between support and current"
             

@@ -1,4 +1,4 @@
-﻿"""
+"""
 CCI (Commodity Channel Index) Indicator
 Period: 20
 

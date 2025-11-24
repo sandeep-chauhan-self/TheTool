@@ -8,6 +8,7 @@ Manages rollback points for safe recovery from failed migrations.
 import os
 import shutil
 import json
+import tempfile
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -65,6 +66,7 @@ def create_rollback_point(
     description: str,
     files: List[str],
     rollback_dir: str = ".rollback",
+    base_dir: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> RollbackPoint:
     """
@@ -75,6 +77,7 @@ def create_rollback_point(
         description: What this represents
         files: List of file paths to backup
         rollback_dir: Directory to store backups
+        base_dir: Base directory for computing relative paths (default: current directory)
         metadata: Additional metadata to store
     
     Returns:
@@ -110,26 +113,42 @@ def create_rollback_point(
     point_dir = rollback_path / rollback_id
     point_dir.mkdir(exist_ok=True)
     
+    # Use current directory as base if not specified
+    if base_dir is None:
+        base_dir = str(Path.cwd())
+    base_path = Path(base_dir).resolve()
+    
     # Backup files
     backed_up_files = {}
     
     for file_path in files:
-        source = Path(file_path)
+        source = Path(file_path).resolve()
         
         if not source.exists():
             logger.warning(f"File not found, skipping: {file_path}")
             continue
         
-        # Preserve directory structure in backup
-        relative_path = source.name if source.is_file() else source.parts[-1]
+        # Compute relative path from base_dir to preserve directory structure
+        try:
+            relative_path = source.relative_to(base_path)
+        except ValueError:
+            # File is outside base_dir, use parent directory name + file name
+            relative_path = Path(source.parent.name) / source.name
+        
+        # Create backup path with full directory structure
         backup_path = point_dir / relative_path
         
         try:
+            # Ensure parent directories exist
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Copy file or directory
             if source.is_file():
                 shutil.copy2(source, backup_path)
             elif source.is_dir():
                 shutil.copytree(source, backup_path, dirs_exist_ok=True)
             
+            # Record mapping: original path -> backup path for restoration
             backed_up_files[str(source)] = str(backup_path)
             logger.info(f"Backed up: {source} -> {backup_path}")
         
@@ -206,9 +225,40 @@ def rollback_to_point(
             if source.is_file():
                 shutil.copy2(source, dest)
             elif source.is_dir():
-                if dest.exists():
-                    shutil.rmtree(dest)
-                shutil.copytree(source, dest)
+                # Safe directory replacement: copy to temp, verify, then atomically replace
+                temp_dir = None
+                try:
+                    # Step 1: Copy source to temporary location
+                    temp_dir = tempfile.mkdtemp(prefix="rollback_")
+                    temp_copy = Path(temp_dir) / "data"
+                    shutil.copytree(source, temp_copy)
+                    
+                    # Step 2: Atomic replacement
+                    if dest.exists():
+                        # Preserve original by moving to backup before replacement
+                        backup_name = f"{dest}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                        shutil.move(str(dest), backup_name)
+                        try:
+                            # Move temp copy into place
+                            shutil.move(str(temp_copy), str(dest))
+                            # Clean up backup on successful move
+                            if Path(backup_name).exists():
+                                shutil.rmtree(backup_name)
+                        except Exception as move_err:
+                            # Restore original if move failed
+                            if Path(backup_name).exists():
+                                if dest.exists():
+                                    shutil.rmtree(dest)
+                                shutil.move(backup_name, str(dest))
+                            raise move_err
+                    else:
+                        # No existing dest, just move temp copy into place
+                        shutil.move(str(temp_copy), str(dest))
+                
+                finally:
+                    # Always clean up temp directory on exception or success
+                    if temp_dir and Path(temp_dir).exists():
+                        shutil.rmtree(temp_dir, ignore_errors=True)
             
             logger.info(f"Restored: {original_path}")
         

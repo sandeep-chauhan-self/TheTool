@@ -9,11 +9,21 @@ Test the complete analysis workflow:
 import json
 import time
 import requests
+import requests.exceptions
+import os
 from datetime import datetime
 
-API_BASE = "http://localhost:8000"
+# Get API base URL from config or environment, default to development port 5000
+try:
+    from backend.constants import get_api_base_url
+    API_BASE = get_api_base_url()
+except (ImportError, Exception):
+    # Fallback: use environment variable or default to localhost:5000
+    API_BASE = os.getenv('API_BASE_URL', 'http://localhost:5000')
+
 WAIT_TIMEOUT = 300  # 5 minutes
 POLL_INTERVAL = 5   # 5 seconds
+REQUEST_TIMEOUT = 10  # 10 seconds for individual requests
 
 def test_analysis_flow():
     """Test complete analysis workflow"""
@@ -26,20 +36,25 @@ def test_analysis_flow():
     try:
         response = requests.post(
             f"{API_BASE}/api/stocks/analyze-all-stocks",
-            json={"symbols": ["RELIANCE.NS"]}
+            json={"symbols": ["RELIANCE.NS"]},
+            timeout=REQUEST_TIMEOUT
         )
-        if response.status_code != 201:
-            print(f"✗ Failed to start analysis: {response.status_code}")
-            print(response.json())
-            return False
+        response.raise_for_status()
         
-        job_data = response.json()
-        job_id = job_data.get("job_id")
-        print(f"✓ Analysis job created: {job_id}")
-        print(f"  - Status: {job_data.get('status')}")
-        print(f"  - Count: {job_data.get('count')}")
+        try:
+            job_data = response.json()
+            job_id = job_data.get("job_id")
+            print(f"✓ Analysis job created: {job_id}")
+            print(f"  - Status: {job_data.get('status')}")
+            print(f"  - Count: {job_data.get('count')}")
+        except (ValueError, KeyError) as parse_error:
+            print(f"✗ Error parsing response JSON: {parse_error}")
+            return False
+    except requests.exceptions.RequestException as req_error:
+        print(f"✗ Error starting analysis (HTTP/Network): {req_error}")
+        return False
     except Exception as e:
-        print(f"✗ Error starting analysis: {e}")
+        print(f"✗ Unexpected error starting analysis: {e}")
         return False
     
     # Step 2: Poll progress
@@ -49,27 +64,32 @@ def test_analysis_flow():
     
     while (time.time() - start_time) < WAIT_TIMEOUT:
         try:
-            response = requests.get(f"{API_BASE}/api/stocks/all-stocks/progress")
-            if response.status_code != 200:
-                print(f"✗ Failed to get progress: {response.status_code}")
+            response = requests.get(f"{API_BASE}/api/stocks/all-stocks/progress", timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            try:
+                progress = response.json()
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Progress Update:")
+                print(f"  - Is analyzing: {progress.get('is_analyzing')}")
+                print(f"  - Completed: {progress.get('completed')}/{progress.get('total')}")
+                print(f"  - Percentage: {progress.get('percentage')}%")
+                print(f"  - Successful: {progress.get('successful')}")
+                print(f"  - Failed: {progress.get('failed')}")
+                
+                if not progress.get('is_analyzing') and progress.get('analyzing') == 0:
+                    print("✓ Analysis completed!")
+                    completed = True
+                    break
+                
+                time.sleep(POLL_INTERVAL)
+            except (ValueError, KeyError) as parse_error:
+                print(f"✗ Error parsing progress JSON: {parse_error}")
                 return False
-            
-            progress = response.json()
-            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Progress Update:")
-            print(f"  - Is analyzing: {progress.get('is_analyzing')}")
-            print(f"  - Completed: {progress.get('completed')}/{progress.get('total')}")
-            print(f"  - Percentage: {progress.get('percentage')}%")
-            print(f"  - Successful: {progress.get('successful')}")
-            print(f"  - Failed: {progress.get('failed')}")
-            
-            if not progress.get('is_analyzing') and progress.get('analyzing') == 0:
-                print("✓ Analysis completed!")
-                completed = True
-                break
-            
-            time.sleep(POLL_INTERVAL)
+        except requests.exceptions.RequestException as req_error:
+            print(f"✗ Error polling progress (HTTP/Network): {req_error}")
+            return False
         except Exception as e:
-            print(f"✗ Error polling progress: {e}")
+            print(f"✗ Unexpected error polling progress: {e}")
             return False
     
     if not completed:

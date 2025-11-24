@@ -65,10 +65,10 @@ class TestTickerValidation:
     
     def test_empty_ticker_rejected(self):
         """Test empty tickers are rejected"""
-        with pytest.raises(InvalidTickerError, match="non-empty|too short"):
+        with pytest.raises(InvalidTickerError, match=r"(non-empty|too short)"):
             validate_ticker_format('')
         
-        with pytest.raises(InvalidTickerError, match="non-empty|too short"):
+        with pytest.raises(InvalidTickerError, match=r"(non-empty|too short)"):
             validate_ticker_format('   ')
     
     def test_none_rejected(self):
@@ -143,7 +143,7 @@ class TestDataQualityValidation:
         df = self.create_valid_dataframe()
         df_missing = df.drop(columns=['Volume'])
         
-        with pytest.raises(DataQualityError, match="missing.*Volume"):
+        with pytest.raises(DataQualityError, match=r"missing.*Volume"):
             validate_data_quality(df_missing, 'TEST')
     
     def test_all_nan_column_rejected(self):

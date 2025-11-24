@@ -12,6 +12,9 @@ except ImportError:
     SCHEDULER_AVAILABLE = False
     BackgroundScheduler = None
 
+# Initialize logger at module import time (used by functions below)
+logger = logging.getLogger('trading_analyzer')
+
 def get_log_directory():
     """
     Get log directory from environment variable with robust fallback.
@@ -50,8 +53,6 @@ def get_log_directory():
 def clean_old_cache(days=7):
     """Stub for cache cleaning"""
     pass
-
-logger = logging.getLogger('trading_analyzer')
 
 def update_nse_universe():
     """

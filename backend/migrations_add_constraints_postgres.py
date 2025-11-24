@@ -253,19 +253,19 @@ def add_postgres_constraints():
         if conn:
             try:
                 conn.rollback()
-            except:
+            except Exception:
                 pass
         raise
     finally:
         if cursor:
             try:
                 cursor.close()
-            except:
+            except Exception:
                 pass
         if conn:
             try:
                 conn.close()
-            except:
+            except Exception:
                 pass
 
 

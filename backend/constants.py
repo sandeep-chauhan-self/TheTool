@@ -24,7 +24,7 @@ Usage:
 
 import os
 import urllib.parse
-from typing import Dict, Literal
+from typing import Dict, Union, Literal, Any
 from enum import Enum
 
 
@@ -70,12 +70,12 @@ class ENVIRONMENTS:
     }
     
     @staticmethod
-    def get_current() -> Dict[str, str]:
+    def get_current() -> Dict[str, Union[str, bool]]:
         """
         Get current environment configuration based on FLASK_ENV variable.
         
         Returns:
-            Dict[str, str]: Environment configuration dict
+            Dict[str, Union[str, bool]]: Environment configuration dict with string and boolean values
         """
         env = os.getenv('FLASK_ENV', 'development').lower()
         
@@ -87,7 +87,7 @@ class ENVIRONMENTS:
             return ENVIRONMENTS.DEVELOPMENT
     
     @staticmethod
-    def all() -> Dict[str, Dict[str, str]]:
+    def all() -> Dict[str, Dict[str, Union[str, bool]]]:
         """Get all environment configurations"""
         return {
             "development": ENVIRONMENTS.DEVELOPMENT,
@@ -226,8 +226,36 @@ class FRONTEND_URLS:
     
     @staticmethod
     def get_api_key() -> str:
-        """Get API key from environment"""
-        return os.getenv('MASTER_API_KEY', 'development-key')
+        """
+        Get API key from environment.
+        
+        In production, MASTER_API_KEY must be explicitly set (no fallback).
+        In development/testing, uses a default development key for convenience.
+        
+        Returns:
+            str: API key
+            
+        Raises:
+            RuntimeError: If MASTER_API_KEY is missing in production
+        """
+        api_key = os.getenv('MASTER_API_KEY')
+        
+        # Determine current environment
+        flask_env = os.getenv('FLASK_ENV', 'development').lower()
+        is_production = flask_env in ('production', 'prod')
+        
+        if api_key:
+            return api_key
+        
+        # Production requires explicit API key
+        if is_production:
+            raise RuntimeError(
+                "MASTER_API_KEY environment variable is required in production. "
+                "Please set it before starting the application."
+            )
+        
+        # Development/testing: allow convenient fallback
+        return 'development-key'
 
 
 # =============================================================================

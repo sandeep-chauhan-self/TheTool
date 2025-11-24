@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
 """Simple test script to verify the new analysis routes work"""
 
 import os
 import sys
 import tempfile
 
-# Set test database path before importing app
+# Set test configuration before importing app
+os.environ['FLASK_ENV'] = 'testing'
 os.environ['DB_PATH'] = os.path.join(tempfile.gettempdir(), 'test_trading_app.db')
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -29,7 +29,6 @@ def test_routes():
 
         # Test POST /analyze with empty tickers (should return 400)
         resp = client.post('/analyze', json={})
-        print(f"Debug: empty data response status {resp.status_code}, data: {resp.get_data()}")
         assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
         print("✓ POST /analyze with empty data correctly returns 400")
 
@@ -62,5 +61,4 @@ def test_routes():
     return True
 
 if __name__ == "__main__":
-    app.config['TESTING'] = True
     test_routes()

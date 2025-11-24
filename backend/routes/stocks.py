@@ -232,46 +232,61 @@ def get_stock_history(symbol):
 
 def _get_active_job_for_symbols(symbols: list) -> dict:
     """
-    Check if an identical or very similar job is already running.
+    Check if an identical job is already running for the exact same symbol set.
     Returns the existing job info or None if safe to create new job.
     
-    Considers jobs "duplicate" if:
-    - Same symbols (in any order)
+    Only considers jobs "duplicate" if:
+    - Same symbols (in any order) - normalized by uppercase + trim
     - Status is 'queued' or 'processing'
     - Within last 5 minutes (to avoid stale locks)
+    
+    Different symbol sets are NOT blocked and can run concurrently.
     """
     try:
-        symbols_set = set(symbols)
-        symbols_str = ','.join(sorted(symbols))
+        # Normalize requested symbols: uppercase, trim, sort
+        normalized_symbols = sorted([s.upper().strip() for s in symbols])
+        requested_json = json.dumps(normalized_symbols)
         
         # Get active jobs from last 5 minutes
         from datetime import datetime, timedelta
         five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
         
         active_jobs = query_db("""
-            SELECT job_id, status, total, completed, created_at
+            SELECT job_id, status, total, completed, created_at, tickers_json
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
               AND created_at > ?
             ORDER BY created_at DESC
-            LIMIT 10
+            LIMIT 20
         """, (five_min_ago,))
         
         if not active_jobs:
             return None
         
-        # For now, if ANY active job exists, return it
-        # (More sophisticated symbol matching could be added)
-        job_id, status, total, completed, created_at = active_jobs[0]
-        logger.info(f"Found active job {job_id} with status {status}")
+        # Check each active job for exact symbol match
+        for job_id, status, total, completed, created_at, tickers_json in active_jobs:
+            # Skip jobs with no tickers_json (shouldn't happen, but be safe)
+            if not tickers_json:
+                continue
+            
+            try:
+                job_symbols = json.loads(tickers_json)
+                # Compare normalized symbol sets
+                if job_symbols == normalized_symbols:
+                    logger.info(f"Found active job {job_id} with matching symbols, status {status}")
+                    return {
+                        "job_id": job_id,
+                        "status": status,
+                        "total": total,
+                        "completed": completed,
+                        "created_at": created_at
+                    }
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse tickers_json for job {job_id}")
+                continue
         
-        return {
-            "job_id": job_id,
-            "status": status,
-            "total": total,
-            "completed": completed,
-            "created_at": created_at
-        }
+        # No matching job found
+        return None
     except Exception as e:
         logger.error(f"Error checking for active jobs: {e}")
         return None
@@ -366,7 +381,8 @@ def analyze_all_stocks():
                     job_id=job_id,
                     status="queued",
                     total=len(symbols),
-                    description=f"Bulk analyze {len(symbols)} stock(s)"
+                    description=f"Bulk analyze {len(symbols)} stock(s)",
+                    tickers=symbols  # Include symbols for duplicate detection
                 )
                 if created:
                     break

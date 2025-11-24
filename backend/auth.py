@@ -5,14 +5,14 @@ CRITICAL FIX (ISSUE_021): Implements API key-based authentication
 to prevent unauthorized access to all endpoints.
 
 Security Features:
-- API key validation
+- API key validation with persistent database storage
 - Request signing (optional)
 - Rate limiting per API key
 - Audit logging for all authenticated requests
+- No raw keys logged or exposed
 """
 
 import os
-import secrets
 import hashlib
 import logging
 import threading
@@ -21,42 +21,17 @@ from datetime import datetime
 from flask import request, jsonify
 from typing import Optional, Callable
 from dotenv import load_dotenv
+from api_key_manager import APIKeyManager
 
 # Load environment variables first
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# API Keys storage (in production, move to database or environment)
-# For now, we generate a master key on startup
-MASTER_API_KEY = os.getenv('MASTER_API_KEY')
-if not MASTER_API_KEY:
-    # Generate a secure API key on first run
-    MASTER_API_KEY = secrets.token_urlsafe(32)
-    logger.warning("=" * 80)
-    logger.warning("NO MASTER_API_KEY FOUND IN ENVIRONMENT!")
-    logger.warning(f"Generated temporary API key: {MASTER_API_KEY}")
-    logger.warning("Add this to your .env file: MASTER_API_KEY=" + MASTER_API_KEY)
-    logger.warning("=" * 80)
-
-# Store valid API keys (hash them for security)
-VALID_API_KEYS = {
-    hashlib.sha256(MASTER_API_KEY.encode()).hexdigest(): {
-        'name': 'Master Key',
-        'permissions': ['all'],
-        'created_at': datetime.now().isoformat()
-    }
-}
-
-
-def hash_api_key(api_key: str) -> str:
-    """Hash API key for secure storage comparison"""
-    return hashlib.sha256(api_key.encode()).hexdigest()
-
 
 def validate_api_key(api_key: str) -> Optional[dict]:
     """
-    Validate an API key and return its metadata
+    Validate an API key and return its metadata from persistent storage.
     
     Args:
         api_key: The API key to validate
@@ -64,11 +39,7 @@ def validate_api_key(api_key: str) -> Optional[dict]:
     Returns:
         dict: API key metadata if valid, None otherwise
     """
-    if not api_key:
-        return None
-    
-    key_hash = hash_api_key(api_key)
-    return VALID_API_KEYS.get(key_hash)
+    return APIKeyManager.validate_api_key(api_key)
 
 
 def require_auth(f: Callable) -> Callable:
@@ -129,37 +100,29 @@ def require_auth(f: Callable) -> Callable:
 
 def create_api_key(name: str, permissions: list = None) -> str:
     """
-    Create a new API key with specified permissions.
+    Create a new API key with specified permissions in persistent storage.
     
     Args:
         name: Friendly name for the API key
-        permissions: List of permissions (default: ['all'])
+        permissions: List of permissions (default: ['read'])
         
     Returns:
-        str: The generated API key (save this securely!)
+        str: The generated API key (save this securely immediately!)
     """
     if permissions is None:
         permissions = ['read']
     
-    # Generate secure API key
-    api_key = secrets.token_urlsafe(32)
-    key_hash = hash_api_key(api_key)
-    
-    # Store metadata
-    VALID_API_KEYS[key_hash] = {
-        'name': name,
-        'permissions': permissions,
-        'created_at': datetime.now().isoformat()
-    }
-    
-    logger.info(f"Created new API key: {name} with permissions: {permissions}")
-    
-    return api_key
+    try:
+        api_key, metadata = APIKeyManager.create_api_key(name, permissions, created_by='system')
+        return api_key
+    except Exception as e:
+        logger.error(f"Failed to create API key: {e}")
+        raise
 
 
 def revoke_api_key(api_key: str) -> bool:
     """
-    Revoke an API key
+    Revoke an API key in persistent storage.
     
     Args:
         api_key: The API key to revoke
@@ -167,13 +130,11 @@ def revoke_api_key(api_key: str) -> bool:
     Returns:
         bool: True if revoked successfully
     """
-    key_hash = hash_api_key(api_key)
-    if key_hash in VALID_API_KEYS:
-        key_metadata = VALID_API_KEYS[key_hash]
-        del VALID_API_KEYS[key_hash]
-        logger.info(f"Revoked API key: {key_metadata['name']}")
-        return True
-    return False
+    try:
+        return APIKeyManager.revoke_api_key(api_key)
+    except Exception as e:
+        logger.error(f"Failed to revoke API key: {e}")
+        raise
 
 
 # Optional: Implement rate limiting per API key
@@ -200,7 +161,7 @@ def check_rate_limit(api_key: str, max_requests_per_minute: int = 60) -> bool:
         - For production, replace with Redis-based or distributed rate limiter
     """
     now = datetime.now()
-    key_hash = hash_api_key(api_key)
+    key_hash = APIKeyManager.hash_api_key(api_key)
     
     # Acquire lock for entire critical section
     with api_key_request_counts_lock:

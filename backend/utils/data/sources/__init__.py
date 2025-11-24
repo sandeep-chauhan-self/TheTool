@@ -7,8 +7,8 @@ Alternative data source implementations:
 - Demo Data: Testing data generator (future)
 """
 
-from utils.data.sources.fallback import get_fallback_data
+from .fallback import fetch_with_fallback
 
 __all__ = [
-    'get_fallback_data',
+    'fetch_with_fallback',
 ]

@@ -568,40 +568,111 @@ def analyze(data, indicators_result=None):
         # Multi-timeframe filter (check weekly trend if daily breakout)
         if CONFIG['use_multitimeframe_filter']:
             try:
-                # Resample daily data to weekly
-                weekly_data = data.resample('W').agg({
-                    'Open': 'first',
-                    'High': 'max',
-                    'Low': 'min',
-                    'Close': 'last',
-                    'Volume': 'sum'
-                }).dropna()
-                
-                if len(weekly_data) >= 20:
-                    # Calculate weekly EMA20
-                    weekly_ema20 = weekly_data['Close'].ewm(span=20, adjust=False).mean().iloc[-1]
-                    weekly_close = weekly_data['Close'].iloc[-1]
-                    
-                    if breakout['breakout_type'] == 'BULLISH':
-                        # For BULLISH, weekly price should be above weekly EMA
-                        if weekly_close > weekly_ema20:
-                            filters_passed['multitimeframe'] = True
-                            filter_reasons.append(f"? Weekly uptrend (close {weekly_close:.2f} > EMA {weekly_ema20:.2f})")
-                        else:
+                # Validate that data.index is a DatetimeIndex before resampling
+                if not isinstance(data.index, pd.DatetimeIndex):
+                    logger.warning("Data index is not DatetimeIndex, attempting conversion")
+                    try:
+                        # Attempt to convert index to datetime
+                        converted_index = pd.to_datetime(data.index, errors='coerce')
+                        # Count valid datetime values after conversion
+                        valid_datetimes = converted_index.notna().sum()
+                        
+                        if valid_datetimes < len(data) * 0.8:  # Less than 80% valid
+                            logger.warning(
+                                f"Index conversion failed: only {valid_datetimes}/{len(data)} rows convertible to datetime. "
+                                "Skipping multi-timeframe check."
+                            )
                             filters_passed['multitimeframe'] = False
-                            filter_reasons.append(f"? Weekly downtrend (close {weekly_close:.2f} < EMA {weekly_ema20:.2f})")
-                    elif breakout['breakout_type'] == 'BEARISH':
-                        # For BEARISH, weekly price should be below weekly EMA
-                        if weekly_close < weekly_ema20:
-                            filters_passed['multitimeframe'] = True
-                            filter_reasons.append(f"? Weekly downtrend (close {weekly_close:.2f} < EMA {weekly_ema20:.2f})")
+                            filter_reasons.append("? Multi-timeframe check skipped (invalid index)")
                         else:
-                            filters_passed['multitimeframe'] = False
-                            filter_reasons.append(f"? Weekly uptrend (close {weekly_close:.2f} > EMA {weekly_ema20:.2f})")
+                            # Replace index with converted datetime and drop NaT rows
+                            data = data.copy()
+                            data.index = converted_index
+                            data = data.dropna(how='any', axis=0)
+                            
+                            if len(data) < 20:
+                                logger.warning(
+                                    f"After NaT removal, insufficient data for weekly analysis ({len(data)} rows < 20). "
+                                    "Skipping multi-timeframe check."
+                                )
+                                filters_passed['multitimeframe'] = False
+                                filter_reasons.append("? Multi-timeframe check skipped (insufficient data after NaT removal)")
+                            else:
+                                # Proceed with resampling
+                                weekly_data = data.resample('W').agg({
+                                    'Open': 'first',
+                                    'High': 'max',
+                                    'Low': 'min',
+                                    'Close': 'last',
+                                    'Volume': 'sum'
+                                }).dropna()
+                                
+                                if len(weekly_data) >= 20:
+                                    # Calculate weekly EMA20
+                                    weekly_ema20 = weekly_data['Close'].ewm(span=20, adjust=False).mean().iloc[-1]
+                                    weekly_close = weekly_data['Close'].iloc[-1]
+                                    
+                                    if breakout['breakout_type'] == 'BULLISH':
+                                        if weekly_close > weekly_ema20:
+                                            filters_passed['multitimeframe'] = True
+                                            filter_reasons.append(f"? Weekly uptrend (close {weekly_close:.2f} > EMA {weekly_ema20:.2f})")
+                                        else:
+                                            filters_passed['multitimeframe'] = False
+                                            filter_reasons.append(f"? Weekly downtrend (close {weekly_close:.2f} < EMA {weekly_ema20:.2f})")
+                                    elif breakout['breakout_type'] == 'BEARISH':
+                                        if weekly_close < weekly_ema20:
+                                            filters_passed['multitimeframe'] = True
+                                            filter_reasons.append(f"? Weekly downtrend (close {weekly_close:.2f} < EMA {weekly_ema20:.2f})")
+                                        else:
+                                            filters_passed['multitimeframe'] = False
+                                            filter_reasons.append(f"? Weekly uptrend (close {weekly_close:.2f} > EMA {weekly_ema20:.2f})")
+                                else:
+                                    logger.warning("Insufficient weekly data for multi-timeframe analysis")
+                                    filters_passed['multitimeframe'] = False
+                                    filter_reasons.append("? Multi-timeframe check skipped (insufficient weekly data)")
+                    except Exception as conversion_error:
+                        logger.error(f"Failed to convert index to datetime: {conversion_error}")
+                        filters_passed['multitimeframe'] = False
+                        filter_reasons.append("? Multi-timeframe check skipped (index conversion error)")
                 else:
-                    logger.warning("Insufficient weekly data for multi-timeframe analysis")
+                    # Index is already DatetimeIndex, proceed with resampling
+                    weekly_data = data.resample('W').agg({
+                        'Open': 'first',
+                        'High': 'max',
+                        'Low': 'min',
+                        'Close': 'last',
+                        'Volume': 'sum'
+                    }).dropna()
+                    
+                    if len(weekly_data) >= 20:
+                        # Calculate weekly EMA20
+                        weekly_ema20 = weekly_data['Close'].ewm(span=20, adjust=False).mean().iloc[-1]
+                        weekly_close = weekly_data['Close'].iloc[-1]
+                        
+                        if breakout['breakout_type'] == 'BULLISH':
+                            # For BULLISH, weekly price should be above weekly EMA
+                            if weekly_close > weekly_ema20:
+                                filters_passed['multitimeframe'] = True
+                                filter_reasons.append(f"? Weekly uptrend (close {weekly_close:.2f} > EMA {weekly_ema20:.2f})")
+                            else:
+                                filters_passed['multitimeframe'] = False
+                                filter_reasons.append(f"? Weekly downtrend (close {weekly_close:.2f} < EMA {weekly_ema20:.2f})")
+                        elif breakout['breakout_type'] == 'BEARISH':
+                            # For BEARISH, weekly price should be below weekly EMA
+                            if weekly_close < weekly_ema20:
+                                filters_passed['multitimeframe'] = True
+                                filter_reasons.append(f"? Weekly downtrend (close {weekly_close:.2f} < EMA {weekly_ema20:.2f})")
+                            else:
+                                filters_passed['multitimeframe'] = False
+                                filter_reasons.append(f"? Weekly uptrend (close {weekly_close:.2f} > EMA {weekly_ema20:.2f})")
+                    else:
+                        logger.warning("Insufficient weekly data for multi-timeframe analysis")
+                        filters_passed['multitimeframe'] = False
+                        filter_reasons.append("? Multi-timeframe check skipped (insufficient weekly data)")
             except Exception as e:
                 logger.error(f"Multi-timeframe analysis error: {e}")
+                filters_passed['multitimeframe'] = False
+                filter_reasons.append("? Multi-timeframe check skipped (analysis error)")
         
         # Step 5: Calculate entry, stop, target
         trade_params = calculate_entry_stop_target(data, breakout, consolidation, atr)

@@ -139,7 +139,8 @@ def get_db_session():
         try:
             yield conn, conn.cursor()
             conn.commit()
-        except:
+        except Exception as e:
+            logger.warning(f"Transaction rolled back due to error: {e}")
             conn.rollback()
             raise
         finally:
@@ -235,9 +236,11 @@ def init_db():
                 db_initialized = False
                 raise
         
-        except (psycopg2.OperationalError if DATABASE_TYPE == 'postgres' else Exception) as e:
-            # PostgreSQL connection errors (transient)
-            if DATABASE_TYPE == 'postgres' and 'could not connect' in str(e).lower():
+        except Exception as e:
+            # Handle all exceptions with branching based on database type and error characteristics
+            # Transient PostgreSQL connection errors get backoff/retry logic
+            if DATABASE_TYPE == 'postgres' and isinstance(e, psycopg2.OperationalError) and 'could not connect' in str(e).lower():
+                # Transient PostgreSQL connection error: retry with backoff
                 last_error = e
                 if attempt < DB_INIT_MAX_ATTEMPTS:
                     backoff_seconds = DB_INIT_BACKOFF_BASE ** (attempt - 1)
@@ -254,12 +257,8 @@ def init_db():
                     db_initialized = False
                     raise
             else:
-                # Non-transient error: re-raise immediately
+                # Non-transient error (auth failure, config error, or non-PostgreSQL error): fail fast
                 _raise_critical_error(e)
-        
-        except Exception as e:
-            # Critical non-transient errors: authentication, configuration, etc.
-            _raise_critical_error(e)
 
 
 def _raise_critical_error(error):
@@ -474,20 +473,20 @@ def _init_postgres_db():
         if conn:
             try:
                 conn.rollback()
-            except:
-                pass
+            except Exception as rollback_error:
+                logger.warning(f"Failed to rollback PostgreSQL connection: {rollback_error}")
         raise
     finally:
         if cursor:
             try:
                 cursor.close()
-            except:
-                pass
+            except Exception as close_error:
+                logger.warning(f"Failed to close PostgreSQL cursor: {close_error}")
         if conn:
             try:
                 conn.close()
-            except:
-                pass
+            except Exception as close_error:
+                logger.warning(f"Failed to close PostgreSQL connection: {close_error}")
 
 
 def cleanup_old_analyses(ticker=None, symbol=None, keep_last=10):

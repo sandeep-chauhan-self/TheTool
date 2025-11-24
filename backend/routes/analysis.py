@@ -60,7 +60,7 @@ def _get_active_job_for_tickers(tickers: list) -> dict:
             "created_at": created_at
         }
     except Exception as e:
-        logger.exception(f"Error checking for active jobs with tickers {tickers}")
+        logger.exception(f"Error checking for active jobs with tickers {tickers}: {e}")
         return None
 
 

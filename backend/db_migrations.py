@@ -16,6 +16,17 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
+# Safe conditional imports for database drivers
+try:
+    import sqlite3
+except ImportError:
+    sqlite3 = None
+
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
 DB_PATH = config.DB_PATH
 CURRENT_SCHEMA_VERSION = 3
 
@@ -35,31 +46,30 @@ def get_db_placeholder(conn):
         str: The correct placeholder for this database driver
     """
     try:
-        # Use the paramstyle from the DB-API 2.0 connection
-        import sqlite3
-        import psycopg2
-        
-        if isinstance(conn, sqlite3.Connection):
+        # Check against sqlite3 if available
+        if sqlite3 is not None and isinstance(conn, sqlite3.Connection):
             return '?'
-        elif isinstance(conn, psycopg2.extensions.connection):
+        
+        # Check against psycopg2 if available
+        if psycopg2 is not None and isinstance(conn, psycopg2.extensions.connection):
             return '%s'
-        else:
-            # Fallback: try to read paramstyle
-            if hasattr(conn, 'paramstyle'):
-                paramstyle = conn.paramstyle
-                if paramstyle == 'qmark':
-                    return '?'
-                elif paramstyle == 'format':
-                    return '%s'
-                elif paramstyle == 'pyformat':
-                    return '%(name)s'  # Would need to be handled specially
-                else:
-                    logger.warning(f"Unknown paramstyle: {paramstyle}, defaulting to %s")
-                    return '%s'
+        
+        # Fallback: try to read paramstyle attribute
+        if hasattr(conn, 'paramstyle'):
+            paramstyle = conn.paramstyle
+            if paramstyle == 'qmark':
+                return '?'
+            elif paramstyle == 'format':
+                return '%s'
+            elif paramstyle == 'pyformat':
+                return '%(name)s'  # Would need to be handled specially
+            else:
+                logger.warning(f"Unknown paramstyle: {paramstyle}, defaulting to '%s'")
+                return '%s'
     except Exception as e:
-        logger.warning(f"Could not determine paramstyle: {e}, defaulting to %s")
+        logger.warning(f"Could not determine paramstyle: {e}, defaulting to '%s'")
     
-    # Default to %s (PostgreSQL) as it's more common in production
+    # Default to '%s' (PostgreSQL format) as it's more common in production
     return '%s'
 
 
@@ -230,24 +240,83 @@ def migration_v2(conn):
     """
     Migration V2: Add ticker and notes columns to watchlist table
     
-    Adds:
+    Adds (conditionally):
     - ticker column (copy from symbol for existing rows)
     - notes column (for user annotations)
     
     This migration ensures backward compatibility with routes expecting ticker field.
+    Detects existing columns and only adds missing ones.
     """
-    migration_sql = '''
-    -- Add ticker column if it doesn't exist
-    ALTER TABLE watchlist ADD COLUMN ticker TEXT;
+    cursor = conn.cursor()
+    migration_sql_parts = []
     
-    -- Add notes column if it doesn't exist
-    ALTER TABLE watchlist ADD COLUMN notes TEXT;
+    try:
+        # Check for existing columns based on database type
+        existing_columns = set()
+        
+        if config.DATABASE_TYPE == 'sqlite':
+            # SQLite: Use PRAGMA table_info
+            cursor.execute("PRAGMA table_info(watchlist)")
+            columns = cursor.fetchall()
+            existing_columns = {col[1] for col in columns}  # col[1] is column name
+            logger.debug(f"SQLite watchlist columns: {existing_columns}")
+        else:
+            # PostgreSQL: Use information_schema
+            cursor.execute('''
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'watchlist'
+            ''')
+            columns = cursor.fetchall()
+            existing_columns = {col[0] for col in columns}  # col[0] is column_name
+            logger.debug(f"PostgreSQL watchlist columns: {existing_columns}")
+        
+        # Conditionally add ticker column
+        if 'ticker' not in existing_columns:
+            migration_sql_parts.append('ALTER TABLE watchlist ADD COLUMN ticker TEXT;')
+            logger.info("  Will add ticker column")
+        else:
+            logger.info("  ticker column already exists, skipping")
+        
+        # Conditionally add notes column
+        if 'notes' not in existing_columns:
+            migration_sql_parts.append('ALTER TABLE watchlist ADD COLUMN notes TEXT;')
+            logger.info("  Will add notes column")
+        else:
+            logger.info("  notes column already exists, skipping")
+        
+        # Always add the UPDATE to sync symbol->ticker if ticker column exists
+        if 'ticker' in existing_columns or 'ticker' not in existing_columns:
+            # Safe to add UPDATE even if column was just added
+            migration_sql_parts.append('UPDATE watchlist SET ticker = symbol WHERE ticker IS NULL;')
+        
+        # Compose final SQL
+        migration_sql = '\n'.join(migration_sql_parts)
+        
+        # If no changes needed, still record migration as applied
+        if not migration_sql_parts or migration_sql.strip() == '':
+            logger.info("Migration v2: No changes needed for watchlist table")
+            # Record the migration as applied even if no SQL executed
+            placeholder = get_db_placeholder(conn)
+            if placeholder == '?':
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (?, ?)
+                ''', (2, "Add ticker and notes to watchlist (no-op)"))
+            else:
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (%s, %s)
+                ''', (2, "Add ticker and notes to watchlist (no-op)"))
+            conn.commit()
+            return True
+        
+        return apply_migration(conn, 2, "Add ticker and notes to watchlist", migration_sql)
     
-    -- Copy symbol to ticker for existing rows
-    UPDATE watchlist SET ticker = symbol WHERE ticker IS NULL;
-    '''
-    
-    return apply_migration(conn, 2, "Add ticker and notes to watchlist", migration_sql)
+    except Exception as e:
+        logger.error(f"✗ Migration v2 preparation failed: {e}")
+        conn.rollback()
+        return False
 
 
 def migration_v3(conn):

@@ -6,15 +6,14 @@ import ssl
 from datetime import datetime, timedelta
 import time
 
-# Fix SSL certificate verification issues (common in corporate environments)
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Environment flag to conditionally disable SSL verification (disabled by default)
+# Only set BACKUP_DISABLE_SSL_VERIFY=true if absolutely necessary in controlled environments
+DISABLE_SSL_VERIFY = os.getenv('BACKUP_DISABLE_SSL_VERIFY', '').lower() == 'true'
 
-# Set SSL context to use unverified context
-try:
-    ssl._create_default_https_context = ssl._create_unverified_context
-except Exception:
-    pass
+# Only disable urllib3 warnings if SSL verification is explicitly disabled
+if DISABLE_SSL_VERIFY:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger('trading_analyzer')
 
@@ -31,7 +30,8 @@ def _get_session():
         from urllib3.util.retry import Retry
         
         _global_session = requests.Session()
-        _global_session.verify = False  # Disable SSL verification
+        # SSL verification enabled by default, only disable if env flag is explicitly true
+        _global_session.verify = not DISABLE_SSL_VERIFY
         
         # Add user agent to mimic browser and avoid blocking
         _global_session.headers.update({
