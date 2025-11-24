@@ -40,6 +40,19 @@ class NumpyEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+def convert_numpy_types(value):
+    """Convert numpy types to Python native types for database insertion"""
+    if isinstance(value, np.integer):
+        return int(value)
+    elif isinstance(value, np.floating):
+        return float(value)
+    elif isinstance(value, np.bool_):
+        return bool(value)
+    elif isinstance(value, np.ndarray):
+        return value.tolist()
+    return value
+
+
 # Global dictionary to track running threads (thread management only)
 # Job state is now managed by JobStateManager (Redis or in-memory)
 job_threads: Dict[str, threading.Thread] = {}
@@ -169,14 +182,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     symbol,
                                     None,  # name not available from watchlist analysis
                                     ticker,  # yahoo_symbol same as ticker
-                                    result.get('score', 0),
+                                    convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
                                     result.get('verdict', 'Neutral'),
-                                    result.get('entry'),
-                                    result.get('stop'),  # Note: key is 'stop' not 'stop_loss'
-                                    result.get('target'),
+                                    convert_numpy_types(result.get('entry')),
+                                    convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
+                                    convert_numpy_types(result.get('target')),
                                     result.get('entry_method', 'Market Order'),
                                     result.get('data_source', 'real'),
-                                    result.get('is_demo_data', 0),
+                                    convert_numpy_types(result.get('is_demo_data', 0)),
                                     raw_data,
                                     'completed',
                                     datetime.now().isoformat(),
@@ -415,14 +428,14 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     symbol,        # symbol without suffix
                     name,          # company name
                     yahoo_symbol,  # yahoo_symbol with suffix
-                    result.get('score', 0),
+                    convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
                     result.get('verdict', 'Neutral'),
-                    result.get('entry'),
-                    result.get('stop'),  # Note: key is 'stop' not 'stop_loss'
-                    result.get('target'),
+                    convert_numpy_types(result.get('entry')),
+                    convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
+                    convert_numpy_types(result.get('target')),
                     result.get('entry_method', 'Market Order'),
                     result.get('data_source', 'real'),
-                    use_demo,
+                    convert_numpy_types(use_demo),
                     raw_data,
                     'completed',
                     datetime.now().isoformat(),
