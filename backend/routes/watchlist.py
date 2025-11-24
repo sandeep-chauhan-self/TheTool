@@ -50,7 +50,7 @@ def _get_watchlist():
             ORDER BY created_at DESC
         """)
         
-        logger.info(f"[WATCHLIST_GET] Query returned type: {type(items)}, len: {len(items)}, items: {items}")
+        logger.info(f"[WATCHLIST_GET] Query returned type: {type(items)}, len: {len(items)}")
         
         # Handle both tuple (PostgreSQL) and dict (SQLite) return types
         items_dict = []
@@ -59,16 +59,18 @@ def _get_watchlist():
                 if isinstance(item, (tuple, list)):
                     items_dict.append({
                         "id": item[0],
-                        "symbol": item[1],
+                        "ticker": item[1],  # Renamed from 'symbol' to match frontend expectation
                         "name": item[2],
                         "created_at": str(item[3]) if item[3] else None
                     })
                 else:
-                    # Convert Row object to dict
+                    # Convert Row object to dict and rename symbol to ticker
                     item_dict = dict(item)
+                    if 'symbol' in item_dict:
+                        item_dict['ticker'] = item_dict.pop('symbol')
                     items_dict.append(item_dict)
         
-        logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items: {items_dict}")
+        logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
         
         # Log items with empty symbol for debugging
         empty_symbol_items = [item for item in items_dict if not item.get('symbol') or item.get('symbol').strip() == '']
@@ -239,12 +241,15 @@ def debug_list_watchlist():
                 if isinstance(item, (tuple, list)):
                     items_list.append({
                         "id": item[0],
-                        "symbol": item[1],
+                        "ticker": item[1],  # Renamed to match frontend
                         "name": item[2],
                         "created_at": str(item[3]) if item[3] else None
                     })
                 else:
-                    items_list.append(dict(item))
+                    item_dict = dict(item)
+                    if 'symbol' in item_dict:
+                        item_dict['ticker'] = item_dict.pop('symbol')
+                    items_list.append(item_dict)
         
         logger.info(f"[DEBUG] Watchlist has {len(items_list)} items")
         return jsonify({
@@ -279,12 +284,15 @@ def debug_cleanup_watchlist():
                 if isinstance(item, (tuple, list)):
                     items_list.append({
                         "id": item[0],
-                        "symbol": item[1],
+                        "ticker": item[1],  # Renamed to match frontend
                         "name": item[2],
                         "created_at": str(item[3]) if item[3] else None
                     })
                 else:
-                    items_list.append(dict(item))
+                    item_dict = dict(item)
+                    if 'symbol' in item_dict:
+                        item_dict['ticker'] = item_dict.pop('symbol')
+                    items_list.append(item_dict)
         
         return jsonify({
             "debug": True,
