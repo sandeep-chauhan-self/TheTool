@@ -23,7 +23,19 @@ function Results() {
       setLoading(true);
       setError(null);
       const data = await getReport(ticker);
-      setReport(data);
+      // Flatten the nested structure: extract analysis fields to top level
+      if (data && data.analysis) {
+        setReport({
+          ...data,
+          verdict: data.analysis.verdict,
+          score: data.analysis.score,
+          entry: data.analysis.entry,
+          stop: data.analysis.stop_loss,  // Note: API returns stop_loss, but UI expects stop
+          target: data.analysis.target
+        });
+      } else {
+        setReport(data);
+      }
     } catch (err) {
       setError('Failed to load analysis report. The stock may not have been analyzed yet.');
       console.error('Failed to load report:', err);
