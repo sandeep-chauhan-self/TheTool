@@ -582,6 +582,43 @@ def run_migrations():
         if current_version < 3:
             migration_v3(conn)
         
+        # CRITICAL: Ensure tickers_json column exists (added after v3 was already deployed)
+        # This runs regardless of version to fix existing databases
+        try:
+            cursor = conn.cursor()
+            if config.DATABASE_TYPE == 'postgres':
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name='analysis_jobs' AND column_name='tickers_json'
+                """)
+                if not cursor.fetchone():
+                    logger.info("Adding missing tickers_json column to analysis_jobs...")
+                    cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+                    logger.info("  ✓ tickers_json column added to analysis_jobs")
+            else:
+                # SQLite
+                cursor.execute("PRAGMA table_info(analysis_jobs)")
+                columns = {row[1] for row in cursor.fetchall()}
+                if 'tickers_json' not in columns:
+                    logger.info("Adding missing tickers_json column to analysis_jobs...")
+                    cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+                    logger.info("  ✓ tickers_json column added to analysis_jobs")
+            
+            # Also create the index if it doesn't exist
+            try:
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_job_tickers
+                    ON analysis_jobs(tickers_json, status)
+                ''')
+                logger.info("  ✓ Index on (tickers_json, status) verified")
+            except:
+                pass  # Index may already exist
+            
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.warning(f"Error ensuring tickers_json column: {e}")
+        
         current_version = get_current_version(conn)
         if current_version == CURRENT_SCHEMA_VERSION:
             logger.info("[OK] Database schema is up to date")
