@@ -3,6 +3,7 @@ Analysis routes - Ticker analysis, job management, and status tracking
 """
 import uuid
 import json
+import hashlib
 import traceback
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
@@ -33,18 +34,23 @@ def _get_active_job_for_tickers(tickers: list) -> dict:
         
         # Normalize tickers for comparison: sort and uppercase
         normalized_tickers = json.dumps(sorted([t.upper().strip() for t in tickers]))
+        # Compute SHA-256 hash of normalized tickers
+        hash_obj = hashlib.sha256(normalized_tickers.encode('utf-8'))
+        tickers_hash = hash_obj.hexdigest()
+        
         five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
         
         # Look for exact same tickers in queued/processing jobs from last 5 minutes
+        # Use hash-based query for efficiency (avoids 8KB index size limit)
         active_job = query_db("""
             SELECT job_id, status, total, completed, created_at
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
-              AND tickers_json = ?
+              AND tickers_hash = ?
               AND created_at > ?
             ORDER BY created_at DESC
             LIMIT 1
-        """, (normalized_tickers, five_min_ago), one=True)
+        """, (tickers_hash, five_min_ago), one=True)
         
         if not active_job:
             return None

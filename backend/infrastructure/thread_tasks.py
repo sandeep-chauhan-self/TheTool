@@ -175,12 +175,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                             with get_db_session() as (conn, cursor):
                                 query = '''
                                     INSERT INTO analysis_results 
-                                    (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                                    (job_id, ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 '''
                                 query, params = _convert_query_params(query, (
+                                    job_id,
                                     ticker,
                                     symbol,
                                     None,  # name not available from watchlist analysis
@@ -421,12 +422,13 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             with get_db_session() as (conn, cursor):
                 query = '''
                     INSERT INTO analysis_results 
-                    (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                    (job_id, ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
                      entry_method, data_source, is_demo_data, raw_data, status, 
                      created_at, updated_at, analysis_source)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 '''
                 query, params = _convert_query_params(query, (
+                    None,  # job_id not available for bulk analysis
                     yahoo_symbol,  # ticker = yahoo_symbol
                     symbol,        # symbol without suffix
                     name,          # company name
@@ -465,11 +467,12 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             with get_db_session() as (conn, cursor):
                 query = '''
                     INSERT INTO analysis_results 
-                    (ticker, symbol, name, yahoo_symbol, score, verdict, status, error_message, 
+                    (job_id, ticker, symbol, name, yahoo_symbol, score, verdict, status, error_message, 
                      created_at, updated_at, analysis_source)
-                    VALUES (%s, %s, %s, %s, 0.0, 'Pending', 'failed', %s, %s, %s, 'bulk')
+                    VALUES (%s, %s, %s, %s, %s, 0.0, 'Pending', 'failed', %s, %s, %s, 'bulk')
                 '''
                 query, params = _convert_query_params(query, (
+                    None,  # job_id not available
                     yahoo_symbol,
                     symbol,
                     name,

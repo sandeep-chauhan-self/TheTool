@@ -28,7 +28,7 @@ except ImportError:
     psycopg2 = None
 
 DB_PATH = config.DB_PATH
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 
 def get_db_placeholder(conn):
@@ -552,6 +552,57 @@ def migration_v3(conn):
         return False
 
 
+def migration_v4(conn):
+    """
+    Migration V4: Add tickers_hash column and replace tickers_json index
+    
+    Problem: PostgreSQL B-tree index size limit (8KB per row) exceeded when
+    indexing tickers_json column containing 2,192+ stocks (~50KB).
+    
+    Solution: Use SHA-256 hash of tickers_json (fixed 64 bytes) for indexing.
+    
+    Changes:
+    - Add tickers_hash column to analysis_jobs
+    - Compute hashes for all existing jobs (backfill)
+    - Drop old problematic index: idx_job_tickers(tickers_json, status)
+    - Create new hash-based index: idx_job_tickers_hash(tickers_hash, status)
+    
+    Backward Compatibility: Keeps tickers_json unchanged, only affects internal queries
+    """
+    try:
+        from migrations.add_tickers_hash import run_migration
+        
+        logger.info("Running migration v4 (Add tickers_hash column)...")
+        
+        # Call the dedicated migration module
+        if run_migration(conn, config.DATABASE_TYPE):
+            # Record migration as applied
+            cursor = conn.cursor()
+            placeholder = get_db_placeholder(conn)
+            
+            if placeholder == '?':
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (?, ?)
+                ''', (4, "Add tickers_hash column and hash-based index"))
+            else:
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (%s, %s)
+                ''', (4, "Add tickers_hash column and hash-based index"))
+            
+            conn.commit()
+            logger.info("[OK] Migration v4 completed successfully")
+            return True
+        else:
+            logger.error("Migration v4 failed")
+            return False
+    except Exception as e:
+        logger.error(f"Migration v4 failed: {e}")
+        conn.rollback()
+        return False
+
+
 def run_migrations():
     """
     Run all pending migrations
@@ -581,6 +632,9 @@ def run_migrations():
         
         if current_version < 3:
             migration_v3(conn)
+        
+        if current_version < 4:
+            migration_v4(conn)
         
         # Cleanup: Remove duplicate watchlist entries
         try:

@@ -10,6 +10,7 @@ Provides:
 
 import json
 import logging
+import hashlib
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from database import get_db_connection, query_db, execute_db
@@ -65,8 +66,12 @@ class JobStateTransactions:
         
         # Normalize tickers: sort and JSON dump for consistent duplicate detection
         tickers_json = None
+        tickers_hash = None
         if tickers:
             tickers_json = json.dumps(sorted([t.upper().strip() for t in tickers]))
+            # Compute SHA-256 hash of normalized tickers
+            hash_obj = hashlib.sha256(tickers_json.encode('utf-8'))
+            tickers_hash = hash_obj.hexdigest()
         
         # Use get_db_session() for proper transaction handling with rollback
         try:
@@ -77,8 +82,8 @@ class JobStateTransactions:
                 query = '''
                     INSERT INTO analysis_jobs 
                     (job_id, status, total, completed, progress, errors,
-                     tickers_json, created_at, updated_at, successful)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     tickers_json, tickers_hash, created_at, updated_at, successful)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     job_id,
@@ -88,6 +93,7 @@ class JobStateTransactions:
                     0,  # progress
                     '[]',  # errors
                     tickers_json,  # normalized tickers
+                    tickers_hash,  # SHA-256 hash of tickers
                     now,
                     now,
                     0  # successful
@@ -95,7 +101,7 @@ class JobStateTransactions:
                 
                 cursor.execute(query, params)
                 # commit() is called automatically by context manager
-                logger.info(f"Job {job_id} created atomically")
+                logger.info(f"Job {job_id} created atomically with tickers_hash={tickers_hash}")
                 return True
                 
         except Exception as e:

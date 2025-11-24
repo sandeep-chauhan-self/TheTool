@@ -5,6 +5,7 @@ import csv
 import json
 import uuid
 import time
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from flask import Blueprint, jsonify, request
@@ -247,44 +248,43 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
         # Normalize requested symbols: uppercase, trim, sort
         normalized_symbols = sorted([s.upper().strip() for s in symbols])
         requested_json = json.dumps(normalized_symbols)
+        # Compute SHA-256 hash for efficient duplicate detection
+        hash_obj = hashlib.sha256(requested_json.encode('utf-8'))
+        requested_hash = hash_obj.hexdigest()
         
         # Get active jobs from last 5 minutes
         from datetime import datetime, timedelta
         five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
         
         active_jobs = query_db("""
-            SELECT job_id, status, total, completed, created_at, tickers_json
+            SELECT job_id, status, total, completed, created_at, tickers_hash
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
+              AND tickers_hash = ?
               AND created_at > ?
             ORDER BY created_at DESC
-            LIMIT 20
-        """, (five_min_ago,))
+            LIMIT 5
+        """, (requested_hash, five_min_ago))
         
         if not active_jobs:
             return None
         
-        # Check each active job for exact symbol match
-        for job_id, status, total, completed, created_at, tickers_json in active_jobs:
-            # Skip jobs with no tickers_json (shouldn't happen, but be safe)
-            if not tickers_json:
+        # Check each active job (should be exactly one with matching hash, but be safe)
+        for job_id, status, total, completed, created_at, tickers_hash in active_jobs:
+            # Skip jobs with no tickers_hash (shouldn't happen, but be safe)
+            if not tickers_hash:
                 continue
             
-            try:
-                job_symbols = json.loads(tickers_json)
-                # Compare normalized symbol sets
-                if job_symbols == normalized_symbols:
-                    logger.info(f"Found active job {job_id} with matching symbols, status {status}")
-                    return {
-                        "job_id": job_id,
-                        "status": status,
-                        "total": total,
-                        "completed": completed,
-                        "created_at": created_at
-                    }
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse tickers_json for job {job_id}")
-                continue
+            # Hash match found - this is our duplicate
+            if tickers_hash == requested_hash:
+                logger.info(f"Found active job {job_id} with matching symbols, status {status}")
+                return {
+                    "job_id": job_id,
+                    "status": status,
+                    "total": total,
+                    "completed": completed,
+                    "created_at": created_at
+                }
         
         # No matching job found
         return None
