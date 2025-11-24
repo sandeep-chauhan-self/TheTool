@@ -45,7 +45,7 @@ def _get_watchlist():
     """GET: Retrieve watchlist items"""
     try:
         items = query_db("""
-            SELECT id, ticker, symbol, notes, created_at
+            SELECT id, symbol, name, created_at
             FROM watchlist
             ORDER BY created_at DESC
         """)
@@ -53,10 +53,10 @@ def _get_watchlist():
         items_dict = [dict(item) for item in items]
         logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
         
-        # Log items with empty ticker for debugging
-        empty_ticker_items = [item for item in items_dict if not item.get('ticker') or item.get('ticker').strip() == '']
-        if empty_ticker_items:
-            logger.warning(f"[WATCHLIST_GET] Found {len(empty_ticker_items)} items with empty ticker: {empty_ticker_items}")
+        # Log items with empty symbol for debugging
+        empty_symbol_items = [item for item in items_dict if not item.get('symbol') or item.get('symbol').strip() == '']
+        if empty_symbol_items:
+            logger.warning(f"[WATCHLIST_GET] Found {len(empty_symbol_items)} items with empty symbol: {empty_symbol_items}")
         
         return jsonify({
             "watchlist": items_dict,
@@ -91,51 +91,49 @@ def _add_to_watchlist():
         
         symbol = validated_data.get("symbol", "").strip().upper()
         name = validated_data.get("name", "").strip()
-        notes = data.get("notes", "").strip()
         
         logger.info(f"[WATCHLIST_ADD] Validated symbol: {symbol}, name: {name}")
         
         # Convert symbol to ticker format (add .NS as default exchange)
         # If symbol already contains an exchange code, use it as-is
         if '.' in symbol:
-            ticker = symbol
+            symbol_with_exchange = symbol
         else:
             # Default to .NS (NSE) if no exchange code provided
-            ticker = f"{symbol}.NS"
+            symbol_with_exchange = f"{symbol}.NS"
         
-        logger.info(f"[WATCHLIST_ADD] Generated ticker: {ticker}")
+        logger.info(f"[WATCHLIST_ADD] Generated symbol: {symbol_with_exchange}")
         
-        # Check if already exists (search by ticker)
+        # Check if already exists (search by symbol)
         existing = query_db(
-            "SELECT id FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
-            (ticker,),
+            "SELECT id FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
+            (symbol_with_exchange,),
             one=True
         )
         
         if existing:
-            logger.warning(f"[WATCHLIST_ADD] Duplicate ticker: {ticker}")
+            logger.warning(f"[WATCHLIST_ADD] Duplicate symbol: {symbol_with_exchange}")
             return StandardizedErrorResponse.format(
                 "WATCHLIST_DUPLICATE",
-                f"Ticker {ticker} already in watchlist",
+                f"Symbol {symbol_with_exchange} already in watchlist",
                 409
             )
         
-        # Insert new item
+        # Insert new item (only using columns that exist: symbol, name)
         item_id = execute_db(
             """
-            INSERT INTO watchlist (ticker, symbol, notes)
-            VALUES (?, ?, ?)
+            INSERT INTO watchlist (symbol, name)
+            VALUES (?, ?)
             """,
-            (ticker, symbol, notes)
+            (symbol_with_exchange, name)
         )
         
-        logger.info(f"[WATCHLIST_ADD] Successfully added - ID: {item_id}, ticker: {ticker}, symbol: {symbol}")
+        logger.info(f"[WATCHLIST_ADD] Successfully added - ID: {item_id}, symbol: {symbol_with_exchange}")
         
         return jsonify({
             "id": item_id,
-            "ticker": ticker,
-            "symbol": symbol,
-            "notes": notes,
+            "symbol": symbol_with_exchange,
+            "name": name,
             "message": "Added to watchlist"
         }), 201
         
@@ -157,20 +155,20 @@ def _remove_from_watchlist():
         logger.info(f"[WATCHLIST_DELETE] Incoming request: {data}")
         
         item_id = data.get("id")
-        ticker = data.get("ticker")
+        symbol = data.get("symbol") or data.get("ticker")  # Accept both symbol and ticker
         
-        if not item_id and not ticker:
-            logger.warning("[WATCHLIST_DELETE] No id or ticker provided")
+        if not item_id and not symbol:
+            logger.warning("[WATCHLIST_DELETE] No id or symbol provided")
             return StandardizedErrorResponse.format(
                 "INVALID_REQUEST",
-                "Provide either 'id' or 'ticker'",
+                "Provide either 'id' or 'symbol'",
                 400
             )
         
         # Build query
         if item_id:
             result = query_db(
-                "SELECT ticker FROM watchlist WHERE id = ?",
+                "SELECT symbol FROM watchlist WHERE id = ?",
                 (item_id,),
                 one=True
             )
@@ -181,20 +179,25 @@ def _remove_from_watchlist():
                     f"Watchlist item {item_id} not found",
                     404
                 )
-            ticker_name = result['ticker']
+            # Handle both tuple (PostgreSQL) and dict (SQLite) return types
+            if isinstance(result, (tuple, list)):
+                symbol_name = result[0]
+            else:
+                symbol_name = result['symbol']
+            
             execute_db("DELETE FROM watchlist WHERE id = ?", (item_id,))
-            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, ticker: {ticker_name}")
+            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, symbol: {symbol_name}")
         else:
-            ticker_name = ticker
+            symbol_name = symbol
             execute_db(
-                "DELETE FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
-                (ticker,)
+                "DELETE FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
+                (symbol,)
             )
-            logger.info(f"[WATCHLIST_DELETE] Removed by ticker: {ticker_name}")
+            logger.info(f"[WATCHLIST_DELETE] Removed by symbol: {symbol_name}")
         
         return jsonify({
             "message": "Removed from watchlist",
-            "ticker": ticker_name
+            "symbol": symbol_name
         }), 200
         
     except Exception as e:
