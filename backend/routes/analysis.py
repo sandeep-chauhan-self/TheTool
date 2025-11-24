@@ -295,10 +295,10 @@ def get_history(ticker):
                 400
             )
         
-        # Query analysis results
+        # Query analysis results including raw_data for indicators
         results = query_db(
             """
-            SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at
+            SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -317,7 +317,15 @@ def get_history(ticker):
         history = []
         for r in results:
             if isinstance(r, (tuple, list)):
-                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at)
+                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data)
+                raw_data = r[9]
+                indicators = []
+                if raw_data:
+                    try:
+                        indicators = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+                    except json.JSONDecodeError:
+                        indicators = []
+                
                 history.append({
                     "id": r[0],
                     "ticker": r[1],
@@ -327,11 +335,21 @@ def get_history(ticker):
                     "entry": r[5],
                     "stop_loss": r[6],
                     "target": r[7],
-                    "created_at": str(r[8]) if r[8] else None
+                    "created_at": str(r[8]) if r[8] else None,
+                    "indicators": indicators
                 })
             else:
                 # SQLite returns Row objects
-                history.append(dict(r))
+                item_dict = dict(r)
+                raw_data = item_dict.get('raw_data')
+                indicators = []
+                if raw_data:
+                    try:
+                        indicators = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+                    except json.JSONDecodeError:
+                        indicators = []
+                item_dict['indicators'] = indicators
+                history.append(item_dict)
         
         return jsonify({
             "ticker": ticker,

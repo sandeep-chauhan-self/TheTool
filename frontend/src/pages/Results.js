@@ -46,19 +46,14 @@ function Results() {
 
   const loadHistory = async () => {
     try {
-      // Try to load from all_stocks_analysis first (centralized data)
+      // Load history but don't override report - history is just for the dropdown
       const historyData = await getStockHistory(ticker);
       if (historyData && historyData.history && historyData.history.length > 0) {
         setHistory(historyData.history);
-        // Set report to latest by default
-        setReport({
-          ticker: ticker,
-          ...historyData.history[0]
-        });
       }
     } catch (err) {
-      console.log('No history available from centralized data, using current report');
-      // Fallback to current report endpoint
+      console.log('No history available, will use report data');
+      // Fallback - history is optional
     }
   };
 
@@ -67,7 +62,13 @@ function Results() {
     const selectedAnalysis = history[index];
     setReport({
       ticker: ticker,
-      ...selectedAnalysis
+      verdict: selectedAnalysis.verdict,
+      score: selectedAnalysis.score,
+      entry: selectedAnalysis.entry,
+      stop: selectedAnalysis.stop_loss,  // Map stop_loss to stop for UI
+      target: selectedAnalysis.target,
+      indicators: selectedAnalysis.indicators || [],
+      created_at: selectedAnalysis.created_at
     });
   };
 
