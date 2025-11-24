@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getReport, downloadReport, analyzeStocks, getStockHistory } from '../api/api';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
 import Header from '../components/Header';
 
 function Results() {
