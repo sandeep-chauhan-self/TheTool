@@ -50,27 +50,25 @@ def _get_watchlist():
             ORDER BY created_at DESC
         """)
         
-        logger.info(f"[WATCHLIST_GET] Raw query returned: {type(items)}, length: {len(items)}")
+        logger.info(f"[WATCHLIST_GET] Query returned type: {type(items)}, len: {len(items)}, items: {items}")
         
         # Handle both tuple (PostgreSQL) and dict (SQLite) return types
         items_dict = []
-        for idx, item in enumerate(items):
-            logger.info(f"[WATCHLIST_GET] Item {idx}: type={type(item)}, value={item}")
-            try:
+        if items:  # Only iterate if items is not None/empty
+            for idx, item in enumerate(items):
                 if isinstance(item, (tuple, list)):
                     items_dict.append({
                         "id": item[0],
                         "symbol": item[1],
                         "name": item[2],
-                        "created_at": item[3]
+                        "created_at": str(item[3]) if item[3] else None
                     })
                 else:
-                    items_dict.append(dict(item))
-            except Exception as e:
-                logger.error(f"[WATCHLIST_GET] Error converting item {idx}: {e}")
-                raise
+                    # Convert Row object to dict
+                    item_dict = dict(item)
+                    items_dict.append(item_dict)
         
-        logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
+        logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items: {items_dict}")
         
         # Log items with empty symbol for debugging
         empty_symbol_items = [item for item in items_dict if not item.get('symbol') or item.get('symbol').strip() == '']
