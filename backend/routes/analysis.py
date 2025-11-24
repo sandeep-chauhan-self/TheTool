@@ -342,7 +342,7 @@ def get_report(ticker):
         # Get latest analysis
         result = query_db(
             """
-            SELECT verdict, score, entry, stop_loss, target, created_at
+            SELECT verdict, score, entry, stop_loss, target, created_at, raw_data
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -369,6 +369,7 @@ def get_report(ticker):
                 "target": result[4]
             }
             created_at = result[5]
+            raw_data = result[6]
         else:
             analysis_data = {
                 "verdict": result['verdict'],
@@ -378,10 +379,21 @@ def get_report(ticker):
                 "target": result['target']
             }
             created_at = result['created_at']
+            raw_data = result['raw_data']
+        
+        # Parse indicators from raw_data JSON
+        indicators = []
+        if raw_data:
+            try:
+                indicators = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse raw_data JSON for {ticker}")
+                indicators = []
         
         return jsonify({
             "ticker": ticker,
             "analysis": analysis_data,
+            "indicators": indicators,
             "created_at": created_at
         }), 200
         
