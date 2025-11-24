@@ -347,6 +347,7 @@ def _init_sqlite_db():
             raw_data TEXT,
             status TEXT,
             error_message TEXT,
+            analysis_version INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP,
             analysis_source TEXT
@@ -381,6 +382,7 @@ def _init_sqlite_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_created ON analysis_results(symbol, created_at DESC)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_source_symbol ON analysis_results(analysis_source, symbol)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON analysis_results(updated_at)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_ticker_version ON analysis_results(ticker, analysis_version DESC)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
 
     
@@ -430,6 +432,7 @@ def _init_postgres_db():
                 raw_data TEXT,
                 status TEXT,
                 error_message TEXT,
+                analysis_version INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP,
                 analysis_source TEXT
@@ -464,6 +467,7 @@ def _init_postgres_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_created ON analysis_results(symbol, created_at DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_source_symbol ON analysis_results(analysis_source, symbol)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON analysis_results(updated_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_ticker_version ON analysis_results(ticker, analysis_version DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
         
         conn.commit()

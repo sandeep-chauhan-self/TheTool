@@ -233,12 +233,16 @@ class ResultInsertion:
         raw_data: Optional[str] = None,
         status: Optional[str] = None,
         error_message: Optional[str] = None,
-        analysis_source: Optional[str] = None
+        analysis_source: Optional[str] = None,
+        analysis_version: int = None
     ) -> Optional[int]:
         """
         Insert an analysis result atomically.
         
         Uses fresh connection to avoid transaction issues.
+        
+        Args:
+            analysis_version: Version number for this analysis. If None, computes next version.
         
         Returns:
             Row ID if inserted, None if failed
@@ -248,19 +252,29 @@ class ResultInsertion:
         try:
             with get_db_session() as (conn, cursor):
                 now = datetime.now().isoformat()
+                
+                # If version not provided, compute next version for this ticker
+                if analysis_version is None:
+                    version_query = 'SELECT MAX(analysis_version) FROM analysis_results WHERE ticker = ?'
+                    version_query, version_params = _convert_query_params(version_query, (ticker,))
+                    cursor.execute(version_query, version_params)
+                    result = cursor.fetchone()
+                    max_version = result[0] if result and result[0] is not None else -1
+                    analysis_version = max_version + 1
+                
                 query = '''
                     INSERT INTO analysis_results
                     (job_id, ticker, symbol, name, yahoo_symbol, score, verdict,
                      entry, stop_loss, target, entry_method, data_source,
                      is_demo_data, raw_data, status, error_message,
-                     created_at, updated_at, analysis_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     analysis_version, created_at, updated_at, analysis_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     job_id, ticker, symbol, name, yahoo_symbol, score, verdict,
                     entry, stop_loss, target, entry_method, data_source,
                     is_demo_data, raw_data, status, error_message,
-                    now, now, analysis_source
+                    analysis_version, now, now, analysis_source
                 ))
                 cursor.execute(query, params)
                 return True  # PostgreSQL doesn't return lastrowid
@@ -371,3 +385,55 @@ def get_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Failed to get job status for {job_id}: {e}")
         return None
+
+
+# Version-aware query helpers
+def get_latest_analysis(ticker: str) -> Optional[Dict[str, Any]]:
+    """
+    Get the latest analysis for a ticker (highest version number).
+    
+    Args:
+        ticker: Stock ticker symbol
+        
+    Returns:
+        Dict with analysis data if found, None otherwise
+    """
+    try:
+        result = query_db(
+            '''SELECT * FROM analysis_results 
+               WHERE ticker = ? 
+               ORDER BY analysis_version DESC 
+               LIMIT 1''',
+            (ticker,),
+            one=True
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Failed to get latest analysis for {ticker}: {e}")
+        return None
+
+
+def get_analysis_history(ticker: str, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+    """
+    Get analysis history for a ticker (all versions).
+    
+    Args:
+        ticker: Stock ticker symbol
+        limit: Maximum number of results to return
+        offset: Number of results to skip
+        
+    Returns:
+        List of analysis results ordered by version descending
+    """
+    try:
+        results = query_db(
+            '''SELECT * FROM analysis_results 
+               WHERE ticker = ? 
+               ORDER BY analysis_version DESC
+               LIMIT ? OFFSET ?''',
+            (ticker, limit, offset)
+        )
+        return results if results else []
+    except Exception as e:
+        logger.error(f"Failed to get analysis history for {ticker}: {e}")
+        return []

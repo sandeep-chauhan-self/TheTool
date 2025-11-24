@@ -84,6 +84,7 @@ def main():
                 raw_data TEXT,
                 status TEXT,
                 error_message TEXT,
+                analysis_version INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP,
                 analysis_source TEXT
@@ -126,6 +127,7 @@ def main():
             ('idx_symbol_created', 'analysis_results(symbol, created_at DESC)'),
             ('idx_source_symbol', 'analysis_results(analysis_source, symbol)'),
             ('idx_updated_at', 'analysis_results(updated_at)'),
+            ('idx_analysis_ticker_version', 'analysis_results(ticker, analysis_version DESC)'),
             ('idx_job_status', 'analysis_jobs(status)'),
             ('idx_job_tickers_hash', 'analysis_jobs(tickers_hash, status)'),
         ]

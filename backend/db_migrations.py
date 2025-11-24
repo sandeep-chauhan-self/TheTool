@@ -28,7 +28,7 @@ except ImportError:
     psycopg2 = None
 
 DB_PATH = config.DB_PATH
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 6
 
 
 def get_db_placeholder(conn):
@@ -603,6 +603,121 @@ def migration_v4(conn):
         return False
 
 
+def migration_v5(conn):
+    """
+    Migration V5: Fix duplicate key constraint for re-analysis
+    
+    Problem: UNIQUE index on (ticker, date) prevents re-analyzing the same
+    stock on the same day. This breaks "Analyze All Stocks" when run multiple
+    times on the same day.
+    
+    Solution: Drop UNIQUE constraint, keep regular indices for performance.
+    
+    Changes:
+    - Drop idx_analysis_ticker_date (UNIQUE constraint)
+    - Create idx_analysis_ticker_created (regular index)
+    - Create idx_analysis_created_date (regular index)
+    - Allows multiple analyses per stock per day
+    
+    Backward Compatibility: Data preserved, just constraint removed
+    """
+    try:
+        from migrations.fix_duplicate_constraint import run_migration
+        
+        logger.info("Running migration v5 (Fix duplicate key constraint)...")
+        
+        # Call the dedicated migration module
+        if run_migration(conn, config.DATABASE_TYPE):
+            # Record migration as applied
+            cursor = conn.cursor()
+            placeholder = get_db_placeholder(conn)
+            
+            if placeholder == '?':
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (?, ?)
+                ''', (5, "Fix duplicate key constraint for re-analysis"))
+            else:
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (%s, %s)
+                ''', (5, "Fix duplicate key constraint for re-analysis"))
+            
+            conn.commit()
+            logger.info("[OK] Migration v5 completed successfully")
+            return True
+        else:
+            logger.error("Migration v5 failed")
+            return False
+    except Exception as e:
+        logger.error(f"Migration v5 failed: {e}")
+        conn.rollback()
+        return False
+
+
+def migration_v6(conn):
+    """
+    Migration V6: Add analysis versioning system
+    
+    Problem: No way to track analysis history or distinguish between multiple
+    analyses of the same stock. Previous analyses are lost when re-analyzing.
+    
+    Solution: Add version tracking to analysis_results table.
+    
+    Changes:
+    - Add 'analysis_version' column to analysis_results (INTEGER, default 0)
+    - Create index on (ticker, analysis_version DESC) for efficient queries
+    - Add 'latest_analysis_version' to watchlist for tracking
+    - Backfill existing data with version = 0
+    
+    Benefits:
+    - Full audit trail of all analyses
+    - Quick fetch of latest version (ORDER BY version DESC LIMIT 1)
+    - Historical analysis comparisons
+    - Data integrity and regulatory compliance
+    
+    Backward Compatibility: Existing queries still work (version 0), new queries
+    can fetch latest version using simple ORDER BY clause
+    """
+    try:
+        from migrations.add_analysis_version import migration_v6_sqlite, migration_v6_postgres
+        
+        logger.info("Running migration v6 (Add analysis versioning)...")
+        
+        # Call the appropriate database-specific migration
+        if config.DATABASE_TYPE == 'postgres':
+            success = migration_v6_postgres(conn)
+        else:
+            success = migration_v6_sqlite(conn)
+        
+        if success:
+            # Record migration as applied
+            cursor = conn.cursor()
+            placeholder = get_db_placeholder(conn)
+            
+            if placeholder == '?':
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (?, ?)
+                ''', (6, "Add analysis versioning system"))
+            else:
+                cursor.execute('''
+                    INSERT INTO db_version (version, description)
+                    VALUES (%s, %s)
+                ''', (6, "Add analysis versioning system"))
+            
+            conn.commit()
+            logger.info("[OK] Migration v6 completed successfully")
+            return True
+        else:
+            logger.error("Migration v6 failed")
+            return False
+    except Exception as e:
+        logger.error(f"Migration v6 failed: {e}")
+        conn.rollback()
+        return False
+
+
 def run_migrations():
     """
     Run all pending migrations
@@ -635,6 +750,12 @@ def run_migrations():
         
         if current_version < 4:
             migration_v4(conn)
+        
+        if current_version < 5:
+            migration_v5(conn)
+        
+        if current_version < 6:
+            migration_v6(conn)
         
         # Cleanup: Remove duplicate watchlist entries
         try:
