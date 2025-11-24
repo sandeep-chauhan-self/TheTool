@@ -26,11 +26,11 @@ from typing import Dict, Any, List, Optional, Tuple
 from utils.data.fetcher import fetch_ticker_data
 from utils.data.validator import DataValidator
 
-# Import indicators
-from indicators import (
-    rsi, macd, adx, psar, ema, stochastic, 
-    cci, williams, atr, bollinger, obv, cmf
-)
+# Import indicators from their category modules
+from indicators.momentum import rsi, stochastic, cci, williams
+from indicators.trend import macd, adx, psar, ema
+from indicators.volatility import atr, bollinger
+from indicators.volume import obv, cmf
 
 # Import enhancement modules
 from utils.trading.entry_calculator import EntryCalculator

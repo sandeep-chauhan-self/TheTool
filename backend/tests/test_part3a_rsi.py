@@ -71,7 +71,7 @@ def test_rsi_constants():
     """Test that magic numbers are replaced with constants"""
     print("=== Testing RSI Constants (MLRM-001) ===")
     
-    from indicators.rsi import (
+    from indicators.momentum.rsi import (
         RSI_OVERSOLD_THRESHOLD,
         RSI_OVERBOUGHT_THRESHOLD,
         RSI_DEFAULT_PERIOD,

@@ -11,7 +11,12 @@ Indicators:
 from indicators.volume.obv import OBVIndicator
 from indicators.volume.cmf import CMFIndicator
 
+# Import modules for backward compatibility (allow "from indicators import obv" style)
+from indicators.volume import obv, cmf
+
 __all__ = [
     'OBVIndicator',
     'CMFIndicator',
+    'obv',
+    'cmf',
 ]

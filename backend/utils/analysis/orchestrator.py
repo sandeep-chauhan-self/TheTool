@@ -1,8 +1,11 @@
 import logging
 import pandas as pd
 
-# Import all indicators
-from indicators import rsi, macd, adx, psar, ema, stochastic, cci, williams, atr, bollinger, obv, cmf
+# Import all indicators from their category modules
+from indicators.momentum import rsi, stochastic, cci, williams
+from indicators.trend import macd, adx, psar, ema
+from indicators.volatility import atr, bollinger
+from indicators.volume import obv, cmf
 
 # Import enhancement modules
 from utils.data.validator import DataValidator

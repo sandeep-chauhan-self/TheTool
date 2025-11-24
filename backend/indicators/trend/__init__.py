@@ -17,10 +17,18 @@ from indicators.trend.ema import EMAIndicator
 from indicators.trend.psar import PSARIndicator
 from indicators.trend.supertrend import SupertrendIndicator
 
+# Import modules for backward compatibility (allow "from indicators import macd" style)
+from indicators.trend import macd, adx, ema, psar, supertrend
+
 __all__ = [
     'MACDIndicator',
     'ADXIndicator',
     'EMAIndicator',
     'PSARIndicator',
     'SupertrendIndicator',
+    'macd',
+    'adx',
+    'ema',
+    'psar',
+    'supertrend',
 ]

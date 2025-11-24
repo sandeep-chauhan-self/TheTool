@@ -15,9 +15,16 @@ from indicators.momentum.stochastic import StochasticIndicator
 from indicators.momentum.cci import CCIIndicator
 from indicators.momentum.williams import WilliamsIndicator
 
+# Import modules for backward compatibility (allow "from indicators import rsi" style)
+from indicators.momentum import rsi, stochastic, cci, williams
+
 __all__ = [
     'RSIIndicator',
     'StochasticIndicator',
     'CCIIndicator',
     'WilliamsIndicator',
+    'rsi',
+    'stochastic',
+    'cci',
+    'williams',
 ]
