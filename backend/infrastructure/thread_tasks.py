@@ -299,17 +299,21 @@ def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[Lis
     """
     Start a new analysis job in background thread
     Returns True if started successfully
+    
+    CRITICAL: On Railway (and cloud platforms), we MUST use daemon=False
+    to ensure threads actually run. Daemon threads are killed immediately
+    on serverless/containerized platforms.
     """
     try:
         thread = threading.Thread(
             target=analyze_stocks_batch,
             args=(job_id, tickers, capital, indicators, use_demo),
-            daemon=True,
+            daemon=False,  # CRITICAL: Must be False on Railway for threads to execute
             name=f"AnalysisJob-{job_id[:8]}"
         )
         thread.start()
         job_threads[job_id] = thread
-        logger.info(f"Started background thread for job {job_id}")
+        logger.info(f"Started background thread for job {job_id} (daemon=False)")
         return True
     except Exception as e:
         logger.error(f"Failed to start thread for job {job_id}: {e}")
