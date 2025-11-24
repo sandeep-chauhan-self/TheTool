@@ -1,0 +1,30 @@
+# Enforce Unix LF line endings for all text files
+* text=auto
+
+# YAML files - enforce LF
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Source code - enforce LF
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+
+# GitHub workflow files - enforce LF
+.github/workflows/*.yml text eol=lf
+
+# Git config - enforce LF
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Binary files - do not convert
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+*.tar binary
+*.gz binary
