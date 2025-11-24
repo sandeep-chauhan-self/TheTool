@@ -377,6 +377,8 @@ def get_report(ticker):
                 400
             )
         
+        logger.info(f"[REPORT] Querying for ticker: {ticker}")
+        
         # Get latest analysis
         result = query_db(
             """
@@ -390,7 +392,14 @@ def get_report(ticker):
             one=True
         )
         
+        logger.info(f"[REPORT] Query result for {ticker}: {result is not None}")
+        
         if not result:
+            # Log available tickers for debugging
+            all_tickers = query_db("SELECT DISTINCT ticker FROM analysis_results LIMIT 10")
+            available = [t[0] if isinstance(t, (tuple, list)) else t['ticker'] for t in all_tickers]
+            logger.warning(f"[REPORT] No analysis found for {ticker}. Available tickers: {available}")
+            
             return StandardizedErrorResponse.format(
                 "REPORT_NOT_FOUND",
                 f"No analysis found for {ticker}",

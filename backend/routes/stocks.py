@@ -622,8 +622,11 @@ def get_all_analysis_results():
         if per_page < 1 or per_page > 500:
             per_page = 50
         
-        # Get total count
-        total_result = query_db("SELECT COUNT(*) FROM analysis_results WHERE status = 'completed'", one=True)
+        # Get total count - include all records with verdict/score (completed analysis)
+        total_result = query_db("""
+            SELECT COUNT(*) FROM analysis_results 
+            WHERE verdict IS NOT NULL
+        """, one=True)
         total = total_result[0] if total_result else 0
         
         # Get paginated results
@@ -631,26 +634,30 @@ def get_all_analysis_results():
         rows = query_db("""
             SELECT id, ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, created_at
             FROM analysis_results
-            WHERE status = 'completed'
+            WHERE verdict IS NOT NULL
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
         """, (per_page, offset))
         
         results = []
         for row in rows:
-            results.append({
-                "id": row[0],
-                "ticker": row[1],
-                "symbol": row[2],
-                "name": row[3],
-                "yahoo_symbol": row[4],
-                "score": row[5],
-                "verdict": row[6],
-                "entry": row[7],
-                "stop_loss": row[8],
-                "target": row[9],
-                "created_at": row[10]
-            })
+            if isinstance(row, (tuple, list)):
+                results.append({
+                    "id": row[0],
+                    "ticker": row[1],
+                    "symbol": row[2],
+                    "name": row[3],
+                    "yahoo_symbol": row[4],
+                    "score": row[5],
+                    "verdict": row[6],
+                    "entry": row[7],
+                    "stop_loss": row[8],
+                    "target": row[9],
+                    "created_at": row[10]
+                })
+            else:
+                # SQLite Row object
+                results.append(dict(row))
         
         logger.info(f"[RESULTS] Retrieved {len(results)} analysis results (page {page})")
         
