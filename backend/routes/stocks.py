@@ -466,7 +466,7 @@ def analyze_all_stocks():
 def get_all_stocks_progress():
     """Get progress of bulk analysis jobs"""
     try:
-        from config import DATABASE_TYPE
+        from config import config
         from datetime import datetime, timedelta
         
         # Get all non-completed jobs (queued/processing)
@@ -482,7 +482,7 @@ def get_all_stocks_progress():
         cutoff_time = (datetime.now() - timedelta(hours=1)).isoformat()
         
         # Also check for recently completed jobs (last 1 hour) - for continuity
-        if DATABASE_TYPE == 'postgres':
+        if config.DATABASE_TYPE == 'postgres':
             completed_jobs_rows = query_db("""
                 SELECT job_id, status, total, completed, successful, errors
                 FROM analysis_jobs
