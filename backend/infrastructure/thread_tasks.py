@@ -313,7 +313,7 @@ def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[Lis
         )
         thread.start()
         job_threads[job_id] = thread
-        logger.info(f"Started background thread for job {job_id} (daemon=False)")
+        logger.info(f"✅ DAEMON_FALSE_FIX: Started background thread for job {job_id} with daemon=False (threads will execute on Railway)")
         return True
     except Exception as e:
         logger.error(f"Failed to start thread for job {job_id}: {e}")
