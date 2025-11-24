@@ -50,7 +50,19 @@ def _get_watchlist():
             ORDER BY created_at DESC
         """)
         
-        items_dict = [dict(item) for item in items]
+        # Handle both tuple (PostgreSQL) and dict (SQLite) return types
+        items_dict = []
+        for item in items:
+            if isinstance(item, (tuple, list)):
+                items_dict.append({
+                    "id": item[0],
+                    "symbol": item[1],
+                    "name": item[2],
+                    "created_at": item[3]
+                })
+            else:
+                items_dict.append(dict(item))
+        
         logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
         
         # Log items with empty symbol for debugging
