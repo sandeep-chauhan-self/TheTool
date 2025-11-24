@@ -226,3 +226,75 @@ def _remove_from_watchlist():
             {"error": str(e)}
         )
 
+
+@bp.route("/debug/list", methods=["GET"])
+def debug_list_watchlist():
+    """DEBUG ENDPOINT: List all watchlist items and database info"""
+    try:
+        items = query_db("SELECT id, symbol, name, created_at FROM watchlist ORDER BY id DESC")
+        
+        items_list = []
+        if items:
+            for item in items:
+                if isinstance(item, (tuple, list)):
+                    items_list.append({
+                        "id": item[0],
+                        "symbol": item[1],
+                        "name": item[2],
+                        "created_at": str(item[3]) if item[3] else None
+                    })
+                else:
+                    items_list.append(dict(item))
+        
+        logger.info(f"[DEBUG] Watchlist has {len(items_list)} items")
+        return jsonify({
+            "debug": True,
+            "total_items": len(items_list),
+            "items": items_list
+        }), 200
+    except Exception as e:
+        logger.error(f"[DEBUG] Error listing watchlist: {e}")
+        return {"error": str(e)}, 500
+
+
+@bp.route("/debug/cleanup", methods=["POST"])
+def debug_cleanup_watchlist():
+    """DEBUG ENDPOINT: Clean up orphaned/duplicate watchlist entries"""
+    try:
+        # Delete duplicates keeping the oldest one
+        deleted = execute_db("""
+            DELETE FROM watchlist 
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
+            )
+        """)
+        
+        logger.info(f"[DEBUG] Cleaned up {deleted} duplicate entries")
+        
+        # Get remaining items
+        items = query_db("SELECT id, symbol, name, created_at FROM watchlist ORDER BY id DESC")
+        items_list = []
+        if items:
+            for item in items:
+                if isinstance(item, (tuple, list)):
+                    items_list.append({
+                        "id": item[0],
+                        "symbol": item[1],
+                        "name": item[2],
+                        "created_at": str(item[3]) if item[3] else None
+                    })
+                else:
+                    items_list.append(dict(item))
+        
+        return jsonify({
+            "debug": True,
+            "action": "cleanup_duplicates",
+            "deleted_count": deleted,
+            "remaining_items": len(items_list),
+            "items": items_list
+        }), 200
+    except Exception as e:
+        logger.error(f"[DEBUG] Error cleaning up watchlist: {e}")
+        return {"error": str(e)}, 500
+
+
