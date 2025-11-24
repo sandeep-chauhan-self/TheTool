@@ -306,7 +306,7 @@ function Dashboard() {
                 </tr>
               ) : (
                 watchlist.map((stock) => (
-                  <tr key={stock.symbol} className="border-t hover:bg-gray-50">
+                  <tr key={stock.ticker} className="border-t hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
@@ -314,7 +314,7 @@ function Dashboard() {
                         onChange={() => handleSelectStock(stock.ticker)}
                       />
                     </td>
-                    <td className="px-4 py-3 font-mono">{stock.symbol}</td>
+                    <td className="px-4 py-3 font-mono">{stock.ticker}</td>
                     <td className="px-4 py-3">{stock.name || '-'}</td>
                     <td className={`px-4 py-3 ${getVerdictColor(stock.verdict)}`}>
                       {stock.verdict}
@@ -328,7 +328,7 @@ function Dashboard() {
                     <td className="px-4 py-3">
                       {stock.has_analysis ? (
                         <button
-                          onClick={() => navigate(`/results/${stock.symbol}`)}
+                          onClick={() => navigate(`/results/${stock.ticker}`)}
                           className="text-blue-600 hover:underline mr-3"
                         >
                           View
@@ -355,7 +355,7 @@ function Dashboard() {
         <AddStockModal
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddStock}
-          existingSymbols={watchlist.map(stock => stock.symbol)}
+          existingSymbols={watchlist.map(stock => stock.ticker)}
         />
       )}
     </div>
