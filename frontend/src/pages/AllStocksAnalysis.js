@@ -109,6 +109,7 @@ function AllStocksAnalysis() {
         if (result) {
           return {
             ...stock,
+            ticker: result.ticker,  // Add ticker from analysis result
             status: 'completed',
             score: result.score,
             verdict: result.verdict,
