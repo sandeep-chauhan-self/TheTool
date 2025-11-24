@@ -466,6 +466,9 @@ def analyze_all_stocks():
 def get_all_stocks_progress():
     """Get progress of bulk analysis jobs"""
     try:
+        from config import DATABASE_TYPE
+        from datetime import datetime, timedelta
+        
         # Get all non-completed jobs (queued/processing)
         jobs_rows = query_db("""
             SELECT job_id, status, total, completed, successful, errors
@@ -475,15 +478,28 @@ def get_all_stocks_progress():
             LIMIT 20
         """)
         
+        # Calculate cutoff time for completed jobs (last 1 hour)
+        cutoff_time = (datetime.now() - timedelta(hours=1)).isoformat()
+        
         # Also check for recently completed jobs (last 1 hour) - for continuity
-        completed_jobs_rows = query_db("""
-            SELECT job_id, status, total, completed, successful, errors
-            FROM analysis_jobs
-            WHERE status IN ('completed', 'cancelled', 'failed')
-            AND completed_at > datetime('now', '-1 hour')
-            ORDER BY completed_at DESC
-            LIMIT 5
-        """)
+        if DATABASE_TYPE == 'postgres':
+            completed_jobs_rows = query_db("""
+                SELECT job_id, status, total, completed, successful, errors
+                FROM analysis_jobs
+                WHERE status IN ('completed', 'cancelled', 'failed')
+                AND completed_at > %s
+                ORDER BY completed_at DESC
+                LIMIT 5
+            """, (cutoff_time,))
+        else:
+            completed_jobs_rows = query_db("""
+                SELECT job_id, status, total, completed, successful, errors
+                FROM analysis_jobs
+                WHERE status IN ('completed', 'cancelled', 'failed')
+                AND completed_at > ?
+                ORDER BY completed_at DESC
+                LIMIT 5
+            """, (cutoff_time,))
         
         jobs = []
         total_jobs = 0
