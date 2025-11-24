@@ -72,10 +72,10 @@ def _get_watchlist():
         
         logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
         
-        # Log items with empty symbol for debugging
-        empty_symbol_items = [item for item in items_dict if not item.get('symbol') or item.get('symbol').strip() == '']
-        if empty_symbol_items:
-            logger.warning(f"[WATCHLIST_GET] Found {len(empty_symbol_items)} items with empty symbol: {empty_symbol_items}")
+        # Log items with empty ticker for debugging
+        empty_ticker_items = [item for item in items_dict if not item.get('ticker') or item.get('ticker').strip() == '']
+        if empty_ticker_items:
+            logger.warning(f"[WATCHLIST_GET] Found {len(empty_ticker_items)} items with empty ticker: {empty_ticker_items}")
         
         return jsonify({
             "watchlist": items_dict,
