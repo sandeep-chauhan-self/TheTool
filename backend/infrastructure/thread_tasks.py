@@ -80,11 +80,15 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         for attempt in range(max_retries):
             try:
                 with get_db_session() as (conn, cursor):
-                    cursor.execute('''
+                    # Need to convert query params for PostgreSQL compatibility
+                    from database import _convert_query_params, DATABASE_TYPE
+                    query = '''
                         UPDATE analysis_jobs 
-                        SET status = 'processing', started_at = ?
-                        WHERE job_id = ?
-                    ''', (datetime.now().isoformat(), job_id))
+                        SET status = 'processing', started_at = %s
+                        WHERE job_id = %s
+                    '''
+                    query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
+                    cursor.execute(query, params)
                 status_updated = True
                 logger.info(f"✓ Job {job_id} status updated to 'processing'")
                 break
@@ -120,11 +124,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             if current_job and current_job.get('cancelled'):
                 logger.warning(f"Job {job_id}: CANCELLED by user at {completed}/{total}")
                 with get_db_session() as (conn, cursor):
-                    cursor.execute('''
+                    from database import _convert_query_params, DATABASE_TYPE
+                    query = '''
                         UPDATE analysis_jobs 
-                        SET status = 'cancelled', completed_at = ?
-                        WHERE job_id = ?
-                    ''', (datetime.now().isoformat(), job_id))
+                        SET status = 'cancelled', completed_at = %s
+                        WHERE job_id = %s
+                    '''
+                    query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
+                    cursor.execute(query, params)
                 job_state.update_job(job_id, {'status': 'cancelled'})
                 break
             
@@ -215,11 +222,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             for progress_attempt in range(3):
                 try:
                     with get_db_session() as (conn, cursor):
-                        cursor.execute('''
+                        from database import _convert_query_params, DATABASE_TYPE
+                        query = '''
                             UPDATE analysis_jobs 
-                            SET progress = ?, completed = ?, successful = ?, errors = ?
-                            WHERE job_id = ?
-                        ''', (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
+                            SET progress = %s, completed = %s, successful = %s, errors = %s
+                            WHERE job_id = %s
+                        '''
+                        query, params = _convert_query_params(query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id), DATABASE_TYPE)
+                        cursor.execute(query, params)
                     progress_updated = True
                     break
                 except Exception as progress_error:
@@ -247,11 +257,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         final_status = 'cancelled' if (current_job and current_job.get('cancelled')) else 'completed'
         
         with get_db_session() as (conn, cursor):
-            cursor.execute('''
+            from database import _convert_query_params, DATABASE_TYPE
+            query = '''
                 UPDATE analysis_jobs 
-                SET status = ?, completed_at = ?, errors = ?
-                WHERE job_id = ?
-            ''', (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id))
+                SET status = %s, completed_at = %s, errors = %s
+                WHERE job_id = %s
+            '''
+            query, params = _convert_query_params(query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id), DATABASE_TYPE)
+            cursor.execute(query, params)
         
         # Update job state
         job_state.update_job(job_id, {
@@ -271,11 +284,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         logger.error(f"FATAL ERROR in job {job_id}: {e}", exc_info=True)
         try:
             with get_db_session() as (conn, cursor):
-                cursor.execute('''
+                from database import _convert_query_params, DATABASE_TYPE
+                query = '''
                     UPDATE analysis_jobs 
-                    SET status = 'failed', completed_at = ?, errors = ?
-                    WHERE job_id = ?
-                ''', (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id))
+                    SET status = 'failed', completed_at = %s, errors = %s
+                    WHERE job_id = %s
+                '''
+                query, params = _convert_query_params(query, (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id), DATABASE_TYPE)
+                cursor.execute(query, params)
             
             # Update job state
             job_state.update_job(job_id, {
