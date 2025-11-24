@@ -406,6 +406,36 @@ def migration_v3(conn):
             logger.debug(f"  Watchlist columns may already exist: {e}")
         
         try:
+            # Check existing columns in analysis_jobs
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='analysis_jobs'
+            """)
+            existing_cols = {row[0] for row in cursor.fetchall()}
+            
+            if 'tickers_json' not in existing_cols:
+                cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+                logger.info("  ✓ Added tickers_json column to analysis_jobs")
+            
+            conn.commit()
+            logger.info("  ✓ All analysis_jobs columns added")
+        except Exception as e:
+            conn.rollback()
+            logger.debug(f"  Analysis jobs columns may already exist: {e}")
+        
+        try:
+            # Create index for duplicate detection
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_job_tickers
+                ON analysis_jobs(tickers_json, status)
+            ''')
+            conn.commit()
+            logger.info("  ✓ Created index on (tickers_json, status)")
+        except Exception as e:
+            conn.rollback()
+            logger.debug(f"  Index may already exist: {e}")
+        
+        try:
             # Check existing columns in analysis_results
             cursor.execute("""
                 SELECT column_name FROM information_schema.columns 
