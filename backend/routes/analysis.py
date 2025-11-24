@@ -359,18 +359,30 @@ def get_report(ticker):
                 404
             )
         
-        analysis_data = {
-            "verdict": result['verdict'],
-            "score": result['score'],
-            "entry": result['entry'],
-            "stop_loss": result['stop_loss'],
-            "target": result['target']
-        }
+        # Handle both tuple (PostgreSQL) and dict (SQLite) return types
+        if isinstance(result, (tuple, list)):
+            analysis_data = {
+                "verdict": result[0],
+                "score": result[1],
+                "entry": result[2],
+                "stop_loss": result[3],
+                "target": result[4]
+            }
+            created_at = result[5]
+        else:
+            analysis_data = {
+                "verdict": result['verdict'],
+                "score": result['score'],
+                "entry": result['entry'],
+                "stop_loss": result['stop_loss'],
+                "target": result['target']
+            }
+            created_at = result['created_at']
         
         return jsonify({
             "ticker": ticker,
             "analysis": analysis_data,
-            "created_at": result['created_at']
+            "created_at": created_at
         }), 200
         
     except Exception as e:
@@ -414,13 +426,23 @@ def download_report(ticker):
                 404
             )
         
-        analysis_data = {
-            "verdict": result['verdict'],
-            "score": result['score'],
-            "entry": result['entry'],
-            "stop_loss": result['stop_loss'],
-            "target": result['target']
-        }
+        # Handle both tuple (PostgreSQL) and dict (SQLite) return types
+        if isinstance(result, (tuple, list)):
+            analysis_data = {
+                "verdict": result[0],
+                "score": result[1],
+                "entry": result[2],
+                "stop_loss": result[3],
+                "target": result[4]
+            }
+        else:
+            analysis_data = {
+                "verdict": result['verdict'],
+                "score": result['score'],
+                "entry": result['entry'],
+                "stop_loss": result['stop_loss'],
+                "target": result['target']
+            }
         
         # Export to Excel
         analyze_ticker, export_to_excel = get_analyze_ticker()
