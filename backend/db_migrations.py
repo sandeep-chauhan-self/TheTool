@@ -584,41 +584,40 @@ def run_migrations():
         
         # Cleanup: Remove duplicate watchlist entries
         try:
-            cursor = conn.cursor()
             logger.info("Cleaning up duplicate watchlist entries...")
+            cursor = conn.cursor()
             
-            # Find duplicates
-            if config.DATABASE_TYPE == 'postgres':
-                cursor.execute("""
-                    SELECT LOWER(symbol) FROM watchlist 
-                    GROUP BY LOWER(symbol) HAVING COUNT(*) > 1
-                """)
-            else:
-                cursor.execute("""
-                    SELECT LOWER(symbol) FROM watchlist 
-                    GROUP BY LOWER(symbol) HAVING COUNT(*) > 1
-                """)
-            
-            duplicates = [row[0] for row in cursor.fetchall()]
-            if duplicates:
-                logger.warning(f"  Found duplicate symbols: {', '.join(duplicates)}")
+            # Find and count duplicates
+            cursor.execute("""
+                SELECT COUNT(*) as total,
+                       COUNT(DISTINCT LOWER(symbol)) as unique_symbols
+                FROM watchlist
+            """)
+            stats = cursor.fetchone()
+            if stats:
+                total = stats[0] if isinstance(stats, (tuple, list)) else stats.get('total', 0)
+                unique = stats[1] if isinstance(stats, (tuple, list)) else stats.get('unique_symbols', 0)
+                logger.info(f"  Watchlist stats: {total} total entries, {unique} unique symbols")
                 
-                # Delete duplicates, keeping the oldest (MIN id)
-                cursor.execute("""
-                    DELETE FROM watchlist 
-                    WHERE id NOT IN (
-                        SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
-                    )
-                """)
-                deleted_count = cursor.rowcount
-                logger.info(f"  ✓ Cleaned up {deleted_count} duplicate watchlist entries")
-            else:
-                logger.info("  No duplicate watchlist entries found")
+                if total > unique:
+                    logger.warning(f"  Found {total - unique} duplicate entries")
+                    
+                    # Delete duplicates, keeping the oldest (MIN id)
+                    cursor.execute("""
+                        DELETE FROM watchlist 
+                        WHERE id NOT IN (
+                            SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
+                        )
+                    """)
+                    deleted_count = cursor.rowcount
+                    logger.info(f"  ✓ Cleaned up {deleted_count} duplicate watchlist entries")
+                else:
+                    logger.info("  No duplicates found in watchlist")
             
             conn.commit()
         except Exception as e:
             conn.rollback()
-            logger.warning(f"Warning during watchlist cleanup (may not have duplicates): {e}")
+            logger.warning(f"Warning during watchlist cleanup: {e}")
         
         # CRITICAL: Ensure tickers_json column exists (added after v3 was already deployed)
         # This runs regardless of version to fix existing databases
