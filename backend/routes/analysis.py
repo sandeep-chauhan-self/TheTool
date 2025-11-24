@@ -313,9 +313,29 @@ def get_history(ticker):
                 "history": []
             }), 200
         
+        # Handle both tuple (PostgreSQL) and dict (SQLite) return types
+        history = []
+        for r in results:
+            if isinstance(r, (tuple, list)):
+                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at)
+                history.append({
+                    "id": r[0],
+                    "ticker": r[1],
+                    "symbol": r[2],
+                    "verdict": r[3],
+                    "score": r[4],
+                    "entry": r[5],
+                    "stop_loss": r[6],
+                    "target": r[7],
+                    "created_at": str(r[8]) if r[8] else None
+                })
+            else:
+                # SQLite returns Row objects
+                history.append(dict(r))
+        
         return jsonify({
             "ticker": ticker,
-            "history": [dict(r) for r in results]
+            "history": history
         }), 200
         
     except Exception as e:

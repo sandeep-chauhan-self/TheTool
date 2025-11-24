@@ -51,8 +51,8 @@ function Dashboard() {
       const watchlistWithResults = await Promise.all(
         validWatchlist.map(async (stock) => {
           try {
-            // Get analysis history for this stock
-            const historyData = await getStockHistory(stock.symbol);
+            // Get analysis history for this stock (use ticker field, not symbol)
+            const historyData = await getStockHistory(stock.ticker);
             
             if (historyData && historyData.history && historyData.history.length > 0) {
               const latest = historyData.history[0];
@@ -66,7 +66,7 @@ function Dashboard() {
             
             return { ...stock, verdict: 'No analysis available', confidence: 0, has_analysis: false };
           } catch (error) {
-            console.error(`Error fetching history for ${stock.symbol}:`, error);
+            console.error(`Error fetching history for ${stock.ticker}:`, error);
             return { ...stock, verdict: 'No analysis available', confidence: 0, has_analysis: false };
           }
         })
