@@ -323,36 +323,71 @@ def migration_v3(conn):
     """
     Migration V3: Add constraints and indices for job tracking and performance
     
-    This is a specialized PostgreSQL migration that:
+    This migration handles both PostgreSQL and SQLite:
+    - Adds tickers_json column to analysis_jobs (both databases)
     - Adds indices for performance
     - Adds columns for job tracking and temporal data
     - Creates new tables for detailed tracking
     
     For PostgreSQL: Uses CAST(... AS DATE) and information_schema
-    For SQLite: Skips if features not supported
+    For SQLite: Uses PRAGMA table_info and simpler syntax
     """
     try:
-        # Check if we're using PostgreSQL
-        if config.DATABASE_TYPE != 'postgres':
-            logger.info("Migration v3 skipping for non-PostgreSQL database")
-            return apply_migration(conn, 3, "PostgreSQL constraints (skipped)", "")
-        
-        # For PostgreSQL, run the full constraints migration
         cursor = conn.cursor()
         
-        logger.info("Running PostgreSQL constraint migration v3...")
+        logger.info("Running migration v3...")
         
-        # 1. Add UNIQUE index on (ticker, date)
+        # UNIVERSAL: Add tickers_json column to analysis_jobs (both SQLite and PostgreSQL)
+        try:
+            if config.DATABASE_TYPE == 'postgres':
+                # Check if column exists in PostgreSQL
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name='analysis_jobs' AND column_name='tickers_json'
+                """)
+                if not cursor.fetchone():
+                    cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+                    logger.info("  ✓ Added tickers_json column to analysis_jobs (PostgreSQL)")
+            else:
+                # SQLite: Check using PRAGMA table_info
+                cursor.execute("PRAGMA table_info(analysis_jobs)")
+                columns = {row[1] for row in cursor.fetchall()}
+                if 'tickers_json' not in columns:
+                    cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+                    logger.info("  ✓ Added tickers_json column to analysis_jobs (SQLite)")
+            
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.debug(f"  tickers_json column already exists or error: {e}")
+        
+        # UNIVERSAL: Create index on (tickers_json, status) for both databases
         try:
             cursor.execute('''
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_ticker_date
-                ON analysis_results(ticker, CAST(created_at AS DATE))
+                CREATE INDEX IF NOT EXISTS idx_job_tickers
+                ON analysis_jobs(tickers_json, status)
             ''')
             conn.commit()
-            logger.info("  ✓ UNIQUE INDEX created on (ticker, date)")
+            logger.info("  ✓ Created index on (tickers_json, status)")
         except Exception as e:
             conn.rollback()
             logger.debug(f"  Index may already exist: {e}")
+        
+        # POSTGRESQL ONLY: Add constraints and additional indices
+        if config.DATABASE_TYPE == 'postgres':
+            logger.info("Running PostgreSQL-specific migration v3...")
+        
+            # 1. Add UNIQUE index on (ticker, date)
+            try:
+                cursor.execute('''
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_ticker_date
+                    ON analysis_results(ticker, CAST(created_at AS DATE))
+                ''')
+                conn.commit()
+                logger.info("  ✓ UNIQUE INDEX created on (ticker, date)")
+            except Exception as e:
+                conn.rollback()
+                logger.debug(f"  Index may already exist: {e}")
         
         # 2. Add basic indices
         try:
@@ -377,91 +412,61 @@ def migration_v3(conn):
         except Exception as e:
             conn.rollback()
             logger.debug(f"  Indices may already exist: {e}")
+            
+            # 3. Add columns to existing tables (PostgreSQL only)
+            try:
+                # Check existing columns in watchlist (PostgreSQL only)
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name='watchlist'
+                """)
+                existing_cols = {row[0] for row in cursor.fetchall()}
+                
+                if 'last_job_id' not in existing_cols:
+                    cursor.execute('ALTER TABLE watchlist ADD COLUMN last_job_id TEXT')
+                    logger.info("  ✓ Added last_job_id column to watchlist")
+                
+                if 'last_analyzed_at' not in existing_cols:
+                    cursor.execute('ALTER TABLE watchlist ADD COLUMN last_analyzed_at TIMESTAMP')
+                    logger.info("  ✓ Added last_analyzed_at column to watchlist")
+                
+                if 'last_status' not in existing_cols:
+                    cursor.execute('ALTER TABLE watchlist ADD COLUMN last_status TEXT')
+                    logger.info("  ✓ Added last_status column to watchlist")
+                
+                conn.commit()
+                logger.info("  ✓ All watchlist columns added")
+            except Exception as e:
+                conn.rollback()
+                logger.debug(f"  Watchlist columns may already exist: {e}")
+            
+            try:
+                # Check existing columns in analysis_results (PostgreSQL only)
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name='analysis_results'
+                """)
+                existing_cols = {row[0] for row in cursor.fetchall()}
+                
+                if 'job_id' not in existing_cols:
+                    cursor.execute('ALTER TABLE analysis_results ADD COLUMN job_id TEXT')
+                    logger.info("  ✓ Added job_id column to analysis_results")
+                
+                if 'started_at' not in existing_cols:
+                    cursor.execute('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP')
+                    logger.info("  ✓ Added started_at column to analysis_results")
+                
+                if 'completed_at' not in existing_cols:
+                    cursor.execute('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP')
+                    logger.info("  ✓ Added completed_at column to analysis_results")
+                
+                conn.commit()
+                logger.info("  ✓ All analysis_results columns added")
+            except Exception as e:
+                conn.rollback()
+                logger.debug(f"  Analysis results columns may already exist: {e}")
         
-        # 3. Add columns to existing tables
-        try:
-            # Check existing columns in watchlist
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name='watchlist'
-            """)
-            existing_cols = {row[0] for row in cursor.fetchall()}
-            
-            if 'last_job_id' not in existing_cols:
-                cursor.execute('ALTER TABLE watchlist ADD COLUMN last_job_id TEXT')
-                logger.info("  ✓ Added last_job_id column to watchlist")
-            
-            if 'last_analyzed_at' not in existing_cols:
-                cursor.execute('ALTER TABLE watchlist ADD COLUMN last_analyzed_at TIMESTAMP')
-                logger.info("  ✓ Added last_analyzed_at column to watchlist")
-            
-            if 'last_status' not in existing_cols:
-                cursor.execute('ALTER TABLE watchlist ADD COLUMN last_status TEXT')
-                logger.info("  ✓ Added last_status column to watchlist")
-            
-            conn.commit()
-            logger.info("  ✓ All watchlist columns added")
-        except Exception as e:
-            conn.rollback()
-            logger.debug(f"  Watchlist columns may already exist: {e}")
-        
-        try:
-            # Check existing columns in analysis_jobs
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name='analysis_jobs'
-            """)
-            existing_cols = {row[0] for row in cursor.fetchall()}
-            
-            if 'tickers_json' not in existing_cols:
-                cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
-                logger.info("  ✓ Added tickers_json column to analysis_jobs")
-            
-            conn.commit()
-            logger.info("  ✓ All analysis_jobs columns added")
-        except Exception as e:
-            conn.rollback()
-            logger.debug(f"  Analysis jobs columns may already exist: {e}")
-        
-        try:
-            # Create index for duplicate detection
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_job_tickers
-                ON analysis_jobs(tickers_json, status)
-            ''')
-            conn.commit()
-            logger.info("  ✓ Created index on (tickers_json, status)")
-        except Exception as e:
-            conn.rollback()
-            logger.debug(f"  Index may already exist: {e}")
-        
-        try:
-            # Check existing columns in analysis_results
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name='analysis_results'
-            """)
-            existing_cols = {row[0] for row in cursor.fetchall()}
-            
-            if 'job_id' not in existing_cols:
-                cursor.execute('ALTER TABLE analysis_results ADD COLUMN job_id TEXT')
-                logger.info("  ✓ Added job_id column to analysis_results")
-            
-            if 'started_at' not in existing_cols:
-                cursor.execute('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP')
-                logger.info("  ✓ Added started_at column to analysis_results")
-            
-            if 'completed_at' not in existing_cols:
-                cursor.execute('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP')
-                logger.info("  ✓ Added completed_at column to analysis_results")
-            
-            conn.commit()
-            logger.info("  ✓ All analysis_results columns added")
-        except Exception as e:
-            conn.rollback()
-            logger.debug(f"  Analysis results columns may already exist: {e}")
-        
-        # 4. Create new tables
+        # 4. Create new tables (PostgreSQL only)
         try:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS analysis_jobs_details (

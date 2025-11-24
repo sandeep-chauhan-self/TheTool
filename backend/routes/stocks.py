@@ -4,6 +4,7 @@ Stocks routes - NSE stock list and bulk analysis
 import csv
 import json
 import uuid
+import time
 from datetime import datetime
 from pathlib import Path
 from flask import Blueprint, jsonify, request
@@ -390,25 +391,28 @@ def analyze_all_stocks():
                     # Job creation returned False, likely due to race condition
                     # Retry with fresh check in case another thread just created it
                     logger.warning(f"Job creation failed (attempt {attempt + 1}/{max_retries}), retrying...")
-                    import time
                     time.sleep(0.1 * (attempt + 1))  # Exponential backoff
                     
                     # Check if job was created by concurrent request
                     if attempt == max_retries - 1:
-                        active_job = _get_active_job_for_symbols(symbols)
-                        if active_job:
-                            logger.info(f"Found existing job {active_job['job_id']} created by concurrent request")
-                            return jsonify({
-                                "job_id": active_job["job_id"],
-                                "status": active_job["status"],
-                                "is_duplicate": True,
-                                "message": "Analysis already running for these symbols",
-                                "total": active_job["total"],
-                                "completed": active_job["completed"],
-                                "symbols": symbols,
-                                "capital": capital,
-                                "count": len(symbols)
-                            }), 200
+                        try:
+                            active_job = _get_active_job_for_symbols(symbols)
+                            if active_job:
+                                logger.info(f"Found existing job {active_job['job_id']} created by concurrent request")
+                                return jsonify({
+                                    "job_id": active_job["job_id"],
+                                    "status": active_job["status"],
+                                    "is_duplicate": True,
+                                    "message": "Analysis already running for these symbols",
+                                    "total": active_job["total"],
+                                    "completed": active_job["completed"],
+                                    "symbols": symbols,
+                                    "capital": capital,
+                                    "count": len(symbols)
+                                }), 200
+                        except Exception as check_err:
+                            logger.warning(f"Could not check for existing job on final retry: {check_err}")
+                            # Continue to error response
             except Exception as e:
                 logger.error(f"Exception during job creation (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt == max_retries - 1:
