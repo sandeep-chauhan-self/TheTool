@@ -50,18 +50,25 @@ def _get_watchlist():
             ORDER BY created_at DESC
         """)
         
+        logger.info(f"[WATCHLIST_GET] Raw query returned: {type(items)}, length: {len(items)}")
+        
         # Handle both tuple (PostgreSQL) and dict (SQLite) return types
         items_dict = []
-        for item in items:
-            if isinstance(item, (tuple, list)):
-                items_dict.append({
-                    "id": item[0],
-                    "symbol": item[1],
-                    "name": item[2],
-                    "created_at": item[3]
-                })
-            else:
-                items_dict.append(dict(item))
+        for idx, item in enumerate(items):
+            logger.info(f"[WATCHLIST_GET] Item {idx}: type={type(item)}, value={item}")
+            try:
+                if isinstance(item, (tuple, list)):
+                    items_dict.append({
+                        "id": item[0],
+                        "symbol": item[1],
+                        "name": item[2],
+                        "created_at": item[3]
+                    })
+                else:
+                    items_dict.append(dict(item))
+            except Exception as e:
+                logger.error(f"[WATCHLIST_GET] Error converting item {idx}: {e}")
+                raise
         
         logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
         
