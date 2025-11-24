@@ -95,7 +95,7 @@ export const getAllStocks = async () => {
 };
 
 export const getStockHistory = async (symbol) => {
-  const response = await api.get(`/api/stocks/all-stocks/${symbol}/history`);
+  const response = await api.get(`/api/analysis/history/${symbol}`);
   return response.data;
 };
 
