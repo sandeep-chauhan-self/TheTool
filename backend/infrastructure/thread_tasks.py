@@ -17,7 +17,7 @@ import json
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from database import get_db_connection, get_db_session, close_thread_connection
+from database import get_db_connection, get_db_session, close_thread_connection, _convert_query_params, DATABASE_TYPE
 from utils.compute_score import analyze_ticker
 from models.job_state import get_job_state_manager
 
@@ -157,13 +157,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     for insert_attempt in range(3):
                         try:
                             with get_db_session() as (conn, cursor):
-                                cursor.execute('''
+                                query = '''
                                     INSERT INTO analysis_results 
                                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                ''', (
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                '''
+                                query, params = _convert_query_params(query, (
                                     ticker,
                                     symbol,
                                     None,  # name not available from watchlist analysis
@@ -181,7 +182,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     datetime.now().isoformat(),
                                     datetime.now().isoformat(),
                                     'watchlist'  # Mark as watchlist analysis
-                                ))
+                                ), DATABASE_TYPE)
+                                cursor.execute(query, params)
                             insert_success = True
                             break
                         except Exception as insert_error:
@@ -401,13 +403,14 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
             
             with get_db_session() as (conn, cursor):
-                cursor.execute('''
+                query = '''
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
                      entry_method, data_source, is_demo_data, raw_data, status, 
                      created_at, updated_at, analysis_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                '''
+                query, params = _convert_query_params(query, (
                     yahoo_symbol,  # ticker = yahoo_symbol
                     symbol,        # symbol without suffix
                     name,          # company name
@@ -425,7 +428,8 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     datetime.now().isoformat(),
                     datetime.now().isoformat(),
                     'bulk'  # Mark as bulk analysis
-                ))
+                ), DATABASE_TYPE)
+                cursor.execute(query, params)
             
             # Auto-cleanup old analyses (keep last 10) - using symbol parameter
             cleanup_old_analyses(symbol=symbol, keep_last=10)
@@ -443,12 +447,13 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
         
         try:
             with get_db_session() as (conn, cursor):
-                cursor.execute('''
+                query = '''
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, status, error_message, 
                      created_at, updated_at, analysis_source)
-                    VALUES (?, ?, ?, ?, 0.0, 'Pending', 'failed', ?, ?, ?, 'bulk')
-                ''', (
+                    VALUES (%s, %s, %s, %s, 0.0, 'Pending', 'failed', %s, %s, %s, 'bulk')
+                '''
+                query, params = _convert_query_params(query, (
                     yahoo_symbol,
                     symbol,
                     name,
@@ -456,7 +461,8 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     str(e),
                     datetime.now().isoformat(),
                     datetime.now().isoformat()
-                ))
+                ), DATABASE_TYPE)
+                cursor.execute(query, params)
         except Exception as cleanup_error:
             logger.error(f"Failed to log error for {symbol}: {cleanup_error}")
         

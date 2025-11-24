@@ -10,7 +10,7 @@ import json
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from database import get_db_connection, _convert_query_params
+from database import get_db_connection, _convert_query_params, DATABASE_TYPE
 from utils.compute_score import analyze_ticker
 
 logger = logging.getLogger('thread_tasks')
