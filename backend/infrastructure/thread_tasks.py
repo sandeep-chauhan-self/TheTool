@@ -50,6 +50,9 @@ def convert_numpy_types(value):
         return bool(value)
     elif isinstance(value, np.ndarray):
         return value.tolist()
+    # Convert 0/1 to False/True for boolean columns
+    elif isinstance(value, int) and value in (0, 1):
+        return bool(value)
     return value
 
 
