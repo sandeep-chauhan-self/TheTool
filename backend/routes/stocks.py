@@ -466,13 +466,23 @@ def analyze_all_stocks():
 def get_all_stocks_progress():
     """Get progress of bulk analysis jobs"""
     try:
-        # Get all non-completed jobs
+        # Get all non-completed jobs (queued/processing)
         jobs_rows = query_db("""
             SELECT job_id, status, total, completed, successful, errors
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
             ORDER BY created_at DESC
             LIMIT 20
+        """)
+        
+        # Also check for recently completed jobs (last 1 hour) - for continuity
+        completed_jobs_rows = query_db("""
+            SELECT job_id, status, total, completed, successful, errors
+            FROM analysis_jobs
+            WHERE status IN ('completed', 'cancelled', 'failed')
+            AND completed_at > datetime('now', '-1 hour')
+            ORDER BY completed_at DESC
+            LIMIT 5
         """)
         
         jobs = []
@@ -482,6 +492,7 @@ def get_all_stocks_progress():
         total_analyzing = 0
         total_errors = 0
         
+        # Process active jobs
         for row in jobs_rows:
             try:
                 errors_list = json.loads(row[5]) if row[5] else []
@@ -508,8 +519,34 @@ def get_all_stocks_progress():
             total_analyzing += row[2] - row[3]  # pending = total - completed
             total_errors += len(errors_list)
         
+        # Process completed jobs (for continuity during final polling)
+        for row in completed_jobs_rows:
+            try:
+                errors_list = json.loads(row[5]) if row[5] else []
+            except (json.JSONDecodeError, TypeError):
+                errors_list = []
+            
+            # Only add if not already in active jobs
+            if not any(j['job_id'] == row[0] for j in jobs):
+                progress_pct = 100 if row[1] == 'completed' else 0
+                
+                jobs.append({
+                    "job_id": row[0],
+                    "status": row[1],
+                    "total": row[2],
+                    "completed": row[3],
+                    "successful": row[4],
+                    "errors_count": len(errors_list),
+                    "progress_percent": progress_pct
+                })
+                
+                total_jobs += 1
+                total_completed += row[3]
+                total_successful += row[4]
+                total_errors += len(errors_list)
+        
         # Calculate overall progress
-        is_analyzing = len(jobs) > 0
+        is_analyzing = len([j for j in jobs if j['status'] in ('queued', 'processing')]) > 0
         overall_total = sum(j['total'] for j in jobs) if jobs else 0
         overall_completed = sum(j['completed'] for j in jobs) if jobs else 0
         overall_percentage = 0
@@ -529,11 +566,11 @@ def get_all_stocks_progress():
             else:
                 estimated_remaining = f"{estimated_seconds // 3600}h"
         
-        logger.info(f"[PROGRESS] Retrieved {len(jobs)} active jobs. Total: {overall_total}, Completed: {overall_completed}, Percentage: {overall_percentage}%")
+        logger.info(f"[PROGRESS] Retrieved {len(jobs)} jobs. Active: {len([j for j in jobs if j['status'] in ('queued', 'processing')])}, Completed: {overall_completed}/{overall_total} ({overall_percentage}%)")
         
         return jsonify({
             "is_analyzing": is_analyzing,
-            "analyzing": len(jobs),
+            "analyzing": len([j for j in jobs if j['status'] in ('queued', 'processing')]),
             "completed": overall_completed,
             "total": overall_total,
             "percentage": overall_percentage,
@@ -542,7 +579,7 @@ def get_all_stocks_progress():
             "failed": total_errors,
             "successful": total_successful,
             "jobs": jobs,
-            "active_count": len(jobs)
+            "active_count": len([j for j in jobs if j['status'] in ('queued', 'processing')])
         }), 200
         
     except Exception as e:
