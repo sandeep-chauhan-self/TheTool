@@ -144,6 +144,19 @@ function AllStocksAnalysis() {
         };
       });
       
+      // DEBUG: Log sample verdicts to inspect data type and values
+      if (stocksWithStatus.length > 0) {
+        console.log('🔍 VERDICT DATA INSPECTION:');
+        const sampleVerdicts = stocksWithStatus.slice(0, 10).map(s => ({
+          symbol: s.symbol,
+          verdict: s.verdict,
+          type: typeof s.verdict,
+          length: s.verdict ? s.verdict.length : 'N/A'
+        }));
+        console.table(sampleVerdicts);
+        console.log('VERDICT_PRIORITY keys:', Object.keys(VERDICT_PRIORITY));
+      }
+      
       setStocks(stocksWithStatus);
       
     } catch (error) {
@@ -270,12 +283,22 @@ function AllStocksAnalysis() {
     // Helper: verdict → numeric priority
     const verdictPriority = (stock) => {
       const v = (stock.verdict || '-').trim();
-      return VERDICT_PRIORITY[v] ?? VERDICT_PRIORITY['-'];
+      const priority = VERDICT_PRIORITY[v] ?? VERDICT_PRIORITY['-'];
+      // Debug logging (only on first 5 calls)
+      if (Math.random() < 0.1) {
+        console.log(`📊 verdictPriority("${v}") → ${priority}`, {
+          original: stock.verdict,
+          trimmed: v,
+          exists: VERDICT_PRIORITY[v] !== undefined,
+          allKeys: Object.keys(VERDICT_PRIORITY)
+        });
+      }
+      return priority;
     };
 
     // MAPPING SORT COLUMNS TO ITERATEES
     const sortIteratees = {
-      verdict: verdictPriority,
+      verdict: (s) => (s.verdict || '-').toLowerCase(),
       symbol: (s) => (s.symbol || '').toLowerCase(),
       score: (s) => s.score ?? -1,
       entry: (s) => s.entry ?? -1,
