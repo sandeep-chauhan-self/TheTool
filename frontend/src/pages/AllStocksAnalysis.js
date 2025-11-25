@@ -261,47 +261,44 @@ function AllStocksAnalysis() {
 
     // Then, apply sorting if sortBy is set
     if (sortBy) {
-      filtered.sort((a, b) => {
-        let aVal, bVal;
+      filtered = [...filtered].sort((a, b) => {
+        let compareResult = 0;
 
         switch (sortBy) {
           case 'verdict':
             // Normalize verdict values and get priority
             const aVerdictNorm = (a.verdict || '-').trim();
             const bVerdictNorm = (b.verdict || '-').trim();
-            aVal = VERDICT_PRIORITY[aVerdictNorm] ?? VERDICT_PRIORITY['-'];
-            bVal = VERDICT_PRIORITY[bVerdictNorm] ?? VERDICT_PRIORITY['-'];
+            const aPriority = VERDICT_PRIORITY[aVerdictNorm] !== undefined ? VERDICT_PRIORITY[aVerdictNorm] : VERDICT_PRIORITY['-'];
+            const bPriority = VERDICT_PRIORITY[bVerdictNorm] !== undefined ? VERDICT_PRIORITY[bVerdictNorm] : VERDICT_PRIORITY['-'];
+            compareResult = aPriority - bPriority;
             break;
           case 'symbol':
-            aVal = a.symbol.toLowerCase();
-            bVal = b.symbol.toLowerCase();
+            const aSymbol = (a.symbol || '').toLowerCase();
+            const bSymbol = (b.symbol || '').toLowerCase();
+            compareResult = aSymbol.localeCompare(bSymbol);
             break;
           case 'score':
-            aVal = a.score ?? -1;
-            bVal = b.score ?? -1;
+            const aScore = a.score !== null && a.score !== undefined ? a.score : -1;
+            const bScore = b.score !== null && b.score !== undefined ? b.score : -1;
+            compareResult = aScore - bScore;
             break;
           case 'entry':
-            aVal = a.entry ?? -1;
-            bVal = b.entry ?? -1;
+            const aEntry = a.entry !== null && a.entry !== undefined ? a.entry : -1;
+            const bEntry = b.entry !== null && b.entry !== undefined ? b.entry : -1;
+            compareResult = aEntry - bEntry;
             break;
           case 'target':
-            aVal = a.target ?? -1;
-            bVal = b.target ?? -1;
+            const aTarget = a.target !== null && a.target !== undefined ? a.target : -1;
+            const bTarget = b.target !== null && b.target !== undefined ? b.target : -1;
+            compareResult = aTarget - bTarget;
             break;
           default:
-            return 0;
+            compareResult = 0;
         }
 
-        // Handle comparison for strings vs numbers
-        if (typeof aVal === 'string' && typeof bVal === 'string') {
-          return sortDirection === 'asc' 
-            ? aVal.localeCompare(bVal)
-            : bVal.localeCompare(aVal);
-        } else {
-          return sortDirection === 'asc' 
-            ? aVal - bVal
-            : bVal - aVal;
-        }
+        // Apply sort direction
+        return sortDirection === 'asc' ? compareResult : -compareResult;
       });
     }
 
