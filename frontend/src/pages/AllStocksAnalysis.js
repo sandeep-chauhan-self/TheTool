@@ -265,13 +265,12 @@ function AllStocksAnalysis() {
     // Step 2: Apply sorting if sortBy is set
     if (sortBy) {
       let sortByPath;
-      let customIteratee = null;
 
-      // Map sort columns to their paths and custom iteratees
+      // Map sort columns to their iteratees (all use sortByPath for consistency)
       switch (sortBy) {
         case 'verdict':
-          // Custom iteratee for verdict priority mapping
-          customIteratee = (stock) => {
+          // Use sortByPath that maps verdict to its priority value
+          sortByPath = (stock) => {
             const verdictNorm = (stock.verdict || '-').trim();
             return VERDICT_PRIORITY[verdictNorm] !== undefined 
               ? VERDICT_PRIORITY[verdictNorm] 
@@ -294,10 +293,9 @@ function AllStocksAnalysis() {
           return filtered;
       }
 
-      // Use the appropriate iteratee (custom for verdict, path for others)
-      const iteratee = customIteratee || sortByPath;
+      // Use Lodash orderBy with the iteratee function
       const order = sortDirection === 'asc' ? 'asc' : 'desc';
-      filtered = _.orderBy(filtered, [iteratee], [order]);
+      filtered = _.orderBy(filtered, [sortByPath], [order]);
     }
 
     return filtered;
