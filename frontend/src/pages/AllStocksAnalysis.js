@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import _ from 'lodash';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeAllStocks, getAllAnalysisResults, getAllNSEStocks, getAllStocksProgress } from '../api/api';
 import Header from '../components/Header';
@@ -154,9 +155,9 @@ function AllStocksAnalysis() {
   };
 
   const handleSelectAll = () => {
-    // Use sorted and filtered stocks to respect current sort order
-    const sorted = getSortedAndFilteredStocks();
-    setSelectedStocks(sorted.map(s => s.yahoo_symbol));
+    // Use memoized filtered stocks (already sorted) to respect current sort order
+    // Note: filteredStocks is computed in useMemo and available here
+    setSelectedStocks(filteredStocks.map(s => s.yahoo_symbol));
   };
 
   const handleDeselectAll = () => {
@@ -249,10 +250,11 @@ function AllStocksAnalysis() {
     }
   };
 
-  const getSortedAndFilteredStocks = () => {
+  // Memoized sorted and filtered stocks using Lodash orderBy
+  const filteredStocks = useMemo(() => {
     const query = searchQuery.toLowerCase();
     
-    // First, filter by search query (including verdict now)
+    // Step 1: Filter by search query (including verdict)
     let filtered = stocks.filter(stock => 
       stock.symbol.toLowerCase().includes(query) ||
       stock.name.toLowerCase().includes(query) ||
@@ -260,69 +262,51 @@ function AllStocksAnalysis() {
       (stock.verdict || '').toLowerCase().includes(query)
     );
 
-    // Then, apply sorting if sortBy is set
+    // Step 2: Apply sorting if sortBy is set
     if (sortBy) {
-      filtered = [...filtered].sort((a, b) => {
-        let compareResult = 0;
+      let sortByPath;
+      let customIteratee = null;
 
-        switch (sortBy) {
-          case 'verdict':
-            // Normalize verdict values and get priority
-            const aVerdictNorm = (a.verdict || '-').trim();
-            const bVerdictNorm = (b.verdict || '-').trim();
-            const aPriority = VERDICT_PRIORITY[aVerdictNorm] !== undefined ? VERDICT_PRIORITY[aVerdictNorm] : VERDICT_PRIORITY['-'];
-            const bPriority = VERDICT_PRIORITY[bVerdictNorm] !== undefined ? VERDICT_PRIORITY[bVerdictNorm] : VERDICT_PRIORITY['-'];
-            compareResult = aPriority - bPriority;
-            break;
-          case 'symbol':
-            const aSymbol = (a.symbol || '').toLowerCase();
-            const bSymbol = (b.symbol || '').toLowerCase();
-            compareResult = aSymbol.localeCompare(bSymbol);
-            break;
-          case 'score':
-            const aScore = a.score !== null && a.score !== undefined ? a.score : -1;
-            const bScore = b.score !== null && b.score !== undefined ? b.score : -1;
-            compareResult = aScore - bScore;
-            break;
-          case 'entry':
-            const aEntry = a.entry !== null && a.entry !== undefined ? a.entry : -1;
-            const bEntry = b.entry !== null && b.entry !== undefined ? b.entry : -1;
-            compareResult = aEntry - bEntry;
-            break;
-          case 'target':
-            const aTarget = a.target !== null && a.target !== undefined ? a.target : -1;
-            const bTarget = b.target !== null && b.target !== undefined ? b.target : -1;
-            compareResult = aTarget - bTarget;
-            break;
-          default:
-            compareResult = 0;
-        }
+      // Map sort columns to their paths and custom iteratees
+      switch (sortBy) {
+        case 'verdict':
+          // Custom iteratee for verdict priority mapping
+          customIteratee = (stock) => {
+            const verdictNorm = (stock.verdict || '-').trim();
+            return VERDICT_PRIORITY[verdictNorm] !== undefined 
+              ? VERDICT_PRIORITY[verdictNorm] 
+              : VERDICT_PRIORITY['-'];
+          };
+          break;
+        case 'symbol':
+          sortByPath = (stock) => (stock.symbol || '').toLowerCase();
+          break;
+        case 'score':
+          sortByPath = (stock) => stock.score !== null && stock.score !== undefined ? stock.score : -1;
+          break;
+        case 'entry':
+          sortByPath = (stock) => stock.entry !== null && stock.entry !== undefined ? stock.entry : -1;
+          break;
+        case 'target':
+          sortByPath = (stock) => stock.target !== null && stock.target !== undefined ? stock.target : -1;
+          break;
+        default:
+          return filtered;
+      }
 
-        // Apply sort direction
-        return sortDirection === 'asc' ? compareResult : -compareResult;
-      });
+      // Use the appropriate iteratee (custom for verdict, path for others)
+      const iteratee = customIteratee || sortByPath;
+      const order = sortDirection === 'asc' ? 'asc' : 'desc';
+      filtered = _.orderBy(filtered, [iteratee], [order]);
     }
 
     return filtered;
-  };
+  }, [stocks, searchQuery, sortBy, sortDirection]);
 
   const getSortIndicator = (column) => {
     if (sortBy !== column) return '';
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
-
-  const getFilteredStocks = () => {
-    if (!searchQuery.trim()) return stocks;
-    
-    const query = searchQuery.toLowerCase();
-    return stocks.filter(stock => 
-      stock.symbol.toLowerCase().includes(query) ||
-      stock.name.toLowerCase().includes(query) ||
-      stock.yahoo_symbol.toLowerCase().includes(query)
-    );
-  };
-
-  const filteredStocks = getSortedAndFilteredStocks();
 
   return (
     <div className="min-h-screen bg-gray-100">
