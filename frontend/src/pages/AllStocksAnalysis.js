@@ -250,53 +250,52 @@ function AllStocksAnalysis() {
     }
   };
 
-  // Memoized sorted and filtered stocks using Lodash orderBy
+  // Memoized sorted + filtered stocks with stable Lodash ordering
   const filteredStocks = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    
-    // Step 1: Filter by search query (including verdict)
-    let filtered = stocks.filter(stock => 
+
+    // --- 1. FILTERING ---
+    let filtered = stocks.filter(stock =>
       stock.symbol.toLowerCase().includes(query) ||
       stock.name.toLowerCase().includes(query) ||
       stock.yahoo_symbol.toLowerCase().includes(query) ||
       (stock.verdict || '').toLowerCase().includes(query)
     );
 
-    // Step 2: Apply sorting if sortBy is set
-    if (sortBy) {
-      let sortByPath;
+    // --- 2. SORTING ---
+    if (!sortBy) return filtered;
 
-      // Map sort columns to their iteratees (all use sortByPath for consistency)
-      switch (sortBy) {
-        case 'verdict':
-          // Use sortByPath that maps verdict to its priority value
-          sortByPath = (stock) => {
-            const verdictNorm = (stock.verdict || '-').trim();
-            return VERDICT_PRIORITY[verdictNorm] ?? VERDICT_PRIORITY['-'];
-          };
-          break;
-        case 'symbol':
-          sortByPath = (stock) => (stock.symbol || '').toLowerCase();
-          break;
-        case 'score':
-          sortByPath = (stock) => stock.score !== null && stock.score !== undefined ? stock.score : -1;
-          break;
-        case 'entry':
-          sortByPath = (stock) => stock.entry !== null && stock.entry !== undefined ? stock.entry : -1;
-          break;
-        case 'target':
-          sortByPath = (stock) => stock.target !== null && stock.target !== undefined ? stock.target : -1;
-          break;
-        default:
-          return filtered;
-      }
+    const sortDirectionLodash = sortDirection === 'asc' ? 'asc' : 'desc';
 
-      // Use Lodash orderBy with the iteratee function
-      const order = sortDirection === 'asc' ? 'asc' : 'desc';
-      filtered = _.orderBy(filtered, [sortByPath], [order]);
-    }
+    // Helper: verdict → numeric priority
+    const verdictPriority = (stock) => {
+      const v = (stock.verdict || '-').trim();
+      return VERDICT_PRIORITY[v] ?? VERDICT_PRIORITY['-'];
+    };
 
-    return filtered;
+    // MAPPING SORT COLUMNS TO ITERATEES
+    const sortIteratees = {
+      verdict: verdictPriority,
+      symbol: (s) => (s.symbol || '').toLowerCase(),
+      score: (s) => s.score ?? -1,
+      entry: (s) => s.entry ?? -1,
+      target: (s) => s.target ?? -1
+    };
+
+    // Primary iteratee
+    const primary = sortIteratees[sortBy];
+
+    // Add secondary ordering for stability:
+    // ALWAYS SORT BY SYMBOL after primary
+    const secondary = (s) => (s.symbol || '').toLowerCase();
+
+    // Apply orderBy with 2 keys
+    return _.orderBy(
+      filtered,
+      [primary, secondary],
+      [sortDirectionLodash, 'asc']
+    );
+
   }, [stocks, searchQuery, sortBy, sortDirection]);
 
   const getSortIndicator = (column) => {
