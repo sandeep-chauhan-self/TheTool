@@ -11,6 +11,8 @@ function AllStocksAnalysis() {
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -226,6 +228,87 @@ function AllStocksAnalysis() {
     );
   };
 
+  const handleSort = (column) => {
+    // If clicking the same column, toggle direction; otherwise, set new column and reset to asc
+    if (sortBy === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Define verdict sort order (higher priority first)
+  const verdictPriority = {
+    'STRONG BUY': 5,
+    'BUY': 4,
+    'HOLD': 3,
+    'SELL': 2,
+    'STRONG SELL': 1,
+    '-': 0 // No analysis
+  };
+
+  const getSortedAndFilteredStocks = () => {
+    const query = searchQuery.toLowerCase();
+    
+    // First, filter by search query
+    let filtered = stocks.filter(stock => 
+      stock.symbol.toLowerCase().includes(query) ||
+      stock.name.toLowerCase().includes(query) ||
+      stock.yahoo_symbol.toLowerCase().includes(query)
+    );
+
+    // Then, apply sorting if sortBy is set
+    if (sortBy) {
+      filtered.sort((a, b) => {
+        let aVal, bVal;
+
+        switch (sortBy) {
+          case 'verdict':
+            aVal = verdictPriority[a.verdict] ?? verdictPriority['-'];
+            bVal = verdictPriority[b.verdict] ?? verdictPriority['-'];
+            break;
+          case 'symbol':
+            aVal = a.symbol.toLowerCase();
+            bVal = b.symbol.toLowerCase();
+            break;
+          case 'score':
+            aVal = a.score ?? -1;
+            bVal = b.score ?? -1;
+            break;
+          case 'entry':
+            aVal = a.entry ?? -1;
+            bVal = b.entry ?? -1;
+            break;
+          case 'target':
+            aVal = a.target ?? -1;
+            bVal = b.target ?? -1;
+            break;
+          default:
+            return 0;
+        }
+
+        // Handle comparison for strings vs numbers
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          return sortDirection === 'asc' 
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        } else {
+          return sortDirection === 'asc' 
+            ? aVal - bVal
+            : bVal - aVal;
+        }
+      });
+    }
+
+    return filtered;
+  };
+
+  const getSortIndicator = (column) => {
+    if (sortBy !== column) return '';
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
+  };
+
   const getFilteredStocks = () => {
     if (!searchQuery.trim()) return stocks;
     
@@ -237,7 +320,7 @@ function AllStocksAnalysis() {
     );
   };
 
-  const filteredStocks = getFilteredStocks();
+  const filteredStocks = getSortedAndFilteredStocks();
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -362,8 +445,11 @@ function AllStocksAnalysis() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                       Select
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Symbol
+                    <th 
+                      onClick={() => handleSort('symbol')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Symbol{getSortIndicator('symbol')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Company Name
@@ -371,17 +457,29 @@ function AllStocksAnalysis() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Score
+                    <th 
+                      onClick={() => handleSort('score')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Score{getSortIndicator('score')}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Verdict
+                    <th 
+                      onClick={() => handleSort('verdict')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Verdict{getSortIndicator('verdict')}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Entry
+                    <th 
+                      onClick={() => handleSort('entry')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Entry{getSortIndicator('entry')}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Target
+                    <th 
+                      onClick={() => handleSort('target')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Target{getSortIndicator('target')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
