@@ -252,11 +252,12 @@ function AllStocksAnalysis() {
   const getSortedAndFilteredStocks = () => {
     const query = searchQuery.toLowerCase();
     
-    // First, filter by search query
+    // First, filter by search query (including verdict now)
     let filtered = stocks.filter(stock => 
       stock.symbol.toLowerCase().includes(query) ||
       stock.name.toLowerCase().includes(query) ||
-      stock.yahoo_symbol.toLowerCase().includes(query)
+      stock.yahoo_symbol.toLowerCase().includes(query) ||
+      (stock.verdict || '').toLowerCase().includes(query)
     );
 
     // Then, apply sorting if sortBy is set
