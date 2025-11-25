@@ -272,9 +272,7 @@ function AllStocksAnalysis() {
           // Use sortByPath that maps verdict to its priority value
           sortByPath = (stock) => {
             const verdictNorm = (stock.verdict || '-').trim();
-            return VERDICT_PRIORITY[verdictNorm] !== undefined 
-              ? VERDICT_PRIORITY[verdictNorm] 
-              : VERDICT_PRIORITY['-'];
+            return VERDICT_PRIORITY[verdictNorm] ?? VERDICT_PRIORITY['-'];
           };
           break;
         case 'symbol':
