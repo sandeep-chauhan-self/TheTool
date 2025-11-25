@@ -4,6 +4,16 @@ import { analyzeAllStocks, getAllAnalysisResults, getAllNSEStocks, getAllStocksP
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 
+// Define verdict sort order (higher priority first) - outside component to avoid recreating on every render
+const VERDICT_PRIORITY = {
+  'STRONG BUY': 5,
+  'BUY': 4,
+  'HOLD': 3,
+  'SELL': 2,
+  'STRONG SELL': 1,
+  '-': 0 // No analysis
+};
+
 function AllStocksAnalysis() {
   const [stocks, setStocks] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
@@ -144,8 +154,9 @@ function AllStocksAnalysis() {
   };
 
   const handleSelectAll = () => {
-    const filtered = getFilteredStocks();
-    setSelectedStocks(filtered.map(s => s.yahoo_symbol));
+    // Use sorted and filtered stocks to respect current sort order
+    const sorted = getSortedAndFilteredStocks();
+    setSelectedStocks(sorted.map(s => s.yahoo_symbol));
   };
 
   const handleDeselectAll = () => {
@@ -238,16 +249,6 @@ function AllStocksAnalysis() {
     }
   };
 
-  // Define verdict sort order (higher priority first)
-  const verdictPriority = {
-    'STRONG BUY': 5,
-    'BUY': 4,
-    'HOLD': 3,
-    'SELL': 2,
-    'STRONG SELL': 1,
-    '-': 0 // No analysis
-  };
-
   const getSortedAndFilteredStocks = () => {
     const query = searchQuery.toLowerCase();
     
@@ -265,8 +266,11 @@ function AllStocksAnalysis() {
 
         switch (sortBy) {
           case 'verdict':
-            aVal = verdictPriority[a.verdict] ?? verdictPriority['-'];
-            bVal = verdictPriority[b.verdict] ?? verdictPriority['-'];
+            // Normalize verdict values and get priority
+            const aVerdictNorm = (a.verdict || '-').trim();
+            const bVerdictNorm = (b.verdict || '-').trim();
+            aVal = VERDICT_PRIORITY[aVerdictNorm] ?? VERDICT_PRIORITY['-'];
+            bVal = VERDICT_PRIORITY[bVerdictNorm] ?? VERDICT_PRIORITY['-'];
             break;
           case 'symbol':
             aVal = a.symbol.toLowerCase();
@@ -327,19 +331,19 @@ function AllStocksAnalysis() {
       <NavigationBar />
       <Header title="All Stocks Analysis" subtitle={`${stocks.length} NSE Stocks`} />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
         
         {/* Completion Message */}
         {progress && !analyzing && progress.percentage === 100 && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg shadow-md">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">✓</span>
+          <div className="mb-6 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg shadow-md">
+            <div className="flex gap-3">
+              <span className="text-xl flex-shrink-0">✓</span>
               <div>
-                <p className="text-sm font-medium text-green-800">
+                <p className="text-xs sm:text-sm font-medium text-green-800">
                   Analysis Completed Successfully!
                 </p>
                 <p className="text-xs text-green-700 mt-1">
-                  Processed {progress.completed}/{progress.total} stocks 
+                  Processed {progress.completed}/{progress.total} 
                   ({progress.successful} successful, {progress.failed} failed)
                 </p>
               </div>
@@ -349,12 +353,12 @@ function AllStocksAnalysis() {
         
         {/* Progress Bar */}
         {analyzing && progress && (
-          <div className="mb-6 p-4 bg-white rounded-lg shadow-md">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                Analyzing {progress.completed}/{progress.total} stocks ({progress.percentage}% complete)
+          <div className="mb-6 p-3 sm:p-4 bg-white rounded-lg shadow-md">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
+                Analyzing {progress.completed}/{progress.total} ({progress.percentage}%)
               </span>
-              <span className="text-sm text-gray-500">
+              <span className="text-xs text-gray-500">
                 ETA: {progress.estimated_time_remaining}
               </span>
             </div>
@@ -364,7 +368,7 @@ function AllStocksAnalysis() {
                 style={{ width: `${progress.percentage}%` }}
               ></div>
             </div>
-            <div className="mt-2 flex justify-between text-xs text-gray-600">
+            <div className="mt-2 grid grid-cols-2 sm:flex sm:justify-between gap-2 text-xs text-gray-600">
               <span>Completed: {progress.completed}</span>
               <span>Analyzing: {progress.analyzing}</span>
               <span>Failed: {progress.failed}</span>
@@ -374,27 +378,27 @@ function AllStocksAnalysis() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-4 mb-6 flex-wrap">
+        <div className="flex gap-2 sm:gap-4 mb-6 flex-wrap justify-center sm:justify-start">
           <button
             onClick={handleAnalyzeAll}
             disabled={analyzing || loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+            className="flex-1 sm:flex-none px-3 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium text-xs sm:text-sm whitespace-nowrap"
           >
-            {analyzing ? 'Analysis Running...' : `Analyze All ${stocks.length} Stocks`}
+            {analyzing ? 'Running...' : `Analyze All`}
           </button>
           
           <button
             onClick={handleAnalyzeSelected}
             disabled={selectedStocks.length === 0 || analyzing || loading}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium"
+            className="flex-1 sm:flex-none px-3 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium text-xs sm:text-sm whitespace-nowrap"
           >
-            Analyze Selected ({selectedStocks.length})
+            Analyze ({selectedStocks.length})
           </button>
           
           <button
             onClick={handleSelectAll}
             disabled={loading}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm whitespace-nowrap"
           >
             Select All
           </button>
@@ -402,7 +406,7 @@ function AllStocksAnalysis() {
           <button
             onClick={handleDeselectAll}
             disabled={loading || selectedStocks.length === 0}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm disabled:bg-gray-100"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm disabled:bg-gray-100 whitespace-nowrap"
           >
             Deselect All
           </button>
@@ -410,7 +414,7 @@ function AllStocksAnalysis() {
           <button
             onClick={loadAllStocks}
             disabled={loading}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm ml-auto"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm ml-0 sm:ml-auto whitespace-nowrap"
           >
             Refresh
           </button>
@@ -420,12 +424,12 @@ function AllStocksAnalysis() {
         <div className="mb-4">
           <input
             type="text"
-            placeholder="Search stocks by symbol or name..."
+            placeholder="Search stocks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
             Showing {filteredStocks.length} of {stocks.length} stocks
           </p>
         </div>
@@ -434,54 +438,54 @@ function AllStocksAnalysis() {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading all 2,192 NSE stocks...</p>
+            <p className="text-gray-600 text-sm">Loading all 2,192 NSE stocks...</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full divide-y divide-gray-200 text-xs sm:text-sm">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8 sm:w-12">
                       Select
                     </th>
                     <th 
                       onClick={() => handleSort('symbol')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       Symbol{getSortIndicator('symbol')}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Company Name
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden lg:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th 
                       onClick={() => handleSort('score')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       Score{getSortIndicator('score')}
                     </th>
                     <th 
                       onClick={() => handleSort('verdict')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       Verdict{getSortIndicator('verdict')}
                     </th>
                     <th 
                       onClick={() => handleSort('entry')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       Entry{getSortIndicator('entry')}
                     </th>
                     <th 
                       onClick={() => handleSort('target')}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       Target{getSortIndicator('target')}
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -489,7 +493,7 @@ function AllStocksAnalysis() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredStocks.map((stock) => (
                     <tr key={stock.yahoo_symbol} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                         <input
                           type="checkbox"
                           checked={selectedStocks.includes(stock.yahoo_symbol)}
@@ -497,43 +501,43 @@ function AllStocksAnalysis() {
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{stock.symbol}</div>
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <div className="text-xs sm:text-sm font-medium text-gray-900">{stock.symbol}</div>
                         <div className="text-xs text-gray-500">{stock.yahoo_symbol}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-900 truncate max-w-xs">{stock.name}</div>
+                      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3">
+                        <div className="text-xs sm:text-sm text-gray-900 truncate max-w-xs">{stock.name}</div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="hidden lg:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                         {getStatusBadge(stock.status)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <div className="text-xs sm:text-sm text-gray-900">
                           {stock.score !== null ? stock.score.toFixed(1) : '-'}
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <div className="text-xs sm:text-sm text-gray-900 font-medium">
                           {stock.verdict || '-'}
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <div className="text-xs sm:text-sm text-gray-900">
                           {stock.entry ? `Rs. ${stock.entry.toFixed(2)}` : '-'}
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <div className="text-xs sm:text-sm text-gray-900">
                           {stock.target ? `Rs. ${stock.target.toFixed(2)}` : '-'}
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
                         {stock.has_analysis && (
                           <button
                             onClick={() => handleViewDetails(stock.ticker)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
                           >
-                            View Details
+                            View
                           </button>
                         )}
                       </td>
@@ -546,8 +550,8 @@ function AllStocksAnalysis() {
         )}
 
         {!loading && filteredStocks.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-lg shadow-md">
-            <p className="text-gray-600">No stocks found matching your search</p>
+          <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
+            <p className="text-gray-600 text-sm">No stocks found matching your search</p>
           </div>
         )}
       </div>
