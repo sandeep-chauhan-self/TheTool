@@ -50,8 +50,8 @@ def populate_watchlist():
     
     for ticker, symbol, notes in stocks_to_insert:
         try:
-            query = "INSERT INTO watchlist (ticker, symbol, notes) VALUES (?, ?, ?)"
-            query, args = _convert_query_params(query, (ticker, symbol, notes))
+            query = "INSERT INTO watchlist (ticker, notes) VALUES (?, ?)"
+            query, args = _convert_query_params(query, (ticker, notes))
             cursor.execute(query, args)
             inserted += 1
             if inserted % 100 == 0:

@@ -28,7 +28,7 @@ except ImportError:
     psycopg2 = None
 
 DB_PATH = config.DB_PATH
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 
 def get_db_placeholder(conn):
@@ -552,6 +552,234 @@ def migration_v3(conn):
         return False
 
 
+def migration_v4(conn):
+    """
+    Migration V4: Rename 'symbol' column to 'ticker' in watchlist table
+    
+    This migration safely renames the symbol column to ticker for consistency
+    across the codebase (analysis_results uses ticker).
+    
+    Strategy:
+    1. Clean and validate data before migration
+    2. Create new table with correct schema (ticker instead of symbol)
+    3. Copy data from old table
+    4. Drop old table
+    5. Rename new table
+    6. Recreate indices
+    
+    Works for both SQLite and PostgreSQL
+    """
+    try:
+        cursor = conn.cursor()
+        
+        logger.info("Running migration v4: Rename 'symbol' to 'ticker' in watchlist table...")
+        
+        # STEP 1: Validate and clean data before migration
+        logger.info("  [Step 1] Validating watchlist data...")
+        try:
+            # Get stats before migration
+            cursor.execute("SELECT COUNT(*) FROM watchlist")
+            count_before = cursor.fetchone()[0]
+            logger.info(f"    Total records: {count_before}")
+            
+            # Check for NULL values in symbol
+            cursor.execute("SELECT COUNT(*) FROM watchlist WHERE symbol IS NULL")
+            null_count = cursor.fetchone()[0]
+            if null_count > 0:
+                logger.warning(f"    Found {null_count} records with NULL symbol - removing them")
+                cursor.execute("DELETE FROM watchlist WHERE symbol IS NULL")
+                conn.commit()
+                logger.info(f"    ✓ Removed {null_count} records with NULL symbol")
+            
+            # Check for duplicates and clean them
+            cursor.execute("""
+                SELECT COUNT(*) FROM watchlist 
+                WHERE id NOT IN (
+                    SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
+                )
+            """)
+            dup_count = cursor.fetchone()[0]
+            if dup_count > 0:
+                logger.warning(f"    Found {dup_count} duplicate records - removing them")
+                cursor.execute("""
+                    DELETE FROM watchlist 
+                    WHERE id NOT IN (
+                        SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
+                    )
+                """)
+                conn.commit()
+                logger.info(f"    ✓ Removed {dup_count} duplicate records")
+            
+            # Trim whitespace from symbol values
+            if config.DATABASE_TYPE == 'postgres':
+                cursor.execute("UPDATE watchlist SET symbol = TRIM(symbol) WHERE symbol IS NOT NULL")
+            else:
+                cursor.execute("UPDATE watchlist SET symbol = TRIM(symbol) WHERE symbol IS NOT NULL")
+            conn.commit()
+            logger.info("    ✓ Trimmed whitespace from symbol values")
+            
+        except Exception as e:
+            logger.warning(f"    Data validation warning: {e}")
+            conn.rollback()
+        
+        # STEP 2: Check if migration is needed (ticker column might already exist)
+        logger.info("  [Step 2] Checking if ticker column already exists...")
+        
+        ticker_exists = False
+        symbol_exists = False
+        
+        if config.DATABASE_TYPE == 'postgres':
+            # PostgreSQL: check information_schema
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='watchlist' AND column_name='ticker'
+            """)
+            ticker_exists = cursor.fetchone() is not None
+            
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='watchlist' AND column_name='symbol'
+            """)
+            symbol_exists = cursor.fetchone() is not None
+            
+            logger.info(f"    ticker column exists: {ticker_exists}")
+            logger.info(f"    symbol column exists: {symbol_exists}")
+        else:
+            # SQLite: check PRAGMA table_info
+            cursor.execute("PRAGMA table_info(watchlist)")
+            columns = {row[1] for row in cursor.fetchall()}
+            ticker_exists = 'ticker' in columns
+            symbol_exists = 'symbol' in columns
+            logger.info(f"    ticker column exists: {ticker_exists}")
+            logger.info(f"    symbol column exists: {symbol_exists}")
+        
+        # If migration already done, skip
+        if ticker_exists and not symbol_exists:
+            logger.info("    ✓ Migration already applied (ticker exists, symbol doesn't)")
+            return apply_migration(conn, 4, "Rename symbol to ticker in watchlist (already done)", "")
+        
+        # If only symbol exists, need to rename
+        if symbol_exists and not ticker_exists:
+            logger.info("    ✓ Migration needed: symbol exists, ticker doesn't")
+        elif ticker_exists and symbol_exists:
+            logger.warning("    Both ticker and symbol columns exist - removing symbol column")
+        
+        # STEP 3: Handle the rename based on database type
+        logger.info("  [Step 3] Performing column rename...")
+        
+        try:
+            if config.DATABASE_TYPE == 'postgres':
+                # PostgreSQL: Use RENAME COLUMN
+                if symbol_exists and not ticker_exists:
+                    logger.info("    Executing: ALTER TABLE watchlist RENAME COLUMN symbol TO ticker")
+                    cursor.execute("ALTER TABLE watchlist RENAME COLUMN symbol TO ticker")
+                    logger.info("    ✓ Column renamed successfully")
+                elif ticker_exists and symbol_exists:
+                    logger.info("    Dropping duplicate symbol column (ticker already exists)")
+                    cursor.execute("ALTER TABLE watchlist DROP COLUMN symbol")
+                    logger.info("    ✓ Duplicate symbol column dropped")
+            else:
+                # SQLite: No RENAME COLUMN support, must recreate table
+                logger.info("    Creating new table with ticker column...")
+                
+                # 1. Create backup of original table
+                cursor.execute("""
+                    CREATE TABLE watchlist_backup AS 
+                    SELECT * FROM watchlist
+                """)
+                logger.info("    ✓ Created backup table")
+                
+                # 2. Drop old table
+                cursor.execute("DROP TABLE watchlist")
+                logger.info("    ✓ Dropped original watchlist table")
+                
+                # 3. Create new table with correct schema
+                cursor.execute('''
+                    CREATE TABLE watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT UNIQUE NOT NULL,
+                        name TEXT,
+                        user_id INTEGER DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_job_id TEXT,
+                        last_analyzed_at TIMESTAMP,
+                        last_status TEXT,
+                        notes TEXT
+                    )
+                ''')
+                logger.info("    ✓ Created new watchlist table with ticker column")
+                
+                # 4. Copy data from backup (symbol -> ticker)
+                cursor.execute("""
+                    INSERT INTO watchlist (id, ticker, name, user_id, created_at, last_job_id, last_analyzed_at, last_status, notes)
+                    SELECT 
+                        id,
+                        symbol AS ticker,
+                        name,
+                        user_id,
+                        created_at,
+                        CASE WHEN json_extract(symbol, '$') IS NOT NULL THEN symbol ELSE NULL END,
+                        NULL,
+                        NULL,
+                        NULL
+                    FROM watchlist_backup
+                """)
+                logger.info(f"    ✓ Copied {cursor.rowcount} records from backup")
+                
+                # 5. Drop backup table
+                cursor.execute("DROP TABLE watchlist_backup")
+                logger.info("    ✓ Dropped backup table")
+            
+            conn.commit()
+            
+        except Exception as e:
+            logger.error(f"    ✗ Column rename failed: {e}")
+            conn.rollback()
+            raise
+        
+        # STEP 4: Verify migration succeeded
+        logger.info("  [Step 4] Verifying migration...")
+        
+        if config.DATABASE_TYPE == 'postgres':
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='watchlist'
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+        else:
+            cursor.execute("PRAGMA table_info(watchlist)")
+            columns = [row[1] for row in cursor.fetchall()]
+        
+        logger.info(f"    Watchlist columns after migration: {columns}")
+        
+        if 'ticker' not in columns:
+            raise Exception("Migration failed: 'ticker' column not found after migration")
+        
+        logger.info("    ✓ Migration verified successfully")
+        
+        # STEP 5: Recreate indices
+        logger.info("  [Step 5] Recreating indices...")
+        
+        try:
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_watchlist_ticker ON watchlist(ticker)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_created ON watchlist(created_at DESC)")
+            logger.info("    ✓ Indices recreated")
+        except Exception as e:
+            logger.warning(f"    Index creation warning: {e}")
+        
+        conn.commit()
+        
+        logger.info("[OK] Migration v4 completed successfully")
+        return apply_migration(conn, 4, "Rename symbol to ticker in watchlist", "")
+        
+    except Exception as e:
+        logger.error(f"✗ Migration v4 failed: {e}")
+        conn.rollback()
+        return False
+
+
 def run_migrations():
     """
     Run all pending migrations
@@ -582,22 +810,25 @@ def run_migrations():
         if current_version < 3:
             migration_v3(conn)
         
+        if current_version < 4:
+            migration_v4(conn)
+        
         # Cleanup: Remove duplicate watchlist entries
         try:
             logger.info("Cleaning up duplicate watchlist entries...")
             cursor = conn.cursor()
             
-            # Find and count duplicates
+            # Find and count duplicates (use ticker column which exists after migration v4)
             cursor.execute("""
                 SELECT COUNT(*) as total,
-                       COUNT(DISTINCT LOWER(symbol)) as unique_symbols
+                       COUNT(DISTINCT LOWER(ticker)) as unique_tickers
                 FROM watchlist
             """)
             stats = cursor.fetchone()
             if stats:
                 total = stats[0] if isinstance(stats, (tuple, list)) else stats.get('total', 0)
-                unique = stats[1] if isinstance(stats, (tuple, list)) else stats.get('unique_symbols', 0)
-                logger.info(f"  Watchlist stats: {total} total entries, {unique} unique symbols")
+                unique = stats[1] if isinstance(stats, (tuple, list)) else stats.get('unique_tickers', 0)
+                logger.info(f"  Watchlist stats: {total} total entries, {unique} unique tickers")
                 
                 if total > unique:
                     logger.warning(f"  Found {total - unique} duplicate entries")
@@ -606,7 +837,7 @@ def run_migrations():
                     cursor.execute("""
                         DELETE FROM watchlist 
                         WHERE id NOT IN (
-                            SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
+                            SELECT MIN(id) FROM watchlist GROUP BY LOWER(ticker)
                         )
                     """)
                     deleted_count = cursor.rowcount

@@ -45,7 +45,7 @@ def _get_watchlist():
     """GET: Retrieve watchlist items"""
     try:
         items = query_db("""
-            SELECT id, symbol, name, created_at
+            SELECT id, ticker, name, created_at
             FROM watchlist
             ORDER BY created_at DESC
         """)
@@ -59,15 +59,13 @@ def _get_watchlist():
                 if isinstance(item, (tuple, list)):
                     items_dict.append({
                         "id": item[0],
-                        "ticker": item[1],  # Renamed from 'symbol' to match frontend expectation
+                        "ticker": item[1],
                         "name": item[2],
                         "created_at": str(item[3]) if item[3] else None
                     })
                 else:
-                    # Convert Row object to dict and rename symbol to ticker
+                    # Convert Row object to dict
                     item_dict = dict(item)
-                    if 'symbol' in item_dict:
-                        item_dict['ticker'] = item_dict.pop('symbol')
                     items_dict.append(item_dict)
         
         logger.info(f"[WATCHLIST_GET] Retrieved {len(items_dict)} items")
@@ -123,25 +121,25 @@ def _add_to_watchlist():
         
         logger.info(f"[WATCHLIST_ADD] Generated symbol: {symbol_with_exchange}")
         
-        # Check if already exists (search by symbol)
+        # Check if already exists (search by ticker)
         existing = query_db(
-            "SELECT id FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
+            "SELECT id FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
             (symbol_with_exchange,),
             one=True
         )
         
         if existing:
-            logger.warning(f"[WATCHLIST_ADD] Duplicate symbol: {symbol_with_exchange}")
+            logger.warning(f"[WATCHLIST_ADD] Duplicate ticker: {symbol_with_exchange}")
             return StandardizedErrorResponse.format(
                 "WATCHLIST_DUPLICATE",
                 f"Symbol {symbol_with_exchange} already in watchlist",
                 409
             )
         
-        # Insert new item (only using columns that exist: symbol, name)
+        # Insert new item
         item_id = execute_db(
             """
-            INSERT INTO watchlist (symbol, name)
+            INSERT INTO watchlist (ticker, name)
             VALUES (?, ?)
             """,
             (symbol_with_exchange, name)
@@ -187,7 +185,7 @@ def _remove_from_watchlist():
         # Build query
         if item_id:
             result = query_db(
-                "SELECT symbol FROM watchlist WHERE id = ?",
+                "SELECT ticker FROM watchlist WHERE id = ?",
                 (item_id,),
                 one=True
             )
@@ -200,23 +198,23 @@ def _remove_from_watchlist():
                 )
             # Handle both tuple (PostgreSQL) and dict (SQLite) return types
             if isinstance(result, (tuple, list)):
-                symbol_name = result[0]
+                ticker_name = result[0]
             else:
-                symbol_name = result['symbol']
+                ticker_name = result['ticker']
             
             execute_db("DELETE FROM watchlist WHERE id = ?", (item_id,))
-            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, symbol: {symbol_name}")
+            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, ticker: {ticker_name}")
         else:
-            symbol_name = symbol
+            ticker_name = symbol
             execute_db(
-                "DELETE FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
+                "DELETE FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
                 (symbol,)
             )
-            logger.info(f"[WATCHLIST_DELETE] Removed by symbol: {symbol_name}")
+            logger.info(f"[WATCHLIST_DELETE] Removed by ticker: {ticker_name}")
         
         return jsonify({
             "message": "Removed from watchlist",
-            "symbol": symbol_name
+            "ticker": ticker_name
         }), 200
         
     except Exception as e:
@@ -233,7 +231,7 @@ def _remove_from_watchlist():
 def debug_list_watchlist():
     """DEBUG ENDPOINT: List all watchlist items and database info"""
     try:
-        items = query_db("SELECT id, symbol, name, created_at FROM watchlist ORDER BY id DESC")
+        items = query_db("SELECT id, ticker, name, created_at FROM watchlist ORDER BY id DESC")
         
         items_list = []
         if items:
@@ -241,14 +239,12 @@ def debug_list_watchlist():
                 if isinstance(item, (tuple, list)):
                     items_list.append({
                         "id": item[0],
-                        "ticker": item[1],  # Renamed to match frontend
+                        "ticker": item[1],
                         "name": item[2],
                         "created_at": str(item[3]) if item[3] else None
                     })
                 else:
                     item_dict = dict(item)
-                    if 'symbol' in item_dict:
-                        item_dict['ticker'] = item_dict.pop('symbol')
                     items_list.append(item_dict)
         
         logger.info(f"[DEBUG] Watchlist has {len(items_list)} items")
@@ -270,28 +266,26 @@ def debug_cleanup_watchlist():
         deleted = execute_db("""
             DELETE FROM watchlist 
             WHERE id NOT IN (
-                SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
+                SELECT MIN(id) FROM watchlist GROUP BY LOWER(ticker)
             )
         """)
         
         logger.info(f"[DEBUG] Cleaned up {deleted} duplicate entries")
         
         # Get remaining items
-        items = query_db("SELECT id, symbol, name, created_at FROM watchlist ORDER BY id DESC")
+        items = query_db("SELECT id, ticker, name, created_at FROM watchlist ORDER BY id DESC")
         items_list = []
         if items:
             for item in items:
                 if isinstance(item, (tuple, list)):
                     items_list.append({
                         "id": item[0],
-                        "ticker": item[1],  # Renamed to match frontend
+                        "ticker": item[1],
                         "name": item[2],
                         "created_at": str(item[3]) if item[3] else None
                     })
                 else:
                     item_dict = dict(item)
-                    if 'symbol' in item_dict:
-                        item_dict['ticker'] = item_dict.pop('symbol')
                     items_list.append(item_dict)
         
         return jsonify({

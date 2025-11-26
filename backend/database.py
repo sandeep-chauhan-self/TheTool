@@ -319,10 +319,14 @@ def _init_sqlite_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS watchlist (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT UNIQUE NOT NULL,
+            ticker TEXT UNIQUE NOT NULL,
             name TEXT,
             user_id INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_job_id TEXT,
+            last_analyzed_at TIMESTAMP,
+            last_status TEXT,
+            notes TEXT
         )
     ''')
     
@@ -406,10 +410,14 @@ def _init_postgres_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS watchlist (
                 id SERIAL PRIMARY KEY,
-                symbol TEXT UNIQUE NOT NULL,
+                ticker TEXT UNIQUE NOT NULL,
                 name TEXT,
                 user_id INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_job_id TEXT,
+                last_analyzed_at TIMESTAMP,
+                last_status TEXT,
+                notes TEXT
             )
         ''')
         
