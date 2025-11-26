@@ -108,11 +108,16 @@ function AllStocksAnalysis() {
       }
       
       // Create a map of symbol -> analysis result for quick lookup
+      // IMPORTANT: Only keep FIRST occurrence of each symbol (which is newest from backend DESC order)
       const resultsMap = {};
       allResults.forEach(result => {
         const key = result.symbol || result.ticker;
         if (key) {
-          resultsMap[key.toUpperCase()] = result;
+          const upperKey = key.toUpperCase();
+          // Only add if not already in map (first = newest from DESC ordering)
+          if (!resultsMap[upperKey]) {
+            resultsMap[upperKey] = result;
+          }
         }
       });
       
@@ -279,22 +284,6 @@ function AllStocksAnalysis() {
     if (!sortBy) return filtered;
 
     const sortDirectionLodash = sortDirection === 'asc' ? 'asc' : 'desc';
-
-    // Helper: verdict → numeric priority
-    const verdictPriority = (stock) => {
-      const v = (stock.verdict || '-').trim();
-      const priority = VERDICT_PRIORITY[v] ?? VERDICT_PRIORITY['-'];
-      // Debug logging (only on first 5 calls)
-      if (Math.random() < 0.1) {
-        console.log(`📊 verdictPriority("${v}") → ${priority}`, {
-          original: stock.verdict,
-          trimmed: v,
-          exists: VERDICT_PRIORITY[v] !== undefined,
-          allKeys: Object.keys(VERDICT_PRIORITY)
-        });
-      }
-      return priority;
-    };
 
     // MAPPING SORT COLUMNS TO ITERATEES
     const sortIteratees = {
