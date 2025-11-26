@@ -381,7 +381,9 @@ def _init_sqlite_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_created ON analysis_results(symbol, created_at DESC)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_source_symbol ON analysis_results(analysis_source, symbol)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON analysis_results(updated_at)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
+    # NOTE: Removed all indexes from analysis_jobs due to tickers_json column causing 8KB index limit overflow
+    # Removed: idx_job_status, idx_job_tickers, idx_job_tickers_hash, idx_jobs_status
+    # Job status queries will use table scan (acceptable - analysis_jobs is small table, typically <100 rows)
 
     
     conn.commit()
@@ -464,7 +466,8 @@ def _init_postgres_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_created ON analysis_results(symbol, created_at DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_source_symbol ON analysis_results(analysis_source, symbol)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON analysis_results(updated_at)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_job_status ON analysis_jobs(status)')
+        # NOTE: Removed idx_job_status from analysis_jobs due to tickers_json column causing 8KB index limit overflow
+        # Job status queries will use table scan (acceptable - analysis_jobs is small table, typically <100 rows)
         
         conn.commit()
         logger.debug("PostgreSQL database schema initialized successfully")
