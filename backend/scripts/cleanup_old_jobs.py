@@ -76,13 +76,13 @@ def cleanup_old_jobs(cursor, days=7):
         int: Number of deleted rows
     """
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
-    cutoff_str = cutoff_date.strftime('%Y-%m-%d %H:%M:%S')
     
-    logger.info(f"Deleting analysis_jobs older than {days} days (before {cutoff_str})")
+    logger.info(f"Deleting analysis_jobs older than {days} days (before {cutoff_date.isoformat()})")
     
+    # Pass datetime object directly to psycopg2 for proper timezone handling
     cursor.execute(
         "DELETE FROM analysis_jobs WHERE created_at < %s",
-        (cutoff_str,)
+        (cutoff_date,)
     )
     
     deleted_count = cursor.rowcount
@@ -96,6 +96,7 @@ def deduplicate_results(cursor):
     Remove duplicate analysis results, keeping only the latest per job_id and ticker.
     
     For results without a job_id, keeps only the latest per ticker.
+    Uses an efficient approach with a self-join for better performance on large tables.
     
     Args:
         cursor: Database cursor
@@ -105,14 +106,20 @@ def deduplicate_results(cursor):
     """
     logger.info("Deduplicating analysis_results (keeping latest per job_id and ticker)")
     
-    # Delete duplicates: keep only the row with the highest id for each (job_id, ticker) combination
-    # This handles both cases: results with job_id and results without (using ticker only)
+    # Use a more efficient DELETE with subquery that identifies rows to keep
+    # This approach uses window functions for better performance on large tables
     cursor.execute("""
         DELETE FROM analysis_results
-        WHERE id NOT IN (
-            SELECT MAX(id)
-            FROM analysis_results
-            GROUP BY COALESCE(job_id, ''), ticker
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY COALESCE(job_id, ''), ticker 
+                           ORDER BY id DESC
+                       ) as rn
+                FROM analysis_results
+            ) ranked
+            WHERE rn > 1
         )
     """)
     
@@ -144,6 +151,7 @@ def deduplicate_results_without_job_id(cursor):
     """
     Remove duplicate analysis results when job_id column doesn't exist.
     Keeps only the latest per ticker.
+    Uses an efficient approach with window functions for better performance on large tables.
     
     Args:
         cursor: Database cursor
@@ -153,12 +161,19 @@ def deduplicate_results_without_job_id(cursor):
     """
     logger.info("Deduplicating analysis_results by ticker only (no job_id column)")
     
+    # Use window functions for efficient deletion on large tables
     cursor.execute("""
         DELETE FROM analysis_results
-        WHERE id NOT IN (
-            SELECT MAX(id)
-            FROM analysis_results
-            GROUP BY ticker
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY ticker 
+                           ORDER BY id DESC
+                       ) as rn
+                FROM analysis_results
+            ) ranked
+            WHERE rn > 1
         )
     """)
     

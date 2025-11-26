@@ -46,6 +46,7 @@ jobs:
         run: |
           set -o pipefail
           cd backend
+          mkdir -p logs
           python scripts/cleanup_old_jobs.py 2>&1 | tee logs/cleanup_output.log
       
       - name: Upload cleanup logs
