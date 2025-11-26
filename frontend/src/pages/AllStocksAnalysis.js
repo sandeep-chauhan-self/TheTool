@@ -70,41 +70,41 @@ function AllStocksAnalysis() {
     try {
       setLoading(true);
       
-      // Load all 2,192 NSE stocks from the new endpoint
-      let allLoadedStocks = [];
-      let currentPage = 1;
-      let hasMore = true;
+      // OPTIMIZED: Fetch first page to get total_pages, then fetch all pages in parallel
+      const firstStocksPage = await getAllNSEStocks(1, 500); // Larger page size
+      const totalStockPages = firstStocksPage?.total_pages || 1;
       
-      while (hasMore) {
-        const data = await getAllNSEStocks(currentPage, 200);
-        if (data && data.stocks) {
-          allLoadedStocks = [...allLoadedStocks, ...data.stocks];
-          currentPage++;
-          hasMore = currentPage <= data.total_pages;
-        } else {
-          hasMore = false;
+      // Fetch remaining stock pages in parallel
+      let allLoadedStocks = [...(firstStocksPage?.stocks || [])];
+      if (totalStockPages > 1) {
+        const stockPagePromises = [];
+        for (let page = 2; page <= totalStockPages; page++) {
+          stockPagePromises.push(getAllNSEStocks(page, 500));
         }
+        const stockResults = await Promise.all(stockPagePromises);
+        stockResults.forEach(data => {
+          if (data?.stocks) {
+            allLoadedStocks = [...allLoadedStocks, ...data.stocks];
+          }
+        });
       }
       
-      // Fetch all analysis results to enrich stocks with analysis data
-      let allResults = [];
-      let resultsPage = 1;
-      let resultsHasMore = true;
+      // OPTIMIZED: Same parallel approach for analysis results
+      const firstResultsPage = await getAllAnalysisResults(1, 500);
+      const totalResultPages = firstResultsPage?.total_pages || 1;
       
-      while (resultsHasMore) {
-        try {
-          const resultsData = await getAllAnalysisResults(resultsPage, 200);
-          if (resultsData && resultsData.results) {
-            allResults = [...allResults, ...resultsData.results];
-            resultsPage++;
-            resultsHasMore = resultsPage <= resultsData.total_pages;
-          } else {
-            resultsHasMore = false;
-          }
-        } catch (error) {
-          console.error('Error fetching analysis results:', error);
-          resultsHasMore = false;
+      let allResults = [...(firstResultsPage?.results || [])];
+      if (totalResultPages > 1) {
+        const resultPagePromises = [];
+        for (let page = 2; page <= totalResultPages; page++) {
+          resultPagePromises.push(getAllAnalysisResults(page, 500));
         }
+        const resultsData = await Promise.all(resultPagePromises);
+        resultsData.forEach(data => {
+          if (data?.results) {
+            allResults = [...allResults, ...data.results];
+          }
+        });
       }
       
       // Create a map of symbol -> analysis result for quick lookup
@@ -148,19 +148,6 @@ function AllStocksAnalysis() {
           has_analysis: false
         };
       });
-      
-      // DEBUG: Log sample verdicts to inspect data type and values
-      if (stocksWithStatus.length > 0) {
-        console.log('🔍 VERDICT DATA INSPECTION:');
-        const sampleVerdicts = stocksWithStatus.slice(0, 10).map(s => ({
-          symbol: s.symbol,
-          verdict: s.verdict,
-          type: typeof s.verdict,
-          length: s.verdict ? s.verdict.length : 'N/A'
-        }));
-        console.table(sampleVerdicts);
-        console.log('VERDICT_PRIORITY keys:', Object.keys(VERDICT_PRIORITY));
-      }
       
       setStocks(stocksWithStatus);
       
