@@ -175,7 +175,7 @@ function Results() {
             >
               {history.map((item, index) => (
                 <option key={index} value={index}>
-                  {index === 0 ? 'Latest - ' : ''}{new Date(item.analyzed_at).toLocaleString('en-IN', {
+                  {index === 0 ? 'Latest - ' : ''}{new Date(item.created_at).toLocaleString('en-IN', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
@@ -190,7 +190,7 @@ function Results() {
             )}
             {selectedHistoryIndex > 0 && (
               <p className="text-xs text-gray-500 mt-1">
-                [Historical Analysis from {new Date(history[selectedHistoryIndex].analyzed_at).toLocaleDateString()}]
+                [Historical Analysis from {new Date(history[selectedHistoryIndex].created_at || history[selectedHistoryIndex].analyzed_at).toLocaleDateString()}]
               </p>
             )}
           </div>
@@ -343,9 +343,9 @@ function Results() {
           </button>
         </div>
 
-        {report.analyzed_at && (
+        {(report.analyzed_at || report.created_at) && (
           <div className="mt-6 text-sm text-gray-500">
-            Last analyzed: {new Date(report.analyzed_at).toLocaleString()}
+            Last analyzed: {new Date(report.analyzed_at || report.created_at).toLocaleString()}
           </div>
         )}
       </div>
