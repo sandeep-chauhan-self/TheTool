@@ -45,7 +45,7 @@ def _get_watchlist():
     """GET: Retrieve watchlist items"""
     try:
         items = query_db("""
-            SELECT id, ticker, name, created_at
+            SELECT id, symbol, name, created_at
             FROM watchlist
             ORDER BY created_at DESC
         """)
@@ -121,15 +121,15 @@ def _add_to_watchlist():
         
         logger.info(f"[WATCHLIST_ADD] Generated symbol: {symbol_with_exchange}")
         
-        # Check if already exists (search by ticker)
+        # Check if already exists (search by symbol)
         existing = query_db(
-            "SELECT id FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
+            "SELECT id FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
             (symbol_with_exchange,),
             one=True
         )
         
         if existing:
-            logger.warning(f"[WATCHLIST_ADD] Duplicate ticker: {symbol_with_exchange}")
+            logger.warning(f"[WATCHLIST_ADD] Duplicate symbol: {symbol_with_exchange}")
             return StandardizedErrorResponse.format(
                 "WATCHLIST_DUPLICATE",
                 f"Symbol {symbol_with_exchange} already in watchlist",
@@ -139,7 +139,7 @@ def _add_to_watchlist():
         # Insert new item
         item_id = execute_db(
             """
-            INSERT INTO watchlist (ticker, name)
+            INSERT INTO watchlist (symbol, name)
             VALUES (?, ?)
             """,
             (symbol_with_exchange, name)
@@ -185,7 +185,7 @@ def _remove_from_watchlist():
         # Build query
         if item_id:
             result = query_db(
-                "SELECT ticker FROM watchlist WHERE id = ?",
+                "SELECT symbol FROM watchlist WHERE id = ?",
                 (item_id,),
                 one=True
             )
@@ -198,23 +198,23 @@ def _remove_from_watchlist():
                 )
             # Handle both tuple (PostgreSQL) and dict (SQLite) return types
             if isinstance(result, (tuple, list)):
-                ticker_name = result[0]
+                symbol_name = result[0]
             else:
-                ticker_name = result['ticker']
+                symbol_name = result['symbol']
             
             execute_db("DELETE FROM watchlist WHERE id = ?", (item_id,))
-            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, ticker: {ticker_name}")
+            logger.info(f"[WATCHLIST_DELETE] Removed by ID - item_id: {item_id}, symbol: {symbol_name}")
         else:
-            ticker_name = symbol
+            symbol_name = symbol
             execute_db(
-                "DELETE FROM watchlist WHERE LOWER(ticker) = LOWER(?)",
+                "DELETE FROM watchlist WHERE LOWER(symbol) = LOWER(?)",
                 (symbol,)
             )
-            logger.info(f"[WATCHLIST_DELETE] Removed by ticker: {ticker_name}")
+            logger.info(f"[WATCHLIST_DELETE] Removed by symbol: {symbol_name}")
         
         return jsonify({
             "message": "Removed from watchlist",
-            "ticker": ticker_name
+            "symbol": symbol_name
         }), 200
         
     except Exception as e:
@@ -231,7 +231,7 @@ def _remove_from_watchlist():
 def debug_list_watchlist():
     """DEBUG ENDPOINT: List all watchlist items and database info"""
     try:
-        items = query_db("SELECT id, ticker, name, created_at FROM watchlist ORDER BY id DESC")
+        items = query_db("SELECT id, symbol, name, created_at FROM watchlist ORDER BY id DESC")
         
         items_list = []
         if items:
@@ -266,14 +266,14 @@ def debug_cleanup_watchlist():
         deleted = execute_db("""
             DELETE FROM watchlist 
             WHERE id NOT IN (
-                SELECT MIN(id) FROM watchlist GROUP BY LOWER(ticker)
+                SELECT MIN(id) FROM watchlist GROUP BY LOWER(symbol)
             )
         """)
         
         logger.info(f"[DEBUG] Cleaned up {deleted} duplicate entries")
         
         # Get remaining items
-        items = query_db("SELECT id, ticker, name, created_at FROM watchlist ORDER BY id DESC")
+        items = query_db("SELECT id, symbol, name, created_at FROM watchlist ORDER BY id DESC")
         items_list = []
         if items:
             for item in items:
