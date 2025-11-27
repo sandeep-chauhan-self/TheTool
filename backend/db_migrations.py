@@ -52,26 +52,28 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
     """Apply a single migration (PostgreSQL format with %s placeholders)"""
     cursor = conn.cursor()
     try:
-        logger.info(f"Applying migration v{version}: {description}")
-        
         # PostgreSQL: execute statements individually
         if migration_sql.strip():
             statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
-            for stmt in statements:
+            logger.info(f"  Executing {len(statements)} SQL statement(s)...")
+            for i, stmt in enumerate(statements, 1):
                 if stmt:
+                    logger.info(f"    [{i}/{len(statements)}] Running SQL...")
                     cursor.execute(stmt)
+            logger.info(f"  ✓ SQL complete")
         
         # Record migration using PostgreSQL format
+        logger.info(f"  Recording in db_version...")
         cursor.execute('''
             INSERT INTO db_version (version, description)
             VALUES (%s, %s)
         ''', (version, description))
         
         conn.commit()
-        logger.info(f"[OK] Migration v{version} applied successfully")
+        logger.info(f"  ✓ v{version} applied successfully")
         return True
     except Exception as e:
-        logger.error(f"✗ Migration v{version} failed: {e}")
+        logger.error(f"  ✗ v{version} failed: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -152,6 +154,7 @@ def migration_v2(conn):
     """
     cursor = conn.cursor()
     try:
+        logger.info("  Checking watchlist table columns...")
         # Check existing columns
         cursor.execute("""
             SELECT column_name 
@@ -159,37 +162,44 @@ def migration_v2(conn):
             WHERE table_name = 'watchlist'
         """)
         existing_cols = {row[0] for row in cursor.fetchall()}
-        logger.info(f"Existing watchlist columns: {existing_cols}")
+        logger.info(f"  Found {len(existing_cols)} columns")
         
         statements = []
+        to_add = []
         
         if 'notes' not in existing_cols:
             statements.append('ALTER TABLE watchlist ADD COLUMN notes TEXT;')
+            to_add.append('notes')
         
         if 'last_job_id' not in existing_cols:
             statements.append('ALTER TABLE watchlist ADD COLUMN last_job_id TEXT;')
+            to_add.append('last_job_id')
         
         if 'last_analyzed_at' not in existing_cols:
             statements.append('ALTER TABLE watchlist ADD COLUMN last_analyzed_at TIMESTAMP;')
+            to_add.append('last_analyzed_at')
         
         if 'last_status' not in existing_cols:
             statements.append('ALTER TABLE watchlist ADD COLUMN last_status TEXT;')
+            to_add.append('last_status')
         
         migration_sql = '\n'.join(statements)
         
         if not migration_sql.strip():
-            logger.info("Migration v2: No changes needed")
+            logger.info("  ✓ All columns already present")
             cursor.execute('''
                 INSERT INTO db_version (version, description)
                 VALUES (%s, %s)
             ''', (2, "Watchlist columns (already present)"))
             conn.commit()
+            logger.info("  ✓ v2 recorded (no-op)")
             return True
         
+        logger.info(f"  Need to add: {', '.join(to_add)}")
         return apply_migration(conn, 2, "Add watchlist columns", migration_sql)
     
     except Exception as e:
-        logger.error(f"✗ Migration v2 failed: {e}")
+        logger.error(f"  ✗ v2 failed: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -200,7 +210,7 @@ def migration_v3(conn):
     """
     cursor = conn.cursor()
     try:
-        logger.info("Running migration v3...")
+        logger.info("  Checking analysis_jobs table...")
         
         # Check for tickers_json column
         cursor.execute("""
@@ -209,37 +219,43 @@ def migration_v3(conn):
         """)
         
         if not cursor.fetchone():
+            logger.info("    Column missing, adding tickers_json...")
             cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
             logger.info("  ✓ Added tickers_json column")
+        else:
+            logger.info("  Column already exists")
         
         conn.commit()
         
         # Create indices
+        logger.info("  Creating indices...")
         try:
+            logger.info("    Creating idx_job_tickers...")
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_job_tickers
                 ON analysis_jobs(tickers_json, status)
             ''')
-            logger.info("  ✓ Created index on (tickers_json, status)")
+            logger.info("      ✓ Created")
         except Exception as e:
-            logger.debug(f"  Index may already exist: {e}")
+            logger.info(f"      (Already exists)")
         
         try:
+            logger.info("    Creating idx_analysis_ticker_date...")
             cursor.execute('''
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_ticker_date
                 ON analysis_results(ticker, CAST(created_at AS DATE))
             ''')
-            logger.info("  ✓ Created UNIQUE index on (ticker, date)")
+            logger.info("      ✓ Created")
         except Exception as e:
-            logger.debug(f"  Index may already exist: {e}")
+            logger.info(f"      (Already exists)")
         
         conn.commit()
         
-        logger.info("[OK] Migration v3 completed")
+        logger.info("  ✓ Indices complete")
         return apply_migration(conn, 3, "Job tracking columns and indices", "")
         
     except Exception as e:
-        logger.error(f"✗ Migration v3 failed: {e}")
+        logger.error(f"  ✗ v3 failed: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -261,27 +277,28 @@ def migration_v4(conn):
             ORDER BY ordinal_position
         """)
         columns = {row[0] for row in cursor.fetchall()}
-        logger.info(f"Current watchlist columns: {columns}")
+        logger.info(f"  Found {len(columns)} columns")
         
         # Check if we need to rename symbol -> ticker
         if 'symbol' in columns and 'ticker' not in columns:
-            logger.info("Renaming 'symbol' to 'ticker'...")
+            logger.info("  Renaming 'symbol' → 'ticker'...")
             cursor.execute("ALTER TABLE watchlist RENAME COLUMN symbol TO ticker")
             conn.commit()
-            logger.info("✓ Column renamed successfully")
+            logger.info("  ✓ Renamed")
+        elif 'ticker' in columns:
+            logger.info("  ✓ 'ticker' present")
         
         # Check if we need to drop duplicate symbol column
         if 'ticker' in columns and 'symbol' in columns:
-            logger.info("Dropping duplicate 'symbol' column...")
+            logger.info("  Dropping duplicate 'symbol'...")
             cursor.execute("ALTER TABLE watchlist DROP COLUMN symbol")
             conn.commit()
-            logger.info("✓ Duplicate column removed")
+            logger.info("  ✓ Removed")
         
-        logger.info("[OK] Migration v4 completed")
         return apply_migration(conn, 4, "Ensure watchlist.ticker exists", "")
         
     except Exception as e:
-        logger.error(f"✗ Migration v4 failed: {e}")
+        logger.error(f"  ✗ v4 failed: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -292,7 +309,7 @@ def migration_v5(conn):
     """
     cursor = conn.cursor()
     try:
-        logger.info("Running migration v5...")
+        logger.info("  Checking analysis_results table columns...")
         
         # Check existing columns
         cursor.execute("""
@@ -300,33 +317,40 @@ def migration_v5(conn):
             WHERE table_name='analysis_results'
         """)
         existing_cols = {row[0] for row in cursor.fetchall()}
+        logger.info(f"  Found {len(existing_cols)} columns")
         
         statements = []
+        to_add = []
         
         if 'job_id' not in existing_cols:
             statements.append('ALTER TABLE analysis_results ADD COLUMN job_id TEXT;')
+            to_add.append('job_id')
         
         if 'started_at' not in existing_cols:
             statements.append('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP;')
+            to_add.append('started_at')
         
         if 'completed_at' not in existing_cols:
             statements.append('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP;')
+            to_add.append('completed_at')
         
         migration_sql = '\n'.join(statements)
         
         if not migration_sql.strip():
-            logger.info("Migration v5: No changes needed")
+            logger.info("  ✓ All columns already present")
             cursor.execute('''
                 INSERT INTO db_version (version, description)
                 VALUES (%s, %s)
             ''', (5, "Analysis result tracking (already present)"))
             conn.commit()
+            logger.info("  ✓ v5 recorded (no-op)")
             return True
         
+        logger.info(f"  Adding {len(to_add)} columns: {', '.join(to_add)}")
         return apply_migration(conn, 5, "Add analysis result tracking columns", migration_sql)
     
     except Exception as e:
-        logger.error(f"✗ Migration v5 failed: {e}")
+        logger.error(f"  ✗ v5 failed: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -344,17 +368,19 @@ def run_migrations():
         logger.info("=" * 70)
         
         # Get database connection
+        logger.info("Connecting to PostgreSQL...")
         conn = get_migration_conn()
-        logger.info("✓ Connected to PostgreSQL database")
+        logger.info("✓ Connected")
         
         # Initialize version tracking
+        logger.info("Initializing version tracking...")
         init_version_table(conn)
         current_version = get_current_version(conn)
-        logger.info(f"Current schema version: {current_version}")
-        logger.info(f"Target schema version: {CURRENT_SCHEMA_VERSION}")
+        logger.info(f"Current schema version:  v{current_version}")
+        logger.info(f"Target schema version:   v{CURRENT_SCHEMA_VERSION}")
         
         if current_version >= CURRENT_SCHEMA_VERSION:
-            logger.info("✓ Database schema is up-to-date, no migrations needed")
+            logger.info("✓ Schema is current - no migrations needed")
             conn.close()
             return True
         
@@ -368,27 +394,41 @@ def run_migrations():
         ]
         
         pending_count = sum(1 for v, _ in migrations if v > current_version)
-        logger.info(f"\nApplying {pending_count} pending migrations...\n")
+        logger.info(f"")
+        logger.info(f"Pending migrations: {pending_count}")
+        if pending_count > 0:
+            logger.info(f"  v{current_version + 1} → v{CURRENT_SCHEMA_VERSION}")
+        logger.info(f"")
         
         for version, migration_func in migrations:
             if version <= current_version:
-                logger.debug(f"Skipping v{version} (already applied)")
+                logger.info(f"  [v{version}] Already applied")
                 continue
             
-            logger.info(f"\n--- Migration v{version} ---")
+            logger.info(f"")
+            logger.info(f"▶ Executing Migration v{version}...")
             success = migration_func(conn)
             
             if not success:
-                logger.error(f"✗ Migration v{version} FAILED - stopping")
+                logger.error(f"")
+                logger.error(f"✗ Migration v{version} FAILED - aborting")
+                logger.error(f"")
                 conn.close()
                 return False
         
         # Verify final version
+        logger.info(f"")
+        logger.info(f"Verifying final schema version...")
         final_version = get_current_version(conn)
         conn.close()
         
-        logger.info("\n" + "=" * 70)
-        logger.info(f"✓ MIGRATIONS COMPLETE - Final schema version: {final_version}")
+        logger.info(f"")
+        logger.info("=" * 70)
+        if final_version >= CURRENT_SCHEMA_VERSION:
+            logger.info(f"✓ MIGRATIONS COMPLETE")
+            logger.info(f"  Final schema version: v{final_version}")
+        else:
+            logger.error(f"⚠ INCOMPLETE: v{final_version} (expected v{CURRENT_SCHEMA_VERSION})")
         logger.info("=" * 70)
         
         return final_version >= CURRENT_SCHEMA_VERSION
