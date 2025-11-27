@@ -1,9 +1,46 @@
 import axios from 'axios';
 
-// Use environment variable for API base URL with fallback to development
-// Production: https://thetool-production.up.railway.app (set via REACT_APP_API_BASE_URL)
-// Development: http://localhost:5000 (default fallback)
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+/**
+ * API Base URL Selection Strategy:
+ * 
+ * Priority Order:
+ * 1. REACT_APP_API_BASE_URL - Explicit environment variable (production/staging builds)
+ * 2. REACT_APP_ENV - Switch between development/production backends
+ *    - "development" -> https://thetool-development.up.railway.app (debug Railway)
+ *    - "production" -> https://thetool-production.up.railway.app (live Railway)
+ * 3. localhost:5000 - Local development fallback
+ * 
+ * Environment Variables:
+ * - REACT_APP_ENV: "development" | "production" | "local"
+ * - REACT_APP_API_BASE_URL: Full backend URL override
+ * - REACT_APP_DEBUG: "true" | "false" - Enable verbose logging
+ */
+
+const getApiBaseUrl = () => {
+  // Explicit override takes precedence
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+
+  // Environment-based selection
+  const env = (process.env.REACT_APP_ENV || 'local').toLowerCase();
+  const backendUrls = {
+    development: 'https://thetool-development.up.railway.app',
+    production: 'https://thetool-production.up.railway.app',
+    local: 'http://localhost:5000',
+  };
+
+  const url = backendUrls[env] || backendUrls.local;
+  
+  // Log environment info in development
+  if (process.env.REACT_APP_DEBUG === 'true') {
+    console.log(`[API] Environment: ${env}, Backend: ${url}`);
+  }
+  
+  return url;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,

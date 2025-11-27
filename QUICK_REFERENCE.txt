@@ -1,0 +1,185 @@
+# QUICK REFERENCE - DUAL BACKEND SUPPORT
+
+## Environment Variables
+
+```bash
+# Frontend: Single variable controls backend
+REACT_APP_ENV=production          # → https://thetool-production.up.railway.app
+REACT_APP_ENV=development         # → https://thetool-development.up.railway.app
+REACT_APP_ENV=local               # → http://localhost:5000
+```
+
+## Switch Environments (PowerShell)
+
+```powershell
+.\switch-env.ps1 production     # Production Railway
+.\switch-env.ps1 development    # Development Railway
+.\switch-env.ps1 local          # Local backend
+```
+
+## Manual Backend Switching
+
+```bash
+# Edit frontend/.env
+REACT_APP_ENV=production        # Change this value
+
+# Restart frontend
+npm start
+```
+
+## Testing Both Simultaneously
+
+```bash
+# Terminal 1: Production
+.\switch-env.ps1 production
+npm start
+# http://localhost:3000 → Production Railway
+
+# Terminal 2: Development (different terminal)
+.\switch-env.ps1 development
+npm start --port 3001
+# http://localhost:3001 → Development Railway
+```
+
+## Backend URLs
+
+| Environment | URL | Use Case |
+|---|---|---|
+| **Production** | https://thetool-production.up.railway.app | Live users |
+| **Development** | https://thetool-development.up.railway.app | Feature testing |
+| **Local** | http://localhost:5000 | Local dev |
+
+## Configuration Files
+
+| File | Content | When |
+|---|---|---|
+| `.env` | `REACT_APP_ENV=production` | Default (Vercel deploy) |
+| `.env.development` | `REACT_APP_ENV=development` | npm start with dev Railway |
+| `.env.production` | `REACT_APP_ENV=production` | npm run build |
+| `.env.example` | Template | Reference only |
+
+## Health Checks
+
+```bash
+# Production
+curl https://thetool-production.up.railway.app/health
+
+# Development
+curl https://thetool-development.up.railway.app/health
+
+# Local
+curl http://localhost:5000/health
+```
+
+## Backend Logging
+
+```bash
+# Production Railway logs
+railway logs --service backend
+
+# Development Railway logs
+railway logs --service backend-dev
+```
+
+## Verify Active Backend (Browser)
+
+```javascript
+// F12 → Console
+console.log(process.env.REACT_APP_ENV)
+// Shows: production | development | local
+```
+
+## Frontend Network Tab
+
+Open browser Dev Tools (F12) → Network tab:
+- All requests show backend URL
+- https://thetool-production.up.railway.app/api/...
+- https://thetool-development.up.railway.app/api/...
+- http://localhost:5000/api/...
+
+## API Key
+
+Same for all backends:
+```
+REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+```
+
+## Local Backend Setup
+
+```bash
+# Terminal 1: Backend
+cd backend
+$env:APP_ENV='development'
+python -m flask run
+
+# Terminal 2: Frontend
+cd frontend
+# Edit .env: REACT_APP_ENV=local
+npm start
+```
+
+## Production Deployment
+
+```bash
+# Vercel uses frontend/.env
+# Default: REACT_APP_ENV=production
+npm run build
+vercel --prod
+```
+
+## CORS Allowed Origins
+
+**Production**: Only production URLs
+- https://the-tool-theta.vercel.app
+- https://thetool-production.up.railway.app
+
+**Development**: All URLs (for testing)
+- localhost:3000, localhost:5173
+- https://the-tool-theta.vercel.app
+- https://thetool-development.up.railway.app
+- https://thetool-production.up.railway.app
+
+## Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| CORS error | Verify `REACT_APP_ENV` is set correctly in .env |
+| Can't reach backend | Check health: `curl <backend>/health` |
+| Wrong backend used | Check browser console: `console.log(process.env.REACT_APP_ENV)` |
+| Need specific URL | Set `REACT_APP_API_BASE_URL=https://custom-url.com` |
+
+## Priority Order (Frontend URL Resolution)
+
+1. `REACT_APP_API_BASE_URL` (explicit override) ← Highest
+2. `REACT_APP_ENV` → URL mapping
+3. Default `http://localhost:5000` ← Lowest
+
+## Database Separation
+
+- **Production**: Separate PostgreSQL (live data)
+- **Development**: Separate PostgreSQL (test data)
+- **Local**: SQLite (development only)
+
+Each has independent data - this is expected.
+
+## One-Minute Setup
+
+```bash
+# 1. Choose environment
+REACT_APP_ENV=development    # or production, local
+
+# 2. Update frontend/.env
+echo "REACT_APP_ENV=development" > frontend/.env
+
+# 3. Run frontend
+npm start
+
+# 4. Done! Automatically connects to correct backend
+```
+
+## Documentation
+
+- **DUAL_BACKEND_SETUP_GUIDE.txt** - Full setup guide
+- **ENVIRONMENT_MIGRATION_GUIDE.txt** - Deployment workflow
+- **IMPLEMENTATION_SUMMARY.txt** - Technical details
+

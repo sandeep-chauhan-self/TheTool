@@ -303,7 +303,7 @@ def register_error_handlers(app):
     
     Note: Stack traces only logged in debug mode (APP_ENV=development)
     """
-    from . import config
+    import config
     
     @app.errorhandler(404)
     def handle_not_found(error):
