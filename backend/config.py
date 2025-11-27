@@ -26,6 +26,14 @@ class Config:
     """Central configuration class for the trading platform"""
     
     # =============================================================================
+    # ENVIRONMENT CONFIGURATION
+    # =============================================================================
+    
+    APP_ENV = os.getenv("APP_ENV", "production").lower()
+    DEBUG = APP_ENV == "development"
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG" if DEBUG else "INFO").upper()
+    
+    # =============================================================================
     # SECURITY CONFIGURATION
     # =============================================================================
     
@@ -68,8 +76,7 @@ class Config:
     # APPLICATION CONFIGURATION
     # =============================================================================
     
-    FLASK_ENV = os.getenv('FLASK_ENV', 'development')
-    DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
+    FLASK_ENV = os.getenv('FLASK_ENV', APP_ENV)  # Deprecated: use APP_ENV instead
     FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')
     FLASK_PORT = int(os.getenv('FLASK_PORT', '5000'))
     
@@ -122,7 +129,6 @@ class Config:
     # LOGGING CONFIGURATION
     # =============================================================================
     
-    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     LOG_FILE = os.getenv('LOG_FILE', './logs/trading_app.log')
     LOG_MAX_SIZE = int(os.getenv('LOG_MAX_SIZE', '10485760'))  # 10MB
     LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', '5'))
@@ -188,14 +194,19 @@ class Config:
         """
         messages = []
         
+        # Environment info
+        messages.append(f"Environment Mode: {self.APP_ENV.upper()}")
+        messages.append(f"Debug Mode: {self.DEBUG}")
+        messages.append(f"Log Level: {self.LOG_LEVEL}")
+        
         # Critical validations
         if not self.MASTER_API_KEY:
-            if self.FLASK_ENV == 'production':
+            if self.APP_ENV == 'production':
                 messages.append("ERROR: MASTER_API_KEY must be set in production!")
             else:
-                messages.append("WARNING: MASTER_API_KEY not set. API will generate a temporary key.")
+                messages.append("INFO: MASTER_API_KEY not set. API will generate a temporary key.")
         
-        if self.DEBUG and self.FLASK_ENV == 'production':
+        if self.DEBUG and self.APP_ENV == 'production':
             messages.append("ERROR: DEBUG mode enabled in production environment!")
         
         if self.MAX_THREADS > 50:
@@ -206,7 +217,7 @@ class Config:
         
         # Database validations
         # Validate that production environments must have DATABASE_URL configured (independent of DATABASE_TYPE derivation)
-        if self.FLASK_ENV in ('production', 'prod') and not self.DATABASE_URL:
+        if self.APP_ENV in ('production', 'prod') and not self.DATABASE_URL:
             messages.append("ERROR: DATABASE_URL must be configured in production environment!")
         
         # Redis validations
@@ -225,8 +236,9 @@ class Config:
         print("=" * 80)
         print("CONFIGURATION SUMMARY")
         print("=" * 80)
-        print(f"Environment: {self.FLASK_ENV}")
+        print(f"Environment: {self.APP_ENV.upper()}")
         print(f"Debug Mode: {self.DEBUG}")
+        print(f"Log Level: {self.LOG_LEVEL}")
         print(f"Database Type: {self.DATABASE_TYPE.upper()}")
         if self.DATABASE_TYPE == 'sqlite':
             print(f"  Path: {self.DB_PATH}")

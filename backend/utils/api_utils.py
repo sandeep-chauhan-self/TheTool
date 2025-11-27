@@ -300,7 +300,10 @@ def register_error_handlers(app):
     - 400: Bad request
     - 500: Internal server errors
     - Unhandled exceptions
+    
+    Note: Stack traces only logged in debug mode (APP_ENV=development)
     """
+    from . import config
     
     @app.errorhandler(404)
     def handle_not_found(error):
@@ -314,7 +317,11 @@ def register_error_handlers(app):
     
     @app.errorhandler(500)
     def handle_server_error(error):
-        logger.error(f"Unhandled server error: {error}", exc_info=True)
+        # Log with stack trace only in development mode
+        logger.error(
+            f"Unhandled server error: {error}",
+            exc_info=config.DEBUG  # Only include stack trace in debug mode
+        )
         response, status = StandardizedErrorResponse.server_error(
             "An unexpected error occurred"
         )
@@ -322,7 +329,11 @@ def register_error_handlers(app):
     
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
-        logger.error(f"Unexpected exception: {error}", exc_info=True)
+        # Log with stack trace only in development mode
+        logger.error(
+            f"Unexpected exception: {error}",
+            exc_info=config.DEBUG  # Only include stack trace in debug mode
+        )
         response, status = StandardizedErrorResponse.server_error(
             "An unexpected error occurred",
             {"error_type": type(error).__name__}

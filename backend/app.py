@@ -75,6 +75,12 @@ def create_app(config_object=None):
     # Setup logging (idempotent, setup_logger handles deduplication)
     logger = setup_logger()
     
+    # Display environment banner
+    logger.info("=" * 70)
+    logger.info(f"TheTool Starting - Environment: {config.APP_ENV.upper()} (debug={config.DEBUG})")
+    logger.info(f"Log Level: {config.LOG_LEVEL}")
+    logger.info("=" * 70)
+    
     # Determine active config for CORS and rate limiting
     active_config = config_object if isinstance(config_object, dict) else config
     
@@ -150,6 +156,25 @@ def create_app(config_object=None):
         # Log only in main/non-worker process
         if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
             logger.info("[OK] Database migrations completed")
+            
+            # Development diagnostics: show schema when in debug mode
+            if config.DEBUG:
+                try:
+                    from database import get_db_connection
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT table_name 
+                        FROM information_schema.tables 
+                        WHERE table_schema = 'public'
+                        ORDER BY table_name
+                    """)
+                    tables = [row[0] for row in cursor.fetchall()]
+                    cursor.close()
+                    conn.close()
+                    logger.debug(f"Database tables: {', '.join(tables)}")
+                except Exception as e:
+                    logger.debug(f"Could not introspect database schema: {e}")
     except Exception as e:
         logger.warning(f"Migration warning (may already be initialized): {e}")
     

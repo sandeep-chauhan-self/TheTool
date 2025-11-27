@@ -5,6 +5,8 @@ from logging.handlers import RotatingFileHandler
 
 def setup_logger():
     """Setup application logger with rotation (idempotent)"""
+    from config import config
+    
     log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
     os.makedirs(log_dir, exist_ok=True)
     
@@ -12,7 +14,7 @@ def setup_logger():
     
     # Create logger
     logger = logging.getLogger('trading_analyzer')
-    logger.setLevel(getattr(logging, os.getenv('LOG_LEVEL', 'INFO')))
+    logger.setLevel(getattr(logging, config.LOG_LEVEL))
     
     # Prevent duplicate handlers if logger already configured
     if logger.hasHandlers():
@@ -40,5 +42,9 @@ def setup_logger():
     # Add handlers
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
+    
+    # Display environment info on logger setup
+    if config.DEBUG:
+        logger.debug(f"Logger initialized - Environment: {config.APP_ENV}, Level: {config.LOG_LEVEL}")
     
     return logger

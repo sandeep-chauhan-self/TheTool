@@ -58,7 +58,10 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
             logger.info(f"  Executing {len(statements)} SQL statement(s)...")
             for i, stmt in enumerate(statements, 1):
                 if stmt:
-                    logger.info(f"    [{i}/{len(statements)}] Running SQL...")
+                    if config.DEBUG:
+                        logger.debug(f"    [{i}/{len(statements)}] SQL: {stmt[:100]}..." if len(stmt) > 100 else f"    [{i}/{len(statements)}] SQL: {stmt}")
+                    else:
+                        logger.info(f"    [{i}/{len(statements)}] Running SQL...")
                     cursor.execute(stmt)
             logger.info(f"  ✓ SQL complete")
         
@@ -73,7 +76,10 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
         logger.info(f"  ✓ v{version} applied successfully")
         return True
     except Exception as e:
-        logger.error(f"  ✗ v{version} failed: {e}", exc_info=True)
+        if config.DEBUG:
+            logger.error(f"  ✗ v{version} failed: {e}", exc_info=True)
+        else:
+            logger.error(f"  ✗ v{version} failed: {e}")
         conn.rollback()
         return False
 
