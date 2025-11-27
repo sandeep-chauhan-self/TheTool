@@ -271,10 +271,22 @@ def migration_v4(conn):
     Migration V4: Ensure watchlist.ticker is primary identifier
     
     PostgreSQL only - simply uses ALTER TABLE RENAME if needed.
+    SQLite: Skip (doesn't support information_schema)
     """
     cursor = conn.cursor()
     try:
         logger.info("Running migration v4: Ensure watchlist.ticker is primary key...")
+        
+        # Detect database type
+        db_type = 'postgres' if hasattr(conn, 'connection') or 'psycopg' in str(type(conn)) else 'sqlite'
+        
+        # Skip for SQLite (doesn't support information_schema)
+        if db_type == 'sqlite':
+            logger.info("  Skipping v4 for SQLite (not applicable)")
+            return apply_migration(conn, 4, "Ensure watchlist.ticker exists (SQLite skipped)", "")
+        
+        # PostgreSQL only
+        logger.info("  PostgreSQL migration: checking columns...")
         
         # Check current columns
         cursor.execute("""
