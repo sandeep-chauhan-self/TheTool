@@ -81,18 +81,52 @@ class Config:
     FLASK_PORT = int(os.getenv('FLASK_PORT', '5000'))
     
     # =============================================================================
-    # CORS CONFIGURATION
+    # CORS CONFIGURATION - Dual Environment Support
     # =============================================================================
+    # Production Railway: thetool-production.up.railway.app (live backend)
+    # Development Railway: thetool-development.up.railway.app (debug backend)
+    # Local: localhost:3000, localhost:5173
+    #
+    # Both backends accept requests from all frontends to support testing
+    # in different environments simultaneously
     
     @property
     def CORS_ORIGINS(self) -> List[str]:
         """
-        Get CORS allowed origins from centralized constants.
+        Get CORS allowed origins based on current environment.
         
-        Delegates to CORS_CONFIG from constants module for single source of truth.
-        This can be overridden with CORS_ORIGINS environment variable.
+        Supports:
+        - Multiple frontend URLs (Vercel production + local dev)
+        - Multiple backend URLs (production + development Railway)
+        - Simultaneous environment testing
+        
+        Can be overridden with CORS_ORIGINS environment variable.
         """
-        return CORS_CONFIG.get_allowed_origins()
+        env_override = os.getenv('CORS_ORIGINS')
+        if env_override:
+            return [o.strip() for o in env_override.split(',')]
+        
+        # Default configuration by backend environment
+        if self.APP_ENV == 'development':
+            # Development backend accepts from everywhere (for testing)
+            return [
+                # Local development
+                'http://localhost:3000',
+                'http://localhost:5173',
+                'http://127.0.0.1:3000',
+                'http://127.0.0.1:5173',
+                # Production frontend URLs
+                'https://the-tool-theta.vercel.app',
+                # Railway backends (both)
+                'https://thetool-development.up.railway.app',
+                'https://thetool-production.up.railway.app',
+            ]
+        else:
+            # Production backend - restrictive
+            return [
+                'https://the-tool-theta.vercel.app',
+                'https://thetool-production.up.railway.app',
+            ]
     
     # =============================================================================
     # THREADING CONFIGURATION

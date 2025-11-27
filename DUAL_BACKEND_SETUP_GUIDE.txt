@@ -1,0 +1,443 @@
+# DUAL-BACKEND ENVIRONMENT SETUP GUIDE
+
+## Overview
+
+TheTool now supports simultaneous connections to two independent Railway deployments:
+
+1. **Production Backend**: `https://thetool-production.up.railway.app` (live)
+2. **Development Backend**: `https://thetool-development.up.railway.app` (debug/testing)
+
+This allows you to:
+- Test new features on development without affecting production
+- Debug issues isolated to specific backends
+- Run A/B testing or feature flags
+- Maintain separate database environments
+
+---
+
+## Architecture
+
+```
+Frontend (Client Layer)
+  ├─ REACT_APP_ENV=production
+  │  └─→ https://thetool-production.up.railway.app (live)
+  │
+  ├─ REACT_APP_ENV=development  
+  │  └─→ https://thetool-development.up.railway.app (debug)
+  │
+  └─ REACT_APP_ENV=local
+     └─→ http://localhost:5000 (local development)
+
+Backend (Server Layer)
+  ├─ Production Railway
+  │  ├─ APP_ENV=production
+  │  ├─ LOG_LEVEL=INFO
+  │  ├─ CORS_ORIGINS=(restricted)
+  │  └─ DATABASE_URL=(production PostgreSQL)
+  │
+  └─ Development Railway
+     ├─ APP_ENV=development
+     ├─ LOG_LEVEL=DEBUG
+     ├─ CORS_ORIGINS=(permissive for testing)
+     └─ DATABASE_URL=(development PostgreSQL)
+```
+
+---
+
+## Frontend Configuration
+
+### Option 1: Production Backend (Default)
+
+**File**: `frontend/.env`
+
+```env
+REACT_APP_ENV=production
+REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+# Uses: https://thetool-production.up.railway.app
+```
+
+**When to use**:
+- Live deployment to Vercel
+- End-user testing
+- Production data analysis
+
+### Option 2: Development Backend
+
+**File**: `frontend/.env.development`
+
+```env
+REACT_APP_ENV=development
+REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+REACT_APP_DEBUG=true
+# Uses: https://thetool-development.up.railway.app
+```
+
+**When to use**:
+- Testing new features
+- Debugging backend behavior
+- Feature isolation
+- Local `npm start` with development backend
+
+### Option 3: Local Backend
+
+**File**: `frontend/.env` or `frontend/.env.local`
+
+```env
+REACT_APP_ENV=local
+REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+REACT_APP_DEBUG=true
+# Uses: http://localhost:5000
+```
+
+**When to use**:
+- Local development (backend running locally)
+- Fast iteration without network latency
+- Complete offline testing
+
+---
+
+## Backend Configuration
+
+### Production Backend
+
+**Railway Environment Variables**:
+
+```env
+APP_ENV=production
+LOG_LEVEL=INFO
+DEBUG=False
+DATABASE_URL=postgresql://...  # Production database
+FLASK_ENV=production
+CORS_ORIGINS=https://the-tool-theta.vercel.app,https://thetool-production.up.railway.app
+```
+
+**Characteristics**:
+- ✓ INFO+ level logging (no DEBUG)
+- ✓ Stack traces disabled
+- ✓ Restrictive CORS (production URLs only)
+- ✓ Optimized for performance
+- ✓ Live data (real stock analysis)
+
+### Development Backend
+
+**Railway Environment Variables**:
+
+```env
+APP_ENV=development
+LOG_LEVEL=DEBUG
+DEBUG=True
+DATABASE_URL=postgresql://...  # Development database (separate)
+FLASK_ENV=development
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173,https://the-tool-theta.vercel.app,https://thetool-development.up.railway.app,https://thetool-production.up.railway.app
+```
+
+**Characteristics**:
+- ✓ DEBUG level logging (all messages)
+- ✓ Stack traces enabled
+- ✓ Permissive CORS (all URLs for testing)
+- ✓ Verbose diagnostics
+- ✓ SQL execution logged
+- ✓ Database introspection on startup
+
+---
+
+## Quick Start Scenarios
+
+### Scenario 1: Local Development (Full Stack)
+
+**1. Backend**: Run locally
+
+```bash
+cd backend
+$env:APP_ENV='development'
+python -m flask run
+```
+
+**2. Frontend**: Switch to local backend
+
+```bash
+# Edit frontend/.env
+REACT_APP_ENV=local
+
+# Run frontend
+npm start
+# Opens http://localhost:3000 → http://localhost:5000
+```
+
+**Benefits**:
+- Fast iteration (no network latency)
+- Full debug visibility (SQL, stack traces, diagnostics)
+- Local database for testing
+
+---
+
+### Scenario 2: Frontend + Development Railway Backend
+
+**1. Backend**: Already running on Railway
+
+**2. Frontend**: Switch to development Railway
+
+```bash
+# Edit frontend/.env.development or .env
+REACT_APP_ENV=development
+
+# Run frontend
+npm start
+# Opens http://localhost:3000 → https://thetool-development.up.railway.app
+```
+
+**Benefits**:
+- Test with production-like infrastructure
+- Don't disrupt production users
+- Full debug logging from Railway
+- Isolated development database
+
+---
+
+### Scenario 3: Vercel Deployment (Production)
+
+**1. Backend**: Production Railway deployment
+
+**2. Frontend**: Vercel with production config
+
+```bash
+# frontend/.env (default)
+REACT_APP_ENV=production
+# Vercel build uses: https://thetool-production.up.railway.app
+```
+
+**Benefits**:
+- Live end-user deployment
+- Production data
+- Restrictive CORS (secure)
+- INFO+ logging only
+
+---
+
+### Scenario 4: Simultaneous Testing (Production + Development)
+
+**Two browser windows**:
+
+**Window 1**: Production data
+```
+URL: https://the-tool-theta.vercel.app
+Backend: https://thetool-production.up.railway.app
+Data: Real live stock data
+```
+
+**Window 2**: Development testing
+```
+URL: http://localhost:3000 (npm start with .env.development)
+Backend: https://thetool-development.up.railway.app
+Data: Test/isolated data
+```
+
+**Benefits**:
+- Test new features without affecting users
+- Compare results across environments
+- Debug issues in isolation
+- Verify data consistency
+
+---
+
+## Environment Variable Priority
+
+Frontend URL resolution:
+
+```
+1. REACT_APP_API_BASE_URL (explicit override)
+   ↓ (if set, use this)
+2. REACT_APP_ENV → Backend URL mapping
+   ├─ "development" → https://thetool-development.up.railway.app
+   ├─ "production" → https://thetool-production.up.railway.app
+   └─ "local" → http://localhost:5000
+   ↓ (if REACT_APP_ENV set, use mapped URL)
+3. Default fallback → http://localhost:5000
+```
+
+**Examples**:
+
+| Config | Result |
+|--------|--------|
+| `REACT_APP_API_BASE_URL=https://custom.example.com` | Uses custom URL |
+| `REACT_APP_ENV=development` | Uses https://thetool-development.up.railway.app |
+| `REACT_APP_ENV=production` | Uses https://thetool-production.up.railway.app |
+| `REACT_APP_ENV=local` | Uses http://localhost:5000 |
+| (none set) | Defaults to http://localhost:5000 |
+
+---
+
+## Debugging with Both Backends
+
+### Check Active Backend
+
+**Frontend Console** (F12 → Console):
+```javascript
+// If REACT_APP_DEBUG=true:
+[API] Environment: development, Backend: https://thetool-development.up.railway.app
+```
+
+### View Backend Logs
+
+**Production Backend** (Railway):
+```bash
+# View production logs
+railway logs --service backend
+```
+
+**Development Backend** (Railway):
+```bash
+# View development logs (debug level)
+railway logs --service backend-dev
+```
+
+### Test Backend Connectivity
+
+```bash
+# Test production backend
+curl -i https://thetool-production.up.railway.app/health
+
+# Test development backend
+curl -i https://thetool-development.up.railway.app/health
+
+# Test local backend
+curl -i http://localhost:5000/health
+```
+
+---
+
+## CORS Configuration Details
+
+### Frontend Requests Allowed From
+
+**Production Backend**:
+- ✓ `https://the-tool-theta.vercel.app` (production frontend)
+- ✓ `https://thetool-production.up.railway.app` (backend domain)
+- ✗ All other origins rejected
+
+**Development Backend**:
+- ✓ `http://localhost:3000` (local frontend)
+- ✓ `http://localhost:5173` (Vite dev server)
+- ✓ `https://the-tool-theta.vercel.app` (production frontend)
+- ✓ `https://thetool-development.up.railway.app` (backend domain)
+- ✓ `https://thetool-production.up.railway.app` (allow switching)
+
+**Local Backend** (in development):
+- ✓ All origins (if no CORS configured)
+
+---
+
+## Database Separation
+
+### Production Database
+- Separate PostgreSQL instance on Railway
+- Contains real stock analysis data
+- Used by: `https://thetool-production.up.railway.app`
+- Backup strategy: Daily automated backups
+
+### Development Database
+- Separate PostgreSQL instance on Railway
+- Contains test/development data
+- Used by: `https://thetool-development.up.railway.app`
+- Can be reset/wiped for testing
+
+### Local Database
+- SQLite (default: `./data/trading_app.db`)
+- Development-only
+- Can be reset with `rm backend/data/trading_app.db`
+
+---
+
+## Environment Switching Workflow
+
+### From Production to Development (and back)
+
+```bash
+# Switch frontend to development
+cd frontend
+echo "REACT_APP_ENV=development" >> .env
+npm start
+
+# Make changes, test on development backend
+# (https://thetool-development.up.railway.app)
+
+# When ready, switch back to production
+echo "REACT_APP_ENV=production" >> .env
+npm run build
+# Deploy to Vercel
+```
+
+### From Frontend + Backend (Local) to Railway
+
+```bash
+# 1. Stop local backend
+# 2. Update frontend
+echo "REACT_APP_ENV=development" > frontend/.env.development
+# 3. Run with development Railway
+npm start  # Uses .env.development → development backend
+```
+
+---
+
+## Troubleshooting
+
+### "CORS error" when connecting to development backend
+
+**Problem**: Browser blocks requests to `https://thetool-development.up.railway.app`
+
+**Solution**:
+1. Verify `REACT_APP_ENV=development` in frontend .env
+2. Check backend has development CORS origins configured
+3. Verify frontend actually sending requests to correct backend:
+   ```javascript
+   // In browser console:
+   console.log(process.env.REACT_APP_ENV);  // Should show "development"
+   ```
+
+### "Cannot reach backend" on production
+
+**Problem**: Frontend can't connect to `https://thetool-production.up.railway.app`
+
+**Solution**:
+1. Verify production backend is running: `https://thetool-production.up.railway.app/health`
+2. Check frontend using `REACT_APP_ENV=production`
+3. Verify API key is correct in frontend .env
+4. Check network tab (F12) to see actual requests
+
+### Database differences between environments
+
+**Problem**: Data doesn't match between production and development
+
+**Solution**:
+- Expected: Each backend has separate database
+- Production DB ≠ Development DB
+- Use specific queries to verify:
+  ```bash
+  # Production backend
+  curl https://thetool-production.up.railway.app/api/stocks/all-stocks
+  
+  # Development backend
+  curl https://thetool-development.up.railway.app/api/stocks/all-stocks
+  ```
+
+---
+
+## Summary Table
+
+| Scenario | Frontend Env | Backend URL | Database | Use Case |
+|----------|-------------|-------------|----------|----------|
+| Local Dev | `REACT_APP_ENV=local` | localhost:5000 | SQLite (local) | Fast iteration |
+| Frontend + Dev Railway | `REACT_APP_ENV=development` | thetool-dev.up.railway.app | PostgreSQL (dev) | Test features |
+| Vercel Production | `REACT_APP_ENV=production` | thetool-prod.up.railway.app | PostgreSQL (prod) | Live users |
+| Simultaneous Testing | Both configs | Both backends | Both databases | A/B testing |
+
+---
+
+## Next Steps
+
+1. **Update Vercel deployment**: No changes needed (uses production config)
+2. **Test development backend**: Switch to `REACT_APP_ENV=development` locally
+3. **Verify CORS**: Test requests from both frontend URLs
+4. **Monitor logs**: Watch both Railway backends during testing
+5. **Set up CI/CD**: Auto-deploy changes to correct backend
+

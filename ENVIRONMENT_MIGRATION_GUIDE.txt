@@ -1,0 +1,412 @@
+# ENVIRONMENT MIGRATION & DEPLOYMENT GUIDE
+
+## What Changed?
+
+### Frontend
+- **Old**: `REACT_APP_API_BASE_URL=https://thetool-production.up.railway.app/`
+- **New**: `REACT_APP_ENV=production` (dynamic URL selection)
+
+**Benefits**:
+- Single environment variable controls backend switching
+- No more hardcoded URLs
+- Easy to switch between backends locally
+- Backward compatible with explicit URL override
+
+### Backend
+- **New CORS Support**: Dynamic CORS based on `APP_ENV`
+- Production: Restrictive (production URLs only)
+- Development: Permissive (all URLs for testing)
+
+---
+
+## Current State
+
+### Frontend Environments
+
+| File | Content | Usage |
+|------|---------|-------|
+| `.env` | `REACT_APP_ENV=production` | Vercel deployment, production builds |
+| `.env.development` | `REACT_APP_ENV=development` | Local dev with dev Railway backend |
+| `.env.production` | `REACT_APP_ENV=production` | Production builds |
+
+### Backend Deployments
+
+| Railway | APP_ENV | LOG_LEVEL | CORS | Database |
+|---------|---------|-----------|------|----------|
+| Production | production | INFO | Restrictive | PostgreSQL (prod) |
+| Development | development | DEBUG | Permissive | PostgreSQL (dev) |
+
+---
+
+## How to Use
+
+### 1. Local Development (Backend Running Locally)
+
+```bash
+# Backend
+cd backend
+$env:APP_ENV='development'
+python -m flask run
+
+# Frontend (new terminal)
+cd frontend
+npm start
+# Automatically uses: http://localhost:5000
+```
+
+### 2. Local Frontend + Development Railway Backend
+
+```bash
+# Edit frontend/.env
+REACT_APP_ENV=development
+
+# Run frontend
+npm start
+# Connects to: https://thetool-development.up.railway.app
+```
+
+### 3. Production (Vercel Deployment)
+
+```bash
+# Frontend/.env already set to production
+# Vercel auto-build uses: frontend/.env
+npm run build
+# Connects to: https://thetool-production.up.railway.app
+```
+
+### 4. Quick Environment Switch (Windows PowerShell)
+
+```bash
+# Switch to development backend
+.\switch-env.ps1 development
+
+# Switch to production backend
+.\switch-env.ps1 production
+
+# Switch to local backend
+.\switch-env.ps1 local
+```
+
+---
+
+## Testing Both Backends Simultaneously
+
+### Browser Setup
+
+**Window 1: Production**
+```
+npm start
+# with frontend/.env: REACT_APP_ENV=production
+URL: http://localhost:3000
+Backend: https://thetool-production.up.railway.app
+```
+
+**Window 2: Development**
+```
+# different terminal
+npm start
+# with frontend/.env.development: REACT_APP_ENV=development
+URL: http://localhost:3001 (if configured) or another port
+Backend: https://thetool-development.up.railway.app
+```
+
+**Result**: 
+- Test production data in one window
+- Test development features in another
+- Compare side-by-side
+
+---
+
+## Deployment Workflow
+
+### Deploy to Vercel (Production)
+
+```bash
+# 1. Verify production config
+cat frontend/.env
+# Should have: REACT_APP_ENV=production
+
+# 2. Build locally to verify
+npm run build
+
+# 3. Deploy to Vercel
+# Option A: Push to main branch (auto-deploy if CI/CD set up)
+git add .
+git commit -m "Feature: dual backend support"
+git push origin main
+
+# Option B: Manual deploy
+vercel --prod
+```
+
+**Vercel Config** (in Vercel dashboard):
+```
+Environment Variables:
+  REACT_APP_ENV=production
+  REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+```
+
+### Development Backend Updates (Railway)
+
+```bash
+# Update development backend code
+git push origin develop  # or your dev branch
+
+# Railway auto-deploys from GitHub
+# Verify: curl https://thetool-development.up.railway.app/health
+```
+
+**Railway Development Config** (in Railway dashboard):
+```
+Environment Variables:
+  APP_ENV=development
+  LOG_LEVEL=DEBUG
+  DEBUG=True
+  DATABASE_URL=postgresql://...
+  FLASK_ENV=development
+```
+
+---
+
+## Environment Variables Reference
+
+### Frontend
+
+| Variable | Development | Production | Local |
+|----------|------------|-----------|-------|
+| `REACT_APP_ENV` | `development` | `production` | `local` |
+| `REACT_APP_API_KEY` | Same | Same | Same |
+| `REACT_APP_DEBUG` | `true` | `false` | `true` |
+| Resolves to | thetool-dev.up.railway.app | thetool-prod.up.railway.app | localhost:5000 |
+
+### Backend
+
+| Variable | Production | Development |
+|----------|-----------|------------|
+| `APP_ENV` | production | development |
+| `LOG_LEVEL` | INFO | DEBUG |
+| `DEBUG` | False | True |
+| `CORS_ORIGINS` | Restrictive | Permissive |
+| `DATABASE_URL` | prod PostgreSQL | dev PostgreSQL |
+
+---
+
+## Troubleshooting Deployments
+
+### Issue: Frontend can't reach backend after deployment
+
+**Diagnosis**:
+```bash
+# Check if backend is running
+curl https://thetool-production.up.railway.app/health
+# Should return: {"status": "ok"}
+
+# Check CORS policy in browser console (F12 → Console)
+# Look for: "Access-Control-Allow-Origin" errors
+```
+
+**Solution**:
+1. Verify `REACT_APP_ENV` is set correctly in Vercel
+2. Verify backend CORS includes Vercel domain:
+   ```
+   https://the-tool-theta.vercel.app
+   ```
+3. Check backend logs: `railway logs --service backend`
+
+### Issue: Development backend returns different results than production
+
+**Expected behavior**: Different databases, so different data
+
+**Verify**:
+```bash
+# Check production database
+curl https://thetool-production.up.railway.app/api/stocks/all-stocks | head -5
+
+# Check development database
+curl https://thetool-development.up.railway.app/api/stocks/all-stocks | head -5
+
+# Should be different if using separate PostgreSQL instances
+```
+
+**If they're the same**: Check backend `APP_ENV` setting on Railway
+
+### Issue: npm start fails with CORS error
+
+**Diagnosis**:
+```bash
+# Check what backend frontend is trying to reach
+echo $env:REACT_APP_ENV  # or npm run env
+
+# Check browser network tab (F12 → Network)
+# See what URL was actually requested
+```
+
+**Solution**:
+1. Verify `.env` has correct `REACT_APP_ENV`
+2. Verify backend CORS includes `http://localhost:3000`
+3. Restart frontend: `npm start`
+
+---
+
+## Reverting to Old Setup (If Needed)
+
+### Go Back to Single URL Setup
+
+**Frontend**:
+```env
+# Instead of:
+REACT_APP_ENV=production
+
+# Use:
+REACT_APP_API_BASE_URL=https://thetool-production.up.railway.app
+```
+
+**Backend**:
+```python
+# In config.py, revert CORS_ORIGINS property to use hardcoded list
+CORS_ORIGINS = [
+    'https://the-tool-theta.vercel.app',
+    'https://thetool-production.up.railway.app',
+]
+```
+
+---
+
+## Monitoring Both Backends
+
+### View Logs
+
+```bash
+# Production backend logs
+railway logs --service backend
+
+# Development backend logs
+railway logs --service backend-dev  # adjust service name
+
+# Local backend logs (stdout)
+# Terminal running: python -m flask run
+```
+
+### Health Checks
+
+```bash
+# Production
+curl -s https://thetool-production.up.railway.app/health | jq .
+
+# Development
+curl -s https://thetool-development.up.railway.app/health | jq .
+
+# Local
+curl -s http://localhost:5000/health | jq .
+```
+
+### Active Connections
+
+```bash
+# Which backend is frontend using?
+# Method 1: Check browser Network tab (F12)
+# Method 2: Check frontend console
+console.log(process.env.REACT_APP_ENV)
+
+# Method 3: Check actual API calls
+# All requests to development backend will show in Network tab as:
+# https://thetool-development.up.railway.app/api/...
+```
+
+---
+
+## Performance Considerations
+
+### Local Backend (Fastest)
+- No network latency
+- Best for rapid iteration
+- Recommended for feature development
+
+### Development Railway Backend (Medium)
+- Real production-like infrastructure
+- Isolated from production
+- Good for integration testing
+- ~100-500ms latency depending on network
+
+### Production Railway Backend (May vary)
+- Shared with real users
+- Don't use for load testing
+- Best for final verification only
+
+---
+
+## Security Considerations
+
+### Don't Commit API Keys
+
+```bash
+# Good (.gitignore):
+frontend/.env        # Never commit
+frontend/.env.local  # Never commit
+
+# OK to commit (.env.example):
+frontend/.env.example  # Template only, no secrets
+```
+
+### API Key Management
+
+Current setup uses same key for both backends:
+```
+REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+```
+
+**For production**, consider using different keys per environment:
+```
+# In Railway environment variables:
+Production:   MASTER_API_KEY=prod-key-1
+Development:  MASTER_API_KEY=dev-key-2
+```
+
+### CORS Best Practices
+
+**Current setup**:
+- Production: Restrictive (production URLs only) ✓
+- Development: Permissive (for testing) ✓
+
+This is secure because development backend data is isolated.
+
+---
+
+## Next Steps
+
+1. **Test local setup**: Switch to `REACT_APP_ENV=local`
+2. **Test development Railway**: Switch to `REACT_APP_ENV=development`
+3. **Verify production**: Keep default `REACT_APP_ENV=production`
+4. **Deploy to Vercel**: Follow deployment workflow above
+5. **Monitor both backends**: Set up dashboards for both Railway deployments
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Switch frontend to development
+.\switch-env.ps1 development
+
+# Switch frontend to production
+.\switch-env.ps1 production
+
+# Switch frontend to local
+.\switch-env.ps1 local
+
+# Verify frontend configuration
+cat frontend/.env
+
+# Build frontend
+npm run build
+
+# Deploy to Vercel
+vercel --prod
+
+# Check production backend
+curl https://thetool-production.up.railway.app/health
+
+# Check development backend
+curl https://thetool-development.up.railway.app/health
+```
+
