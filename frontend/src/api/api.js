@@ -17,7 +17,12 @@ import axios from 'axios';
  */
 
 const getApiBaseUrl = () => {
-  // Explicit override takes precedence
+  // Development Railway backend override
+  if (process.env.REACT_APP_DEV_API_BASE_URL) {
+    return process.env.REACT_APP_DEV_API_BASE_URL;
+  }
+
+  // Production Railway backend override
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
