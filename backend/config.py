@@ -117,6 +117,8 @@ class Config:
                 'http://127.0.0.1:5173',
                 # Production frontend URLs
                 'https://the-tool-theta.vercel.app',
+                # Vercel preview deployment (development)
+                'https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app',
                 # Railway backends (both)
                 'https://thetool-development.up.railway.app',
                 'https://thetool-production.up.railway.app',

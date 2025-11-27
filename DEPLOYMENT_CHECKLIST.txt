@@ -1,0 +1,258 @@
+═══════════════════════════════════════════════════════════════════════════════
+DEPLOYMENT CHECKLIST - DUAL ENVIRONMENT SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 1: GITHUB & GIT SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+□ Ensure two branches exist:
+  - main (for production releases)
+  - development (for staging/testing)
+
+□ Protect main branch:
+  - GitHub Settings → Branches → Add rule for "main"
+  - Require pull request reviews before merging
+  - Require status checks to pass
+  - Require branches to be up to date
+
+□ Configure branch naming (optional but recommended):
+  - Feature branches: feature/description
+  - Bug fixes: bugfix/description
+  - Hotfixes: hotfix/description
+
+□ Local git setup:
+  - git remote -v (verify origin points to sandeep-chauhan-self/TheTool)
+  - git branch -a (confirm main and development branches exist locally)
+  - git fetch origin (sync latest branches)
+
+
+PHASE 2: RAILWAY BACKEND SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+PRODUCTION SERVICE (thetool-production.up.railway.app):
+───────────────────────────────────────────────────────────────────────────────
+□ Create Railway service named: backend-prod
+□ Connect to GitHub: sandeep-chauhan-self/TheTool (main branch)
+□ Add PostgreSQL plugin (production database)
+□ Add Redis plugin (production cache)
+□ Add environment variables from RAILWAY_PROD_ENV_VARS.txt:
+  □ APP_ENV=production
+  □ LOG_LEVEL=INFO
+  □ DEBUG=False
+  □ CORS_ORIGINS="https://the-tool-theta.vercel.app,https://thetool-production.up.railway.app"
+  □ RATE_LIMIT_PER_MINUTE=90
+  □ CACHE_TTL=7200
+  □ All other prod-specific vars (see RAILWAY_PROD_ENV_VARS.txt)
+□ Redeploy service
+□ Verify logs show: "Environment: PRODUCTION (debug=False)" and "Log Level: INFO"
+□ Test health: curl https://thetool-production.up.railway.app/api/health
+
+
+DEVELOPMENT SERVICE (thetool-development.up.railway.app):
+───────────────────────────────────────────────────────────────────────────────
+□ Create Railway service named: backend-dev
+□ Connect to GitHub: sandeep-chauhan-self/TheTool (development branch)
+□ Add PostgreSQL plugin (separate development database)
+□ Add Redis plugin (separate development cache)
+□ Add environment variables from RAILWAY_DEV_ENV_VARS.txt:
+  □ APP_ENV=development
+  □ LOG_LEVEL=DEBUG
+  □ DEBUG=True
+  □ CORS_ORIGINS="https://the-tool-theta.vercel.app,https://thetool-development.up.railway.app,https://thetool-production.up.railway.app,https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app"
+  □ RATE_LIMIT_PER_MINUTE=120
+  □ CACHE_TTL=3600
+  □ All other dev-specific vars (see RAILWAY_DEV_ENV_VARS.txt)
+□ Redeploy service
+□ Verify logs show: "Environment: DEVELOPMENT (debug=True)" and "Log Level: DEBUG"
+□ Test health: curl https://thetool-development.up.railway.app/api/health
+
+
+PHASE 3: VERCEL FRONTEND SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+□ Connect GitHub repository to Vercel:
+  - New Project → Import Git Repository
+  - Select: sandeep-chauhan-self/TheTool
+  - Framework: React
+  - Root Directory: frontend/
+  - Build Command: npm run build
+  - Output Directory: build
+
+□ Set Production environment variables (for main branch):
+  □ REACT_APP_ENV=production
+  □ REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+  □ REACT_APP_DEBUG=false
+  □ Scope: Production
+
+□ Set Preview environment variables (for all other branches):
+  □ REACT_APP_ENV=development
+  □ REACT_APP_API_KEY=_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI
+  □ REACT_APP_DEBUG=true
+  □ Scope: Preview
+
+□ Configure deployment settings:
+  □ Production branch: main
+  □ Auto-deploy on push: enabled
+  □ Preview deployments: enabled for all branches
+
+□ Trigger initial deployment:
+  - Push to development branch
+  - Vercel should create preview deployment
+  - Verify deployment URL matches: https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app
+
+
+PHASE 4: BACKEND CODE VALIDATION
+═══════════════════════════════════════════════════════════════════════════════
+
+□ Verify CORS configuration in backend/config.py:
+  - Development should include Vercel preview URL
+  - Production should be restrictive
+  - Run: grep -n "the-tool-git-development" backend/config.py
+  - Should find the Vercel preview URL in CORS_ORIGINS
+
+□ Verify API layer in frontend/src/api/api.js:
+  - getApiBaseUrl() function exists
+  - Supports development, production, local environments
+  - Logs environment info when REACT_APP_DEBUG=true
+
+□ Test local development (sanity check):
+  - backend/.env: APP_ENV=development, LOG_LEVEL=DEBUG
+  - frontend/.env: REACT_APP_ENV=local, REACT_APP_DEBUG=true
+  - Terminal 1: cd backend && python -m flask run
+  - Terminal 2: cd frontend && npm start
+  - Verify requests go to http://localhost:5000
+  - Verify console logs show backend URL
+
+
+PHASE 5: INTEGRATION TESTING
+═══════════════════════════════════════════════════════════════════════════════
+
+PRODUCTION FLOW (main branch):
+───────────────────────────────────────────────────────────────────────────────
+□ Push a commit to main branch
+□ Wait for Railway backend-prod to redeploy
+□ Wait for Vercel production to deploy
+□ Open: https://the-tool-theta.vercel.app
+□ Browser console should show minimal logging (INFO level)
+□ Network tab should show requests to https://thetool-production.up.railway.app
+□ Test API: Run an analysis, verify results
+□ Check CORS: Production frontend can access prod backend only
+
+
+DEVELOPMENT FLOW (development branch):
+───────────────────────────────────────────────────────────────────────────────
+□ Push a commit to development branch
+□ Wait for Railway backend-dev to redeploy
+□ Wait for Vercel preview to deploy
+□ Open: https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app
+□ Browser console should show DEBUG logs
+□ Network tab should show requests to https://thetool-development.up.railway.app
+□ Test API: Run an analysis, verify results match prod
+□ Check backend logs: Railway dashboard should show DEBUG entries
+□ Check CORS: Dev frontend can access both dev and prod backends
+
+
+SIDE-BY-SIDE COMPARISON:
+───────────────────────────────────────────────────────────────────────────────
+□ Open two browser tabs:
+  - Tab 1: https://the-tool-theta.vercel.app (Production)
+  - Tab 2: https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app (Dev)
+
+□ Run same analysis in both tabs
+□ Compare results:
+  □ Both should produce same stock data (if databases are in sync)
+  □ Both should show same analysis results
+  □ Tab 1 should have minimal logging
+  □ Tab 2 should have verbose DEBUG logging
+
+□ Open DevTools Network tab in both:
+  □ Tab 1: Requests to https://thetool-production.up.railway.app
+  □ Tab 2: Requests to https://thetool-development.up.railway.app
+  □ Response times should be similar if both backends are healthy
+
+
+PHASE 6: MONITORING & MAINTENANCE
+═══════════════════════════════════════════════════════════════════════════════
+
+DAILY CHECKS:
+───────────────────────────────────────────────────────────────────────────────
+□ Production backend logs (Railway):
+  - Check for errors in https://thetool-production.up.railway.app
+  - Verify LOG_LEVEL=INFO (no DEBUG noise)
+  - Confirm API responses are healthy
+
+□ Development backend logs (Railway):
+  - Check for errors in https://thetool-development.up.railway.app
+  - Verify LOG_LEVEL=DEBUG
+  - Confirm API responses match production
+
+□ Vercel deployments:
+  - Check build status: both production and preview should be healthy
+  - Verify no failed deployments
+
+□ Database health:
+  - Verify both PostgreSQL instances are running
+  - Check disk usage on both
+  - Confirm Redis is operational
+
+
+ERROR TROUBLESHOOTING:
+───────────────────────────────────────────────────────────────────────────────
+□ CORS errors:
+  - Check Railway environment: CORS_ORIGINS variable
+  - Verify frontend URL is in CORS whitelist
+  - For dev: should include the Vercel preview URL
+  - Restart service after updating CORS
+
+□ Backend deployment failures:
+  - Check Railway logs for import errors
+  - Verify DATABASE_URL and REDIS_URL are set
+  - Check Python dependencies in requirements.txt
+  - Redeploy service
+
+□ Frontend deployment failures:
+  - Check Vercel build logs
+  - Verify npm packages are compatible
+  - Check for missing environment variables
+  - Trigger manual redeploy from Vercel dashboard
+
+□ API requests timing out:
+  - Check Railway resource usage (CPU, memory)
+  - Check database query performance
+  - Review RATE_LIMIT_PER_MINUTE settings
+  - Consider increasing MAX_WORKERS in Railway
+
+
+PHASE 7: DOCUMENTATION & HANDOFF
+═══════════════════════════════════════════════════════════════════════════════
+
+□ Update team documentation:
+  - Add deployment guide to README.md
+  - Document environment variable meanings
+  - Create runbook for common issues
+  - Add architecture diagram
+
+□ Create deployment notes:
+  - Record Railway service names and URLs
+  - Document Postgres/Redis instance details
+  - List all custom environment variables
+  - Store secret backups securely (not in git)
+
+□ Set up alerts (optional but recommended):
+  - Railway: Error rate alerts
+  - Vercel: Build failure notifications
+  - Email alerts for deployment failures
+
+
+═══════════════════════════════════════════════════════════════════════════════
+DEPLOYMENT COMPLETE ✓
+═══════════════════════════════════════════════════════════════════════════════
+
+Once all phases are complete:
+✓ Production environment stable and monitored
+✓ Development environment for safe testing
+✓ Frontend automatically selects correct backend
+✓ CORS properly configured for both environments
+✓ Can test both simultaneously in split-screen
+✓ Safe to add new features on development branch
+✓ Ready for continuous deployment workflow
