@@ -324,27 +324,37 @@ def analyze_all_stocks():
         
         # Handle empty array: means "analyze ALL stocks"
         if len(symbols) == 0:
-            logger.info("Empty symbols array received - analyzing ALL stocks")
+            logger.info("Empty symbols array received - analyzing ALL stocks from NSE list")
             try:
-                # Get all stocks from database
-                all_stocks = query_db("""
-                    SELECT DISTINCT ticker FROM analysis_results
-                    UNION
-                    SELECT DISTINCT ticker FROM watchlist
-                    ORDER BY ticker
-                """)
+                # Get all stocks from NSE CSV (not just from database)
+                csv_path = _data_root() / "nse_stocks_complete.csv"
+                
+                if not csv_path.exists():
+                    return StandardizedErrorResponse.format(
+                        "NO_STOCKS_FOUND",
+                        "NSE stock list not available. Please ensure nse_stocks_complete.csv exists.",
+                        400
+                    )
+                
+                all_stocks = []
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '').strip()
+                        if symbol:
+                            all_stocks.append(symbol)
                 
                 if not all_stocks:
                     return StandardizedErrorResponse.format(
                         "NO_STOCKS_FOUND",
-                        "No stocks found to analyze. Add stocks to watchlist first.",
+                        "No stocks found in NSE list.",
                         400
                     )
                 
-                symbols = [stock[0] for stock in all_stocks]
-                logger.info(f"Found {len(symbols)} stocks to analyze: {symbols[:10]}...")
+                symbols = all_stocks
+                logger.info(f"Found {len(symbols)} stocks to analyze from NSE list")
             except Exception as e:
-                logger.error(f"Failed to get all stocks: {e}")
+                logger.error(f"Failed to get all stocks from NSE list: {e}")
                 return StandardizedErrorResponse.format(
                     "STOCK_LOOKUP_ERROR",
                     "Failed to retrieve stocks for analysis",
