@@ -330,7 +330,7 @@ def analyze_all_stocks():
                 all_stocks = query_db("""
                     SELECT DISTINCT ticker FROM analysis_results
                     UNION
-                    SELECT DISTINCT symbol AS ticker FROM watchlist
+                    SELECT DISTINCT ticker FROM watchlist
                     ORDER BY ticker
                 """)
                 
