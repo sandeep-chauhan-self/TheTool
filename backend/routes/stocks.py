@@ -340,9 +340,10 @@ def analyze_all_stocks():
                 with open(csv_path, "r", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        symbol = row.get('symbol', '').strip()
-                        if symbol:
-                            all_stocks.append(symbol)
+                        # Use yahoo_symbol (with .NS suffix) instead of bare symbol
+                        yahoo_symbol = row.get('yahoo_symbol', '').strip()
+                        if yahoo_symbol:
+                            all_stocks.append(yahoo_symbol)
                 
                 if not all_stocks:
                     return StandardizedErrorResponse.format(
