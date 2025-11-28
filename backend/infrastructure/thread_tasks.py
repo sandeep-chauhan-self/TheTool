@@ -278,8 +278,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             from database import _convert_query_params, DATABASE_TYPE
             query = '''
                 UPDATE analysis_jobs 
-                SET status = %s, completed_at = %s, errors = %s
-                WHERE job_id = %s
+                SET status = ?, completed_at = ?, errors = ?
+                WHERE job_id = ?
             '''
             query, params = _convert_query_params(query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id), DATABASE_TYPE)
             cursor.execute(query, params)
@@ -305,10 +305,10 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                 from database import _convert_query_params, DATABASE_TYPE
                 query = '''
                     UPDATE analysis_jobs 
-                    SET status = 'failed', completed_at = %s, errors = %s
-                    WHERE job_id = %s
+                    SET status = ?, completed_at = ?, errors = ?
+                    WHERE job_id = ?
                 '''
-                query, params = _convert_query_params(query, (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id), DATABASE_TYPE)
+                query, params = _convert_query_params(query, ('failed', datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id), DATABASE_TYPE)
                 cursor.execute(query, params)
             
             # Update job state
