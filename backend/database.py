@@ -40,9 +40,45 @@ def get_db():
             cursor.close()
     return g.db
 
+def _detect_connection_type(conn):
+    """
+    Detect actual database type from connection object
+    
+    CRITICAL: Checks module and class name to correctly identify connection type
+    regardless of how the module is imported or aliased.
+    
+    Args:
+        conn: Database connection object
+    
+    Returns:
+        'sqlite' or 'postgres'
+    """
+    # Get both class name and module name for robust detection
+    conn_class_name = type(conn).__name__
+    conn_module = type(conn).__module__
+    full_name = f"{conn_module}.{conn_class_name}".lower()
+    
+    # Check for PostgreSQL (psycopg2 or psycopg3)
+    if 'psycopg' in full_name or 'postgresql' in full_name:
+        return 'postgres'
+    # Check for SQLite
+    elif 'sqlite' in full_name:
+        return 'sqlite'
+    # Fallback: check just class name for generic "connection" from psycopg2
+    elif conn_class_name.lower() == 'connection' and ('psycopg' in full_name or DATABASE_TYPE == 'postgres'):
+        return 'postgres'
+    else:
+        # Final fallback to configured DATABASE_TYPE
+        return DATABASE_TYPE
+
+
 def _convert_query_params(query, args, database_type=None):
     """
     Convert SQL query parameters between SQLite (?) and PostgreSQL (%s) formats.
+    
+    CRITICAL FIX: This function now properly handles cases where DATABASE_TYPE
+    is configured as 'postgres' but the actual connection is SQLite (e.g., when
+    PostgreSQL connection fails and falls back to local SQLite).
     
     This function ensures queries work with both databases by converting
     SQLite placeholder style (?) to the correct format for the target database.

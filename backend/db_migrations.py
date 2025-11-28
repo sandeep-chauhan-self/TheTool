@@ -49,9 +49,18 @@ def get_current_version(conn):
 
 
 def apply_migration(conn, version: int, description: str, migration_sql: str):
-    """Apply a single migration (PostgreSQL format with %s placeholders)"""
+    """
+    Apply a single migration.
+    
+    CRITICAL FIX: Now detects actual connection type (SQLite vs PostgreSQL)
+    and uses correct placeholder style (%s for PostgreSQL, ? for SQLite).
+    """
     cursor = conn.cursor()
     try:
+        # Detect actual database type from connection
+        conn_type = type(conn).__name__.lower()
+        is_sqlite = 'sqlite' in conn_type or conn_type == 'connection'
+        
         # PostgreSQL: execute statements individually
         if migration_sql.strip():
             statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
@@ -65,12 +74,20 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
                     cursor.execute(stmt)
             logger.info(f"  ✓ SQL complete")
         
-        # Record migration using PostgreSQL format
+        # Record migration using correct placeholder style for actual database
         logger.info(f"  Recording in db_version...")
-        cursor.execute('''
-            INSERT INTO db_version (version, description)
-            VALUES (%s, %s)
-        ''', (version, description))
+        if is_sqlite:
+            # SQLite uses ?
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (?, ?)
+            ''', (version, description))
+        else:
+            # PostgreSQL uses %s
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (%s, %s)
+            ''', (version, description))
         
         conn.commit()
         logger.info(f"  ✓ v{version} applied successfully")
@@ -271,19 +288,10 @@ def migration_v4(conn):
     Migration V4: Ensure watchlist.ticker is primary identifier
     
     PostgreSQL only - simply uses ALTER TABLE RENAME if needed.
-    SQLite: Skip (doesn't support information_schema)
     """
     cursor = conn.cursor()
     try:
         logger.info("Running migration v4: Ensure watchlist.ticker is primary key...")
-        
-        # Detect database type
-        db_type = 'postgres' if hasattr(conn, 'connection') or 'psycopg' in str(type(conn)) else 'sqlite'
-        
-        # Skip for SQLite (doesn't support information_schema)
-        if db_type == 'sqlite':
-            logger.info("  Skipping v4 for SQLite (not applicable)")
-            return apply_migration(conn, 4, "Ensure watchlist.ticker exists (SQLite skipped)", "")
         
         # PostgreSQL only
         logger.info("  PostgreSQL migration: checking columns...")
@@ -323,49 +331,83 @@ def migration_v4(conn):
 
 def migration_v5(conn):
     """
-    Migration V5: Add analysis result tracking columns
+    Migration V5: Add analysis result tracking columns (job_id, started_at, completed_at)
+    Works for both SQLite and PostgreSQL
     """
     cursor = conn.cursor()
     try:
-        logger.info("  Checking analysis_results table columns...")
+        logger.info("  Adding analysis result tracking columns...")
         
-        # Check existing columns
-        cursor.execute("""
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name='analysis_results'
-        """)
-        existing_cols = {row[0] for row in cursor.fetchall()}
-        logger.info(f"  Found {len(existing_cols)} columns")
+        # Detect database type
+        conn_type = type(conn).__name__.lower()
+        is_sqlite = 'sqlite' in conn_type or conn_type == 'connection'
         
-        statements = []
-        to_add = []
-        
-        if 'job_id' not in existing_cols:
-            statements.append('ALTER TABLE analysis_results ADD COLUMN job_id TEXT;')
-            to_add.append('job_id')
-        
-        if 'started_at' not in existing_cols:
-            statements.append('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP;')
-            to_add.append('started_at')
-        
-        if 'completed_at' not in existing_cols:
-            statements.append('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP;')
-            to_add.append('completed_at')
-        
-        migration_sql = '\n'.join(statements)
-        
-        if not migration_sql.strip():
-            logger.info("  ✓ All columns already present")
-            cursor.execute('''
-                INSERT INTO db_version (version, description)
-                VALUES (%s, %s)
-            ''', (5, "Analysis result tracking (already present)"))
+        if is_sqlite:
+            # SQLite: Try to add columns one by one (silently skip if already exist)
+            logger.info("    Adding columns for SQLite...")
+            columns_to_add = {
+                'job_id': 'TEXT',
+                'started_at': 'TIMESTAMP',
+                'completed_at': 'TIMESTAMP'
+            }
+            
+            for col_name, col_type in columns_to_add.items():
+                try:
+                    cursor.execute(f'ALTER TABLE analysis_results ADD COLUMN {col_name} {col_type}')
+                    logger.info(f"      ✓ Added {col_name} column")
+                except:
+                    logger.info(f"      (Column {col_name} likely already exists)")
+            
             conn.commit()
-            logger.info("  ✓ v5 recorded (no-op)")
-            return True
+            logger.info("  ✓ SQLite migration complete")
+            return apply_migration(conn, 5, "Add analysis result tracking columns", "")
         
-        logger.info(f"  Adding {len(to_add)} columns: {', '.join(to_add)}")
-        return apply_migration(conn, 5, "Add analysis result tracking columns", migration_sql)
+        else:
+            # PostgreSQL: Use information_schema
+            logger.info("    Checking existing columns (PostgreSQL)...")
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name='analysis_results'
+            """)
+            existing_cols = {row[0] for row in cursor.fetchall()}
+            logger.info(f"    Found {len(existing_cols)} columns")
+            
+            statements = []
+            to_add = []
+            
+            if 'job_id' not in existing_cols:
+                statements.append('ALTER TABLE analysis_results ADD COLUMN job_id TEXT;')
+                to_add.append('job_id')
+            
+            if 'started_at' not in existing_cols:
+                statements.append('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP;')
+                to_add.append('started_at')
+            
+            if 'completed_at' not in existing_cols:
+                statements.append('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP;')
+                to_add.append('completed_at')
+            
+            migration_sql = '\n'.join(statements)
+            
+            if not migration_sql.strip():
+                logger.info("    ✓ All columns already present")
+                # Use correct placeholder for actual database type
+                if is_sqlite:
+                    cursor.execute('''
+                        INSERT INTO db_version (version, description)
+                        VALUES (?, ?)
+                    ''', (5, "Analysis result tracking (already present)"))
+                else:
+                    cursor.execute('''
+                        INSERT INTO db_version (version, description)
+                        VALUES (%s, %s)
+                    ''', (5, "Analysis result tracking (already present)"))
+                conn.commit()
+                logger.info("    ✓ v5 recorded (no-op)")
+                return True
+            
+            logger.info(f"    Adding {len(to_add)} columns: {', '.join(to_add)}")
+            return apply_migration(conn, 5, "Add analysis result tracking columns", migration_sql)
     
     except Exception as e:
         logger.error(f"  ✗ v5 failed: {e}", exc_info=True)
