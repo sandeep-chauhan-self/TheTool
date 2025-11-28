@@ -100,8 +100,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     from database import _convert_query_params, DATABASE_TYPE
                     query = '''
                         UPDATE analysis_jobs 
-                        SET status = 'processing', started_at = %s
-                        WHERE job_id = %s
+                        SET status = 'processing', started_at = ?
+                        WHERE job_id = ?
                     '''
                     query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
                     cursor.execute(query, params)
@@ -143,8 +143,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     from database import _convert_query_params, DATABASE_TYPE
                     query = '''
                         UPDATE analysis_jobs 
-                        SET status = 'cancelled', completed_at = %s
-                        WHERE job_id = %s
+                        SET status = 'cancelled', completed_at = ?
+                        WHERE job_id = ?
                     '''
                     query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
                     cursor.execute(query, params)
@@ -178,7 +178,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 '''
                                 query, params = _convert_query_params(query, (
                                     ticker,
@@ -243,8 +243,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         from database import _convert_query_params, DATABASE_TYPE
                         query = '''
                             UPDATE analysis_jobs 
-                            SET progress = %s, completed = %s, successful = %s, errors = %s
-                            WHERE job_id = %s
+                            SET progress = ?, completed = ?, successful = ?, errors = ?
+                            WHERE job_id = ?
                         '''
                         query, params = _convert_query_params(query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id), DATABASE_TYPE)
                         cursor.execute(query, params)
@@ -424,7 +424,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
                      entry_method, data_source, is_demo_data, raw_data, status, 
                      created_at, updated_at, analysis_source)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     yahoo_symbol,  # ticker = yahoo_symbol
@@ -467,7 +467,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, status, error_message, 
                      created_at, updated_at, analysis_source)
-                    VALUES (%s, %s, %s, %s, 0.0, 'Pending', 'failed', %s, %s, %s, 'bulk')
+                    VALUES (?, ?, ?, ?, 0.0, 'Pending', 'failed', ?, ?, ?, 'bulk')
                 '''
                 query, params = _convert_query_params(query, (
                     yahoo_symbol,
