@@ -467,10 +467,10 @@ def download_report(ticker):
                 400
             )
         
-        # Get latest analysis
+        # Get latest analysis with raw_data (contains indicators)
         result = query_db(
             """
-            SELECT verdict, score, entry, stop_loss, target, created_at
+            SELECT verdict, score, entry, stop_loss, target, raw_data, created_at
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -489,25 +489,38 @@ def download_report(ticker):
         
         # Handle both tuple (PostgreSQL) and dict (SQLite) return types
         if isinstance(result, (tuple, list)):
+            raw_data_str = result[5]
             analysis_data = {
+                "ticker": ticker,
                 "verdict": result[0],
                 "score": result[1],
                 "entry": result[2],
-                "stop_loss": result[3],
-                "target": result[4]
+                "stop": result[3],  # export_to_excel expects 'stop' not 'stop_loss'
+                "target": result[4],
+                "indicators": []
             }
         else:
+            raw_data_str = result['raw_data']
             analysis_data = {
+                "ticker": ticker,
                 "verdict": result['verdict'],
                 "score": result['score'],
                 "entry": result['entry'],
-                "stop_loss": result['stop_loss'],
-                "target": result['target']
+                "stop": result['stop_loss'],  # export_to_excel expects 'stop' not 'stop_loss'
+                "target": result['target'],
+                "indicators": []
             }
         
-        # Export to Excel
+        # Parse indicators from raw_data JSON
+        if raw_data_str:
+            try:
+                analysis_data["indicators"] = json.loads(raw_data_str)
+            except (json.JSONDecodeError, TypeError):
+                analysis_data["indicators"] = []
+        
+        # Export to Excel - pass the full result dict (not ticker separately)
         analyze_ticker, export_to_excel = get_analyze_ticker()
-        excel_file = export_to_excel(ticker, analysis_data)
+        excel_file = export_to_excel(analysis_data)
         
         if not excel_file or not excel_file.exists():
             return StandardizedErrorResponse.format(
@@ -519,7 +532,7 @@ def download_report(ticker):
         return send_file(
             excel_file,
             as_attachment=True,
-            download_name=f"{ticker}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            download_name=f"{ticker}_analysis_{get_ist_timestamp()[:19].replace(':', '-')}.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         

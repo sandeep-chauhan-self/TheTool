@@ -1,17 +1,32 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
 import Header from '../components/Header';
 
 function Results() {
   const { ticker } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [history, setHistory] = useState([]);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
+
+  // Determine the back URL - use referrer from state or fallback to checking URL pattern
+  const getBackUrl = () => {
+    // If we came from a specific page, use that
+    if (location.state?.from) {
+      return location.state.from;
+    }
+    // Check if referrer suggests all-stocks page
+    if (document.referrer.includes('/all-stocks')) {
+      return '/all-stocks';
+    }
+    // Default to dashboard
+    return '/';
+  };
 
   useEffect(() => {
     loadReport();
@@ -82,19 +97,26 @@ function Results() {
   };
 
   const handleReanalyze = async () => {
+    if (reanalyzing) return; // Prevent double-clicks
+    
     try {
       setReanalyzing(true);
-      await analyzeStocks([ticker]);
+      console.log('Starting re-analysis for:', ticker);
       
-      // Wait a bit and reload
-      setTimeout(() => {
-        loadReport();
+      const result = await analyzeStocks([ticker]);
+      console.log('Re-analysis started:', result);
+      
+      // Wait for analysis to complete and reload
+      setTimeout(async () => {
+        await loadReport();
+        await loadHistory();
         setReanalyzing(false);
-      }, 3000);
+      }, 5000); // Wait 5 seconds for analysis to complete
+      
     } catch (error) {
-      setReanalyzing(false);
       console.error('Failed to reanalyze:', error);
-      alert('Failed to reanalyze');
+      alert('Failed to start re-analysis: ' + (error.message || 'Unknown error'));
+      setReanalyzing(false);
     }
   };
 
@@ -147,10 +169,10 @@ function Results() {
             {error}
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            &lt; Back to Dashboard
+            &lt; Back
           </button>
         </div>
       </div>
@@ -330,13 +352,17 @@ function Results() {
           </button>
           <button
             onClick={handleReanalyze}
-            disabled={reanalyzing}
-            className="px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+            disabled={reanalyzing || loading}
+            className={`px-6 py-3 text-white rounded ${
+              reanalyzing || loading
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
             {reanalyzing ? 'Reanalyzing...' : 'Re-Analyze'}
           </button>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700"
           >
             &lt; Back
