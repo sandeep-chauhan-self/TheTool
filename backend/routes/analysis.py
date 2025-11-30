@@ -13,6 +13,7 @@ from utils.api_utils import (
     validate_request,
     RequestValidator
 )
+from utils.timezone_util import get_ist_timestamp
 from database import query_db, execute_db, get_db_connection
 from models.job_state import get_job_state_manager
 from utils.db_utils import JobStateTransactions, get_job_status
@@ -29,11 +30,12 @@ def _get_active_job_for_tickers(tickers: list) -> dict:
     Tickers are normalized (sorted, uppercased) for reliable matching.
     """
     try:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
+        from utils.timezone_util import get_ist_now
         
         # Normalize tickers for comparison: sort and uppercase
         normalized_tickers = json.dumps(sorted([t.upper().strip() for t in tickers]))
-        five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        five_min_ago = (get_ist_now() - timedelta(minutes=5)).isoformat()
         
         # Look for exact same tickers in queued/processing jobs from last 5 minutes
         active_job = query_db("""

@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from database import get_db_connection, get_db_session, close_thread_connection, _convert_query_params, DATABASE_TYPE
 from utils.compute_score import analyze_ticker
+from utils.timezone_util import get_ist_timestamp
 from models.job_state import get_job_state_manager
 
 logger = logging.getLogger('thread_tasks')
@@ -103,7 +104,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         SET status = 'processing', started_at = ?
                         WHERE job_id = ?
                     '''
-                    query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
+                    query, params = _convert_query_params(query, (get_ist_timestamp(), job_id), DATABASE_TYPE)
                     cursor.execute(query, params)
                 status_updated = True
                 logger.info(f"✓ Job {job_id} status updated to 'processing'")
@@ -130,7 +131,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             'completed': 0,
             'successful': 0,
             'cancelled': False,
-            'started_at': datetime.now().isoformat()
+            'started_at': get_ist_timestamp()
         })
         
         # Process each stock
@@ -146,7 +147,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         SET status = 'cancelled', completed_at = ?
                         WHERE job_id = ?
                     '''
-                    query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
+                    query, params = _convert_query_params(query, (get_ist_timestamp(), job_id), DATABASE_TYPE)
                     cursor.execute(query, params)
                 job_state.update_job(job_id, {'status': 'cancelled'})
                 break
@@ -195,8 +196,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     convert_numpy_types(result.get('is_demo_data', 0)),
                                     raw_data,
                                     'completed',
-                                    datetime.now().isoformat(),
-                                    datetime.now().isoformat(),
+                                    get_ist_timestamp(),
+                                    get_ist_timestamp(),
                                     'watchlist'  # Mark as watchlist analysis
                                 ), DATABASE_TYPE)
                                 cursor.execute(query, params)

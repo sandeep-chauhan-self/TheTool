@@ -18,6 +18,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 from database import get_db, execute_query, _raise_critical_error
+from utils.timezone_util import get_ist_timestamp, get_ist_now
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class APIKeyManager:
             metadata = {
                 'name': name,
                 'permissions': permissions,
-                'created_at': datetime.now().isoformat(),
+                'created_at': get_ist_timestamp(),
                 'key_hash': key_hash
             }
             
@@ -204,7 +205,7 @@ class APIKeyManager:
             
             # Update last_used_at timestamp
             update_query = "UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?"
-            execute_query(update_query, (datetime.now().isoformat(), key_hash))
+            execute_query(update_query, (get_ist_timestamp(), key_hash))
             
             # Return metadata
             return {
@@ -245,7 +246,7 @@ class APIKeyManager:
             
             # Update revoked_at timestamp
             update_query = "UPDATE api_keys SET revoked_at = ? WHERE key_hash = ?"
-            execute_query(update_query, (datetime.now().isoformat(), key_hash))
+            execute_query(update_query, (get_ist_timestamp(), key_hash))
             
             # Audit log
             APIKeyManager._audit_log(

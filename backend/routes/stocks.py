@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 from utils.logger import setup_logger
 from utils.api_utils import StandardizedErrorResponse, validate_request, RequestValidator
+from utils.timezone_util import get_ist_timestamp
 from database import query_db, execute_db, get_db_connection
 from utils.db_utils import JobStateTransactions, get_job_status
 
@@ -249,8 +250,9 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
         requested_json = json.dumps(normalized_symbols)
         
         # Get active jobs from last 5 minutes
-        from datetime import datetime, timedelta
-        five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        from datetime import timedelta
+        from utils.timezone_util import get_ist_now
+        five_min_ago = (get_ist_now() - timedelta(minutes=5)).isoformat()
         
         active_jobs = query_db("""
             SELECT job_id, status, total, completed, created_at, tickers_json
@@ -490,7 +492,9 @@ def get_all_stocks_progress():
         """)
         
         # Calculate cutoff time for completed jobs (last 1 hour)
-        cutoff_time = (datetime.now() - timedelta(hours=1)).isoformat()
+        from datetime import timedelta
+        from utils.timezone_util import get_ist_now
+        cutoff_time = (get_ist_now() - timedelta(hours=1)).isoformat()
         
         # Also check for recently completed jobs (last 1 hour) - for continuity
         if config.DATABASE_TYPE == 'postgres':
