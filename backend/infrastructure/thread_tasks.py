@@ -51,9 +51,8 @@ def convert_numpy_types(value):
         return bool(value)
     elif isinstance(value, np.ndarray):
         return value.tolist()
-    # Convert 0/1 to False/True for boolean columns
-    elif isinstance(value, int) and value in (0, 1):
-        return bool(value)
+    # Don't convert regular Python int 0/1 to bool - causes issues with numeric columns
+    # Boolean conversion should be explicit in the calling code
     return value
 
 
@@ -204,17 +203,17 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     symbol,
                                     None,  # name not available from watchlist analysis
                                     ticker,  # yahoo_symbol same as ticker
-                                    convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
+                                    float(convert_numpy_types(result.get('score', 0)) or 0),  # Ensure float
                                     result.get('verdict', 'Neutral'),
-                                    convert_numpy_types(result.get('entry')),
-                                    convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
-                                    convert_numpy_types(result.get('target')),
-                                    convert_numpy_types(result.get('position_size', 0)),  # Position size from risk calc
-                                    convert_numpy_types(result.get('risk_reward_ratio', 0)),  # R:R ratio
+                                    float(convert_numpy_types(result.get('entry')) or 0),
+                                    float(convert_numpy_types(result.get('stop')) or 0),  # Note: key is 'stop' not 'stop_loss'
+                                    float(convert_numpy_types(result.get('target')) or 0),
+                                    int(convert_numpy_types(result.get('position_size', 0)) or 0),  # Position size as int
+                                    float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),  # R:R ratio as float
                                     config_json,  # Store config used for this analysis
                                     result.get('entry_method', 'Market Order'),
                                     result.get('data_source', 'real'),
-                                    convert_numpy_types(result.get('is_demo_data', 0)),
+                                    bool(result.get('is_demo_data', False)),  # Explicit boolean
                                     raw_data,
                                     'completed',
                                     get_ist_timestamp(),
@@ -462,17 +461,17 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     symbol,        # symbol without suffix
                     name,          # company name
                     yahoo_symbol,  # yahoo_symbol with suffix
-                    convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
+                    float(convert_numpy_types(result.get('score', 0)) or 0),  # Ensure float
                     result.get('verdict', 'Neutral'),
-                    convert_numpy_types(result.get('entry')),
-                    convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
-                    convert_numpy_types(result.get('target')),
-                    convert_numpy_types(result.get('position_size', 0)),  # Position size
-                    convert_numpy_types(result.get('risk_reward_ratio', 0)),  # R:R ratio
+                    float(convert_numpy_types(result.get('entry')) or 0),
+                    float(convert_numpy_types(result.get('stop')) or 0),  # Note: key is 'stop' not 'stop_loss'
+                    float(convert_numpy_types(result.get('target')) or 0),
+                    int(convert_numpy_types(result.get('position_size', 0)) or 0),  # Position size as int
+                    float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),  # R:R ratio as float
                     None,  # No config for bulk analysis (uses defaults)
                     result.get('entry_method', 'Market Order'),
                     result.get('data_source', 'real'),
-                    convert_numpy_types(use_demo),
+                    bool(use_demo),  # Explicit boolean
                     raw_data,
                     'completed',
                     datetime.now().isoformat(),
