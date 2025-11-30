@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
 import Header from '../components/Header';
 
