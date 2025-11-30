@@ -522,7 +522,9 @@ def download_report(ticker):
         analyze_ticker, export_to_excel = get_analyze_ticker()
         excel_file = export_to_excel(analysis_data)
         
-        if not excel_file or not excel_file.exists():
+        # excel_file is a string path, check if file exists
+        import os
+        if not excel_file or not os.path.exists(excel_file):
             return StandardizedErrorResponse.format(
                 "EXPORT_FAILED",
                 "Failed to generate Excel report",
