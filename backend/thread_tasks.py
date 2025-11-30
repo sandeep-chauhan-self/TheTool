@@ -8,10 +8,9 @@ import logging
 import time
 import json
 import numpy as np
-import sqlite3
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from database import get_db_connection, _convert_query_params, DATABASE_TYPE
+from database import get_db_connection, _convert_query_params
 from utils.compute_score import analyze_ticker
 
 logger = logging.getLogger('thread_tasks')
@@ -53,11 +52,11 @@ def _safe_execute(cursor, query, args, conn):
     """
     Safely execute a query with correct placeholder style for PostgreSQL.
     
-    For PostgreSQL: converts ? placeholders to %s
+    Converts ? placeholders to %s for PostgreSQL.
     
     Args:
         cursor: Database cursor from the connection
-        query: SQL query with ? placeholders (SQLite/standardstyle)
+        query: SQL query with ? placeholders
         args: Query arguments tuple
         conn: Database connection object (for compatibility)
     
@@ -65,8 +64,8 @@ def _safe_execute(cursor, query, args, conn):
         None (raises exception on error)
     """
     # PostgreSQL always needs %s placeholders
-    from database import _convert_query_params, DATABASE_TYPE
-    converted_query, converted_args = _convert_query_params(query, args, DATABASE_TYPE)
+    from database import _convert_query_params
+    converted_query, converted_args = _convert_query_params(query, args)
     
     # Execute with converted parameters
     cursor.execute(converted_query, converted_args)

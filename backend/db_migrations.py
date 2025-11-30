@@ -52,15 +52,10 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
     """
     Apply a single migration.
     
-    CRITICAL FIX: Now detects actual connection type (SQLite vs PostgreSQL)
-    and uses correct placeholder style (%s for PostgreSQL, ? for SQLite).
+    Uses PostgreSQL-only (%s placeholders).
     """
     cursor = conn.cursor()
     try:
-        # Detect actual database type from connection
-        conn_type = type(conn).__name__.lower()
-        is_sqlite = 'sqlite' in conn_type or conn_type == 'connection'
-        
         # PostgreSQL: execute statements individually
         if migration_sql.strip():
             statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
@@ -74,20 +69,12 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
                     cursor.execute(stmt)
             logger.info(f"  ✓ SQL complete")
         
-        # Record migration using correct placeholder style for actual database
+        # Record migration using PostgreSQL placeholder style
         logger.info(f"  Recording in db_version...")
-        if is_sqlite:
-            # SQLite uses ?
-            cursor.execute('''
-                INSERT INTO db_version (version, description)
-                VALUES (?, ?)
-            ''', (version, description))
-        else:
-            # PostgreSQL uses %s
-            cursor.execute('''
-                INSERT INTO db_version (version, description)
-                VALUES (%s, %s)
-            ''', (version, description))
+        cursor.execute('''
+            INSERT INTO db_version (version, description)
+            VALUES (%s, %s)
+        ''', (version, description))
         
         conn.commit()
         logger.info(f"  ✓ v{version} applied successfully")
@@ -332,82 +319,50 @@ def migration_v4(conn):
 def migration_v5(conn):
     """
     Migration V5: Add analysis result tracking columns (job_id, started_at, completed_at)
-    Works for both SQLite and PostgreSQL
+    PostgreSQL only.
     """
     cursor = conn.cursor()
     try:
         logger.info("  Adding analysis result tracking columns...")
         
-        # Detect database type
-        conn_type = type(conn).__name__.lower()
-        is_sqlite = 'sqlite' in conn_type or conn_type == 'connection'
+        # PostgreSQL: Use information_schema
+        logger.info("    Checking existing columns (PostgreSQL)...")
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name='analysis_results'
+        """)
+        existing_cols = {row[0] for row in cursor.fetchall()}
+        logger.info(f"    Found {len(existing_cols)} columns")
         
-        if is_sqlite:
-            # SQLite: Try to add columns one by one (silently skip if already exist)
-            logger.info("    Adding columns for SQLite...")
-            columns_to_add = {
-                'job_id': 'TEXT',
-                'started_at': 'TIMESTAMP',
-                'completed_at': 'TIMESTAMP'
-            }
-            
-            for col_name, col_type in columns_to_add.items():
-                try:
-                    cursor.execute(f'ALTER TABLE analysis_results ADD COLUMN {col_name} {col_type}')
-                    logger.info(f"      ✓ Added {col_name} column")
-                except:
-                    logger.info(f"      (Column {col_name} likely already exists)")
-            
+        statements = []
+        to_add = []
+        
+        if 'job_id' not in existing_cols:
+            statements.append('ALTER TABLE analysis_results ADD COLUMN job_id TEXT;')
+            to_add.append('job_id')
+        
+        if 'started_at' not in existing_cols:
+            statements.append('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP;')
+            to_add.append('started_at')
+        
+        if 'completed_at' not in existing_cols:
+            statements.append('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP;')
+            to_add.append('completed_at')
+        
+        migration_sql = '\n'.join(statements)
+        
+        if not migration_sql.strip():
+            logger.info("    ✓ All columns already present")
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (%s, %s)
+            ''', (5, "Analysis result tracking (already present)"))
             conn.commit()
-            logger.info("  ✓ SQLite migration complete")
-            return apply_migration(conn, 5, "Add analysis result tracking columns", "")
+            logger.info("    ✓ v5 recorded (no-op)")
+            return True
         
-        else:
-            # PostgreSQL: Use information_schema
-            logger.info("    Checking existing columns (PostgreSQL)...")
-            cursor.execute("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name='analysis_results'
-            """)
-            existing_cols = {row[0] for row in cursor.fetchall()}
-            logger.info(f"    Found {len(existing_cols)} columns")
-            
-            statements = []
-            to_add = []
-            
-            if 'job_id' not in existing_cols:
-                statements.append('ALTER TABLE analysis_results ADD COLUMN job_id TEXT;')
-                to_add.append('job_id')
-            
-            if 'started_at' not in existing_cols:
-                statements.append('ALTER TABLE analysis_results ADD COLUMN started_at TIMESTAMP;')
-                to_add.append('started_at')
-            
-            if 'completed_at' not in existing_cols:
-                statements.append('ALTER TABLE analysis_results ADD COLUMN completed_at TIMESTAMP;')
-                to_add.append('completed_at')
-            
-            migration_sql = '\n'.join(statements)
-            
-            if not migration_sql.strip():
-                logger.info("    ✓ All columns already present")
-                # Use correct placeholder for actual database type
-                if is_sqlite:
-                    cursor.execute('''
-                        INSERT INTO db_version (version, description)
-                        VALUES (?, ?)
-                    ''', (5, "Analysis result tracking (already present)"))
-                else:
-                    cursor.execute('''
-                        INSERT INTO db_version (version, description)
-                        VALUES (%s, %s)
-                    ''', (5, "Analysis result tracking (already present)"))
-                conn.commit()
-                logger.info("    ✓ v5 recorded (no-op)")
-                return True
-            
-            logger.info(f"    Adding {len(to_add)} columns: {', '.join(to_add)}")
-            return apply_migration(conn, 5, "Add analysis result tracking columns", migration_sql)
+        logger.info(f"    Adding {len(to_add)} columns: {', '.join(to_add)}")
+        return apply_migration(conn, 5, "Add analysis result tracking columns", migration_sql)
     
     except Exception as e:
         logger.error(f"  ✗ v5 failed: {e}", exc_info=True)
@@ -425,56 +380,37 @@ def migration_v6(conn):
     2. Enabling duplicate job detection
     3. Supporting bulk analysis request deduplication
     
-    Works for PostgreSQL (SQLite handled by direct schema updates)
+    PostgreSQL only.
     """
     cursor = conn.cursor()
     try:
         logger.info("  [CRITICAL FIX] Ensuring tickers_json column in analysis_jobs...")
         
-        # Detect database type
-        conn_type = type(conn).__name__.lower()
-        is_sqlite = 'sqlite' in conn_type or conn_type == 'connection'
+        # PostgreSQL: Use information_schema
+        logger.info("    PostgreSQL environment - checking column...")
         
-        if is_sqlite:
-            logger.info("    SQLite environment detected")
-            try:
-                cursor.execute('PRAGMA table_info(analysis_jobs)')
-                columns = {row[1] for row in cursor.fetchall()}
-                
-                if 'tickers_json' not in columns:
-                    logger.info("    Column missing - adding tickers_json...")
-                    cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
-                    conn.commit()
-                    logger.info("      ✓ Added tickers_json column")
-                else:
-                    logger.info("      ✓ Column already exists")
-                
-                return apply_migration(conn, 6, "CRITICAL FIX: Add tickers_json column", "")
-            except Exception as e:
-                logger.error(f"    SQLite fix failed: {e}")
-                raise
+        # Check if column exists
+        cursor.execute("""
+            SELECT EXISTS(
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='analysis_jobs' AND column_name='tickers_json'
+            )
+        """)
         
+        if not cursor.fetchone()[0]:
+            logger.info("    Column missing - adding tickers_json...")
+            cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+            conn.commit()
+            logger.info("      ✓ Added tickers_json column")
         else:
-            # PostgreSQL
-            logger.info("    PostgreSQL environment detected")
-            
-            # Check if column exists
-            cursor.execute("""
-                SELECT EXISTS(
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name='analysis_jobs' AND column_name='tickers_json'
-                )
-            """)
-            
-            if not cursor.fetchone()[0]:
-                logger.info("    Column missing - adding tickers_json...")
-                cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
-                conn.commit()
-                logger.info("      ✓ Added tickers_json column")
-            else:
-                logger.info("      ✓ Column already exists")
-            
-            return apply_migration(conn, 6, "CRITICAL FIX: Add tickers_json column", "")
+            logger.info("      ✓ Column already exists")
+        
+        return apply_migration(conn, 6, "CRITICAL FIX: Add tickers_json column", "")
+        
+    except Exception as e:
+        logger.error(f"  ✗ v6 failed: {e}", exc_info=True)
+        conn.rollback()
+        return False
         
     except Exception as e:
         logger.error(f"  ✗ v6 failed: {e}", exc_info=True)
