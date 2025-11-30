@@ -371,8 +371,9 @@ class TradeCalculator:
                 stop_loss = entry_price * (1 + stop_pct)
                 target = entry_price * (1 - target_pct)
             else:
+                # HOLD: Still calculate proper stop/target for reference
                 stop_loss = entry_price * (1 - stop_pct)
-                target = entry_price * (1 + stop_pct)
+                target = entry_price * (1 + target_pct)  # Use target_pct with R:R ratio
             
             # Determine signal
             if score >= 0.2:
@@ -382,18 +383,12 @@ class TradeCalculator:
             else:
                 signal = "HOLD"
             
-            # Calculate risk/reward
-            if signal == "BUY":
-                risk = entry_price - stop_loss
-                reward = target - entry_price
-            elif signal == "SELL":
-                risk = stop_loss - entry_price
-                reward = entry_price - target
-            else:
-                risk = 0
-                reward = 0
+            # Calculate risk/reward based on prices
+            risk = abs(entry_price - stop_loss)
+            reward = abs(target - entry_price)
             
-            risk_reward_ratio = (reward / risk) if risk > 0 else 0
+            # Use the actual calculated R:R ratio (should match min_rr_ratio if properly calculated)
+            calculated_rr_ratio = (reward / risk) if risk > 0 else min_rr_ratio
             
             # Use RiskManager for position sizing if capital provided
             position_size = 0
@@ -428,7 +423,7 @@ class TradeCalculator:
                 'stop': stop_loss,
                 'target': target,
                 'signal': signal,
-                'risk_reward_ratio': risk_reward_ratio,
+                'risk_reward_ratio': calculated_rr_ratio,
                 'position_size': position_size,
                 'risk_valid': risk_valid,
                 'risk_message': risk_message
