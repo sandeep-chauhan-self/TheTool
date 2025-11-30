@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
-import { getTradingViewUrl, extractBaseSymbol } from '../utils/tradingViewUtils';
+import { extractBaseSymbol, getTradingViewUrl } from '../utils/tradingViewUtils';
 
 function Results() {
   const { ticker } = useParams();
