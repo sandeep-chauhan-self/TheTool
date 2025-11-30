@@ -65,7 +65,7 @@ job_threads: Dict[str, threading.Thread] = {}
 job_state = get_job_state_manager()
 
 
-def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indicators: Optional[List[str]] = None, use_demo_data: bool = True):
+def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indicators: Optional[List[str]] = None, use_demo_data: bool = True, analysis_config: Optional[Dict[str, Any]] = None):
     """
     Background task to analyze multiple stocks.
     Runs in separate thread with thread-safe database connections.
@@ -80,15 +80,23 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         capital: Trading capital amount
         indicators: Optional list of specific indicators to use
         use_demo_data: Whether to use demo data for testing
+        analysis_config: Optional dict with additional config (risk_percent, position_size_limit, etc.)
     """
+    # Merge config with defaults
+    config = analysis_config or {}
+    effective_capital = config.get('capital', capital) or capital
+    effective_demo = config.get('use_demo_data', use_demo_data)
+    
     try:
         logger.info("=" * 60)
         logger.info(f"THREAD TASK STARTED - Job ID: {job_id}")
         logger.info(f"Total stocks to analyze: {len(tickers)}")
         logger.info(f"Tickers: {tickers}")
-        logger.info(f"Capital: {capital}")
+        logger.info(f"Capital: {effective_capital}")
         logger.info(f"Indicators: {indicators if indicators else 'default'}")
-        logger.info(f"Demo mode: {use_demo_data}")
+        logger.info(f"Demo mode: {effective_demo}")
+        if config:
+            logger.info(f"Additional config: risk_percent={config.get('risk_percent')}, position_limit={config.get('position_size_limit')}, rr_ratio={config.get('risk_reward_ratio')}")
         logger.info("=" * 60)
         
         # ✅ FIX #11: Add retry logic for status update with exponential backoff
@@ -155,8 +163,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             try:
                 logger.info(f"START analyzing {ticker} ({idx}/{total})")
                 
-                # Analyze the stock
-                result = analyze_ticker(ticker, indicator_list=indicators, capital=capital, use_demo_data=use_demo_data)
+                # Analyze the stock with config
+                result = analyze_ticker(
+                    ticker, 
+                    indicator_list=indicators, 
+                    capital=effective_capital, 
+                    use_demo_data=effective_demo,
+                    analysis_config=config
+                )
                 
                 if result:
                     # Store analysis result using thread-safe connection
@@ -330,7 +344,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             del job_threads[job_id]
 
 
-def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[List[str]], capital: float, use_demo: bool) -> bool:
+def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[List[str]], capital: float, use_demo: bool, analysis_config: Optional[Dict[str, Any]] = None) -> bool:
     """
     Start a new analysis job in background thread
     Returns True if started successfully
@@ -338,11 +352,19 @@ def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[Lis
     CRITICAL: On Railway (and cloud platforms), we MUST use daemon=False
     to ensure threads actually run. Daemon threads are killed immediately
     on serverless/containerized platforms.
+    
+    Args:
+        job_id: Unique job identifier
+        tickers: List of stock ticker symbols
+        indicators: Optional list of specific indicators to use
+        capital: Trading capital amount
+        use_demo: Whether to use demo data
+        analysis_config: Optional dict with additional config (risk_percent, position_size_limit, etc.)
     """
     try:
         thread = threading.Thread(
             target=analyze_stocks_batch,
-            args=(job_id, tickers, capital, indicators, use_demo),
+            args=(job_id, tickers, capital, indicators, use_demo, analysis_config),
             daemon=False,  # CRITICAL: Must be False on Railway for threads to execute
             name=f"AnalysisJob-{job_id[:8]}"
         )

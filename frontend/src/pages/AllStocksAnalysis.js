@@ -2,6 +2,7 @@ import _ from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeAllStocks, getAllAnalysisResults, getAllNSEStocks, getAllStocksProgress } from '../api/api';
+import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 
@@ -24,6 +25,8 @@ function AllStocksAnalysis() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [pendingAnalysisType, setPendingAnalysisType] = useState(null); // 'all' or 'selected'
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -179,22 +182,8 @@ function AllStocksAnalysis() {
 
   const handleAnalyzeAll = async () => {
     if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
-      try {
-        setAnalyzing(true);
-        const response = await analyzeAllStocks([]); // Empty array means all stocks
-        
-        // Handle both new job and duplicate job responses
-        if (response.is_duplicate) {
-          alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
-                `Progress: ${response.completed}/${response.total} (${response.completed}/${response.total}%)`);
-        } else {
-          alert(`Analysis started. Job ID: ${response.job_id}`);
-        }
-      } catch (error) {
-        console.error('Failed to start analysis:', error);
-        alert('Failed to start analysis. Please try again.');
-        setAnalyzing(false);
-      }
+      setPendingAnalysisType('all');
+      setShowConfigModal(true);
     }
   };
 
@@ -205,22 +194,31 @@ function AllStocksAnalysis() {
     }
     
     if (window.confirm(`Analyze ${selectedStocks.length} selected stocks?`)) {
-      try {
-        setAnalyzing(true);
-        const response = await analyzeAllStocks(selectedStocks);
-        
-        // Handle both new job and duplicate job responses
-        if (response.is_duplicate) {
-          alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
-                `Progress: ${response.completed}/${response.total}`);
-        } else {
-          alert(`Analysis started. Job ID: ${response.job_id}`);
-        }
-      } catch (error) {
-        console.error('Failed to start analysis:', error);
-        alert('Failed to start analysis. Please try again.');
-        setAnalyzing(false);
+      setPendingAnalysisType('selected');
+      setShowConfigModal(true);
+    }
+  };
+
+  const handleAnalyzeWithConfig = async (config) => {
+    setShowConfigModal(false);
+    
+    const symbolsToAnalyze = pendingAnalysisType === 'all' ? [] : selectedStocks;
+    
+    try {
+      setAnalyzing(true);
+      const response = await analyzeAllStocks(symbolsToAnalyze, config);
+      
+      // Handle both new job and duplicate job responses
+      if (response.is_duplicate) {
+        alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
+              `Progress: ${response.completed}/${response.total}`);
+      } else {
+        alert(`Analysis started. Job ID: ${response.job_id}`);
       }
+    } catch (error) {
+      console.error('Failed to start analysis:', error);
+      alert('Failed to start analysis. Please try again.');
+      setAnalyzing(false);
     }
   };
 
@@ -531,6 +529,17 @@ function AllStocksAnalysis() {
           </div>
         )}
       </div>
+
+      {/* Analysis Config Modal */}
+      {showConfigModal && (
+        <AnalysisConfigModal
+          onClose={() => setShowConfigModal(false)}
+          onConfirm={handleAnalyzeWithConfig}
+          stockCount={pendingAnalysisType === 'all' ? stocks.length : selectedStocks.length}
+          stockNames={pendingAnalysisType === 'all' ? [] : selectedStocks}
+          title={pendingAnalysisType === 'all' ? 'Configure Bulk Analysis' : 'Configure Analysis'}
+        />
+      )}
     </div>
   );
 }

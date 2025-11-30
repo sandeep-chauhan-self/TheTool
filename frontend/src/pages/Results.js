@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
+import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 
 function Results() {
@@ -13,6 +14,7 @@ function Results() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [history, setHistory] = useState([]);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   // Determine the back URL - use referrer from state or fallback to checking URL pattern
   const getBackUrl = () => {
@@ -98,12 +100,17 @@ function Results() {
 
   const handleReanalyze = async () => {
     if (reanalyzing) return; // Prevent double-clicks
+    setShowConfigModal(true);
+  };
+
+  const handleReanalyzeWithConfig = async (config) => {
+    setShowConfigModal(false);
     
     try {
       setReanalyzing(true);
-      console.log('Starting re-analysis for:', ticker);
+      console.log('Starting re-analysis for:', ticker, 'with config:', config);
       
-      const result = await analyzeStocks([ticker]);
+      const result = await analyzeStocks([ticker], config);
       console.log('Re-analysis started:', result);
       
       // Wait for analysis to complete and reload
@@ -375,6 +382,17 @@ function Results() {
           </div>
         )}
       </div>
+
+      {/* Re-analysis Config Modal */}
+      {showConfigModal && (
+        <AnalysisConfigModal
+          onClose={() => setShowConfigModal(false)}
+          onConfirm={handleReanalyzeWithConfig}
+          stockCount={1}
+          stockNames={[ticker]}
+          title="Re-Analyze Configuration"
+        />
+      )}
     </div>
   );
 }

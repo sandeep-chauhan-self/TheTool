@@ -65,8 +65,26 @@ const api = axios.create({
   },
 });
 
-export const analyzeStocks = async (tickers, indicators = null, capital = 100000) => {
-  const response = await api.post('/api/analysis/analyze', { tickers, capital, indicators });
+export const analyzeStocks = async (tickers, config = {}) => {
+  // Support both old signature (tickers, indicators, capital) and new (tickers, config)
+  const analysisConfig = typeof config === 'number' 
+    ? { capital: config } // Legacy: third param was capital
+    : config;
+  
+  const payload = {
+    tickers,
+    capital: analysisConfig.capital || 100000,
+    risk_percent: analysisConfig.riskPercent,
+    position_size_limit: analysisConfig.positionSizeLimit,
+    risk_reward_ratio: analysisConfig.riskRewardRatio,
+    data_period: analysisConfig.dataPeriod,
+    use_demo_data: analysisConfig.useDemoData,
+    category_weights: analysisConfig.categoryWeights,
+    enabled_indicators: analysisConfig.enabledIndicators,
+    indicators: analysisConfig.indicators // Legacy support
+  };
+  
+  const response = await api.post('/api/analysis/analyze', payload);
   return response.data;
 };
 
@@ -151,8 +169,20 @@ export const getStockHistory = async (symbol) => {
   return response.data;
 };
 
-export const analyzeAllStocks = async (symbols = []) => {
-  const response = await api.post('/api/stocks/analyze-all-stocks', { symbols });
+export const analyzeAllStocks = async (symbols = [], config = {}) => {
+  const payload = {
+    symbols,
+    capital: config.capital || 100000,
+    risk_percent: config.riskPercent,
+    position_size_limit: config.positionSizeLimit,
+    risk_reward_ratio: config.riskRewardRatio,
+    data_period: config.dataPeriod,
+    use_demo_data: config.useDemoData,
+    category_weights: config.categoryWeights,
+    enabled_indicators: config.enabledIndicators
+  };
+  
+  const response = await api.post('/api/stocks/analyze-all-stocks', payload);
   return response.data;
 };
 

@@ -324,6 +324,18 @@ def analyze_all_stocks():
         capital = validated_data.get("capital", 100000) if validated_data else 100000
         force = data.get("force", False)  # Force new job even if one is running
         
+        # Extract additional config parameters
+        analysis_config = {
+            "capital": capital,
+            "risk_percent": data.get("risk_percent"),
+            "position_size_limit": data.get("position_size_limit"),
+            "risk_reward_ratio": data.get("risk_reward_ratio"),
+            "data_period": data.get("data_period"),
+            "use_demo_data": data.get("use_demo_data", False),
+            "category_weights": data.get("category_weights"),
+            "enabled_indicators": data.get("enabled_indicators")
+        }
+        
         # Handle empty array: means "analyze ALL stocks"
         if len(symbols) == 0:
             logger.info("Empty symbols array received - analyzing ALL stocks from NSE list")
@@ -448,7 +460,7 @@ def analyze_all_stocks():
         start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_success = start_analysis_job(job_id, symbols, None, capital, False)
+            start_success = start_analysis_job(job_id, symbols, None, capital, False, analysis_config)
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:

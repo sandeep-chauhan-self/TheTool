@@ -106,7 +106,21 @@ def analyze():
         tickers = validated_data["tickers"]
         capital = validated_data["capital"]
         force = data.get("force", False)
+        
+        # Extract additional config parameters
+        analysis_config = {
+            "capital": capital,
+            "risk_percent": data.get("risk_percent"),
+            "position_size_limit": data.get("position_size_limit"),
+            "risk_reward_ratio": data.get("risk_reward_ratio"),
+            "data_period": data.get("data_period"),
+            "use_demo_data": data.get("use_demo_data", False),
+            "category_weights": data.get("category_weights"),
+            "enabled_indicators": data.get("enabled_indicators")
+        }
+        
         logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}, force: {force}")
+        logger.debug(f"[ANALYZE] Config: {analysis_config}")
         
         # Check for duplicate/active jobs (unless force=true)
         if not force:
@@ -168,7 +182,7 @@ def analyze():
         start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_success = start_analysis_job(job_id, tickers, None, capital, False)
+            start_success = start_analysis_job(job_id, tickers, None, capital, False, analysis_config)
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
