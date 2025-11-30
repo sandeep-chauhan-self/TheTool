@@ -289,22 +289,56 @@ function Results() {
             <div>
               <div className="text-sm text-gray-600">Entry Price</div>
               <div className="text-xl font-bold text-blue-600">
-                {report.entry != null ? `Rs. ${Number(report.entry).toFixed(2)}` : 'N/A'}
+                {report.entry != null ? `₹${Number(report.entry).toFixed(2)}` : 'N/A'}
               </div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Stop Loss</div>
               <div className="text-xl font-bold text-red-600">
-                {report.stop != null ? `Rs. ${Number(report.stop).toFixed(2)}` : 'N/A'}
+                {report.stop != null ? `₹${Number(report.stop).toFixed(2)}` : 'N/A'}
               </div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Target</div>
               <div className="text-xl font-bold text-green-600">
-                {report.target != null ? `Rs. ${Number(report.target).toFixed(2)}` : 'N/A'}
+                {report.target != null ? `₹${Number(report.target).toFixed(2)}` : 'N/A'}
               </div>
             </div>
           </div>
+
+          {/* Position Sizing & Risk Management */}
+          {report.position_size > 0 && (
+            <div className="mt-4 p-4 bg-purple-50 rounded border border-purple-200">
+              <h3 className="text-sm font-semibold text-purple-800 mb-3">📊 Position Sizing (Based on Your Config)</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-xs text-purple-600">Recommended Shares</div>
+                  <div className="text-lg font-bold text-purple-700">{report.position_size}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-purple-600">Position Value</div>
+                  <div className="text-lg font-bold text-purple-700">
+                    ₹{(report.position_size * report.entry).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-purple-600">Risk per Trade</div>
+                  <div className="text-lg font-bold text-red-600">
+                    ₹{((report.entry - report.stop) * report.position_size).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-purple-600">Reward Potential</div>
+                  <div className="text-lg font-bold text-green-600">
+                    ₹{((report.target - report.entry) * report.position_size).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              </div>
+              {report.risk_message && (
+                <div className="mt-2 text-xs text-purple-600 italic">{report.risk_message}</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Indicator Summary */}

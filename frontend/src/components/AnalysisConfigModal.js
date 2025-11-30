@@ -257,14 +257,14 @@ function AnalysisConfigModal({
                 type="number"
                 value={config.capital}
                 onChange={(e) => handleConfigChange('capital', Number(e.target.value))}
-                min="10000"
+                min="1000"
                 max="100000000"
-                step="10000"
+                step="1000"
                 className="w-full pl-8 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex gap-2 mt-2">
-              {[50000, 100000, 500000, 1000000].map(amount => (
+              {[10000, 50000, 100000, 500000, 1000000].map(amount => (
                 <button
                   key={amount}
                   onClick={() => handleConfigChange('capital', amount)}
