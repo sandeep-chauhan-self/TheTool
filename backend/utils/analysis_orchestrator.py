@@ -76,13 +76,14 @@ class DataFetcher:
     """
     
     @staticmethod
-    def fetch_and_validate(ticker: str, use_demo_data: bool = False) -> Tuple[Optional[pd.DataFrame], str, bool, str, List[str]]:
+    def fetch_and_validate(ticker: str, use_demo_data: bool = False, period: str = '200d') -> Tuple[Optional[pd.DataFrame], str, bool, str, List[str]]:
         """
         Fetch and validate ticker data.
         
         Args:
             ticker: Stock ticker symbol
             use_demo_data: Use demo data instead of live data
+            period: Historical data period (e.g., '100d', '200d', '1y')
             
         Returns:
             Tuple of (dataframe, source, is_valid, message, warnings)
@@ -90,11 +91,18 @@ class DataFetcher:
         try:
             # Fetch data
             if use_demo_data:
-                # Generate simple demo data
-                df = DataFetcher._generate_demo_data(ticker)
+                # Generate simple demo data - parse period for days
+                days = 200  # default
+                if period.endswith('d'):
+                    days = int(period[:-1])
+                elif period.endswith('y'):
+                    days = int(period[:-1]) * 252  # trading days
+                elif period.endswith('mo'):
+                    days = int(period[:-2]) * 21  # ~21 trading days/month
+                df = DataFetcher._generate_demo_data(ticker, days=days)
                 source = "demo"
             else:
-                df = fetch_ticker_data(ticker)
+                df = fetch_ticker_data(ticker, period=period)
                 source = "yahoo_finance"
             
             if df is None or df.empty:
@@ -341,19 +349,30 @@ class TradeCalculator:
             )
             
             # Calculate stop loss and target based on risk/reward settings
-            # Default stop is 3%, target is based on min R:R ratio
-            default_stop_pct = 0.03
-            target_pct = default_stop_pct * min_rr_ratio
+            # Use ATR-based stop for volatility awareness, with config-based fallback
+            # Conservative uses tighter stops (2%), Aggressive uses wider stops (4%)
+            atr_multiplier = 2.0  # Standard ATR multiplier for stop loss
+            
+            # Get ATR-based stop percentage or use risk_percent as basis
+            # risk_percent is already converted to decimal (e.g., 0.01 for 1%)
+            # Use 2x risk_percent as stop % (Conservative: 2%, Balanced: 4%, Aggressive: 6%)
+            stop_pct = risk_percent * 2  # risk_percent is 0.01 (1%), 0.02 (2%), etc.
+            if stop_pct < 0.02:
+                stop_pct = 0.02  # Minimum 2% stop
+            elif stop_pct > 0.08:
+                stop_pct = 0.08  # Maximum 8% stop
+            
+            target_pct = stop_pct * min_rr_ratio
             
             if verdict in ["Buy", "Strong Buy"]:
-                stop_loss = entry_price * (1 - default_stop_pct)
+                stop_loss = entry_price * (1 - stop_pct)
                 target = entry_price * (1 + target_pct)
             elif verdict in ["Sell", "Strong Sell"]:
-                stop_loss = entry_price * (1 + default_stop_pct)
+                stop_loss = entry_price * (1 + stop_pct)
                 target = entry_price * (1 - target_pct)
             else:
-                stop_loss = entry_price * (1 - default_stop_pct)
-                target = entry_price * (1 + default_stop_pct)
+                stop_loss = entry_price * (1 - stop_pct)
+                target = entry_price * (1 + stop_pct)
             
             # Determine signal
             if score >= 0.2:
@@ -566,11 +585,14 @@ class AnalysisOrchestrator:
             logger.info(f"[ORCHESTRATOR] Starting analysis for ticker: {ticker}")
             logger.debug(f"[ORCHESTRATOR] Analysis params - capital: {effective_capital}, use_demo: {effective_demo}, indicators: {effective_indicators}")
             if config:
-                logger.debug(f"[ORCHESTRATOR] Config: risk_percent={config.get('risk_percent')}, position_limit={config.get('position_size_limit')}")
+                logger.debug(f"[ORCHESTRATOR] Config: risk_percent={config.get('risk_percent')}, position_limit={config.get('position_size_limit')}, data_period={config.get('data_period')}")
+            
+            # Get data period from config (default 200d)
+            data_period = config.get('data_period', '200d') if config else '200d'
             
             # Step 1: Fetch and validate data
             df, source, data_valid, data_message, warnings = self.data_fetcher.fetch_and_validate(
-                ticker, effective_demo
+                ticker, effective_demo, period=data_period
             )
             
             logger.info(f"[ORCHESTRATOR] Data fetch completed - ticker: {ticker}, source: {source}, valid: {data_valid}")

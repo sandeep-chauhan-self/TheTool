@@ -48,7 +48,10 @@ function Results() {
           score: data.analysis.score,
           entry: data.analysis.entry,
           stop: data.analysis.stop_loss,  // Note: API returns stop_loss, but UI expects stop
-          target: data.analysis.target
+          target: data.analysis.target,
+          position_size: data.analysis.position_size || 0,
+          risk_reward_ratio: data.analysis.risk_reward_ratio || 0,
+          risk_message: data.analysis.risk_message || ''
         });
       } else {
         setReport(data);
@@ -84,6 +87,8 @@ function Results() {
       entry: selectedAnalysis.entry,
       stop: selectedAnalysis.stop_loss,  // Map stop_loss to stop for UI
       target: selectedAnalysis.target,
+      position_size: selectedAnalysis.position_size || 0,
+      risk_reward_ratio: selectedAnalysis.risk_reward_ratio || 0,
       indicators: selectedAnalysis.indicators || [],
       created_at: selectedAnalysis.created_at
     });

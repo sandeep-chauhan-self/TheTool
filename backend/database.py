@@ -309,6 +309,9 @@ def _init_postgres_db():
                 entry REAL,
                 stop_loss REAL,
                 target REAL,
+                position_size INTEGER DEFAULT 0,
+                risk_reward_ratio REAL DEFAULT 0,
+                analysis_config TEXT,
                 entry_method TEXT,
                 data_source TEXT,
                 is_demo_data BOOLEAN DEFAULT FALSE,
@@ -320,6 +323,16 @@ def _init_postgres_db():
                 analysis_source TEXT
             )
         ''')
+        
+        # Add columns if they don't exist (migration for existing databases)
+        try:
+            cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS position_size INTEGER DEFAULT 0")
+            cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS risk_reward_ratio REAL DEFAULT 0")
+            cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS analysis_config TEXT")
+            conn.commit()
+        except Exception as col_error:
+            logger.debug(f"Columns may already exist: {col_error}")
+            conn.rollback()
         
         # Job tracking table for async tasks
         cursor.execute('''

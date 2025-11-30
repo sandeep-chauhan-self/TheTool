@@ -188,12 +188,16 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     for insert_attempt in range(3):
                         try:
                             with get_db_session() as (conn, cursor):
+                                # Serialize config for storage
+                                config_json = json.dumps(config) if config else None
+                                
                                 query = '''
                                     INSERT INTO analysis_results 
                                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                                     position_size, risk_reward_ratio, analysis_config,
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 '''
                                 query, params = _convert_query_params(query, (
                                     ticker,
@@ -205,6 +209,9 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     convert_numpy_types(result.get('entry')),
                                     convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
                                     convert_numpy_types(result.get('target')),
+                                    convert_numpy_types(result.get('position_size', 0)),  # Position size from risk calc
+                                    convert_numpy_types(result.get('risk_reward_ratio', 0)),  # R:R ratio
+                                    config_json,  # Store config used for this analysis
                                     result.get('entry_method', 'Market Order'),
                                     result.get('data_source', 'real'),
                                     convert_numpy_types(result.get('is_demo_data', 0)),
@@ -445,9 +452,10 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 query = '''
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                     position_size, risk_reward_ratio, analysis_config,
                      entry_method, data_source, is_demo_data, raw_data, status, 
                      created_at, updated_at, analysis_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     yahoo_symbol,  # ticker = yahoo_symbol
@@ -459,6 +467,9 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     convert_numpy_types(result.get('entry')),
                     convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
                     convert_numpy_types(result.get('target')),
+                    convert_numpy_types(result.get('position_size', 0)),  # Position size
+                    convert_numpy_types(result.get('risk_reward_ratio', 0)),  # R:R ratio
+                    None,  # No config for bulk analysis (uses defaults)
                     result.get('entry_method', 'Market Order'),
                     result.get('data_source', 'real'),
                     convert_numpy_types(use_demo),
