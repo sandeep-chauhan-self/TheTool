@@ -5,6 +5,7 @@ import AddStockModal from '../components/AddStockModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
+import { TradingViewLink } from '../utils/tradingViewUtils';
 
 function Dashboard() {
   const [watchlist, setWatchlist] = useState([]);
@@ -321,7 +322,12 @@ function Dashboard() {
                         onChange={() => handleSelectStock(stock.ticker)}
                       />
                     </td>
-                    <td className="px-4 py-3 font-mono">{stock.ticker}</td>
+                    <td className="px-4 py-3 font-mono">
+                      <TradingViewLink 
+                        ticker={stock.ticker}
+                        className="text-gray-900"
+                      />
+                    </td>
                     <td className="px-4 py-3">{stock.name || '-'}</td>
                     <td className={`px-4 py-3 ${getVerdictColor(stock.verdict)}`}>
                       {stock.verdict}

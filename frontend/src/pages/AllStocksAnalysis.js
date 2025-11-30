@@ -5,6 +5,7 @@ import { analyzeAllStocks, getAllAnalysisResults, getAllNSEStocks, getAllStocksP
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
+import { TradingViewLink } from '../utils/tradingViewUtils';
 
 // Define verdict sort order (higher priority first) - outside component to avoid recreating on every render
 const VERDICT_PRIORITY = {
@@ -476,7 +477,11 @@ function AllStocksAnalysis() {
                         />
                       </td>
                       <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <div className="text-xs sm:text-sm font-medium text-gray-900">{stock.symbol}</div>
+                        <TradingViewLink 
+                          ticker={stock.yahoo_symbol} 
+                          displayText={stock.symbol}
+                          className="text-xs sm:text-sm font-medium text-gray-900"
+                        />
                         <div className="text-xs text-gray-500">{stock.yahoo_symbol}</div>
                       </td>
                       <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3">
