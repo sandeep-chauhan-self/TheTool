@@ -76,13 +76,14 @@ class DataFetcher:
     """
     
     @staticmethod
-    def fetch_and_validate(ticker: str, use_demo_data: bool = False) -> Tuple[Optional[pd.DataFrame], str, bool, str, List[str]]:
+    def fetch_and_validate(ticker: str, use_demo_data: bool = False, period: str = '200d') -> Tuple[Optional[pd.DataFrame], str, bool, str, List[str]]:
         """
         Fetch and validate ticker data.
         
         Args:
             ticker: Stock ticker symbol
             use_demo_data: Use demo data instead of live data
+            period: Historical data period (e.g., '100d', '200d', '1y')
             
         Returns:
             Tuple of (dataframe, source, is_valid, message, warnings)
@@ -90,11 +91,18 @@ class DataFetcher:
         try:
             # Fetch data
             if use_demo_data:
-                # Generate simple demo data
-                df = DataFetcher._generate_demo_data(ticker)
+                # Generate simple demo data - parse period for days
+                days = 200  # default
+                if period.endswith('d'):
+                    days = int(period[:-1])
+                elif period.endswith('y'):
+                    days = int(period[:-1]) * 252  # trading days
+                elif period.endswith('mo'):
+                    days = int(period[:-2]) * 21  # ~21 trading days/month
+                df = DataFetcher._generate_demo_data(ticker, days=days)
                 source = "demo"
             else:
-                df = fetch_ticker_data(ticker)
+                df = fetch_ticker_data(ticker, period=period)
                 source = "yahoo_finance"
             
             if df is None or df.empty:
@@ -232,18 +240,21 @@ class SignalAggregator:
     """
     
     @staticmethod
-    def aggregate_votes(indicator_results: List[Dict[str, Any]]) -> float:
+    def aggregate_votes(indicator_results: List[Dict[str, Any]], category_weights: Optional[Dict[str, float]] = None) -> float:
         """
         Aggregate indicator votes with category-based weighting.
         
         Args:
             indicator_results: List of indicator results
+            category_weights: Optional custom category weights (defaults to TYPE_BIAS)
             
         Returns:
             Composite score (-1.0 to 1.0)
         """
         if not indicator_results:
             return 0.0
+        
+        weights = category_weights or TYPE_BIAS
         
         total_weighted_vote = 0.0
         total_weight = 0.0
@@ -253,8 +264,8 @@ class SignalAggregator:
             confidence = result.get('confidence', 0.5)
             category = result.get('category', 'unknown')
             
-            # Get category bias
-            bias = TYPE_BIAS.get(category, 0.5)
+            # Get category bias from provided weights or default
+            bias = weights.get(category, 0.5)
             
             # Calculate weighted vote
             weight = confidence * bias
@@ -305,7 +316,7 @@ class TradeCalculator:
     """
     
     @staticmethod
-    def calculate_trade_parameters(df: pd.DataFrame, score: float, verdict: str, capital: Optional[float] = None) -> Dict[str, Any]:
+    def calculate_trade_parameters(df: pd.DataFrame, score: float, verdict: str, capital: Optional[float] = None, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Calculate trade parameters.
         
@@ -314,11 +325,18 @@ class TradeCalculator:
             score: Composite score
             verdict: Trading verdict
             capital: Available capital
+            config: Optional config with risk_percent, position_size_limit, risk_reward_ratio
             
         Returns:
             Dictionary with trade parameters
         """
         try:
+            # Extract config values with defaults
+            cfg = config or {}
+            risk_percent = cfg.get('risk_percent', 2) / 100  # Convert to decimal (default 2%)
+            position_limit = cfg.get('position_size_limit', 20) / 100  # Convert to decimal (default 20%)
+            min_rr_ratio = cfg.get('risk_reward_ratio', 1.5)  # Default 1.5:1
+            
             # Get current price
             current_price = float(df['Close'].iloc[-1])
             
@@ -330,16 +348,32 @@ class TradeCalculator:
                 signal=verdict
             )
             
-            # Simple stop loss and target calculation
+            # Calculate stop loss and target based on risk/reward settings
+            # Use ATR-based stop for volatility awareness, with config-based fallback
+            # Conservative uses tighter stops (2%), Aggressive uses wider stops (4%)
+            atr_multiplier = 2.0  # Standard ATR multiplier for stop loss
+            
+            # Get ATR-based stop percentage or use risk_percent as basis
+            # risk_percent is already converted to decimal (e.g., 0.01 for 1%)
+            # Use 2x risk_percent as stop % (Conservative: 2%, Balanced: 4%, Aggressive: 6%)
+            stop_pct = risk_percent * 2  # risk_percent is 0.01 (1%), 0.02 (2%), etc.
+            if stop_pct < 0.02:
+                stop_pct = 0.02  # Minimum 2% stop
+            elif stop_pct > 0.08:
+                stop_pct = 0.08  # Maximum 8% stop
+            
+            target_pct = stop_pct * min_rr_ratio
+            
             if verdict in ["Buy", "Strong Buy"]:
-                stop_loss = entry_price * 0.97  # 3% stop loss
-                target = entry_price * 1.05  # 5% target
+                stop_loss = entry_price * (1 - stop_pct)
+                target = entry_price * (1 + target_pct)
             elif verdict in ["Sell", "Strong Sell"]:
-                stop_loss = entry_price * 1.03
-                target = entry_price * 0.95
+                stop_loss = entry_price * (1 + stop_pct)
+                target = entry_price * (1 - target_pct)
             else:
-                stop_loss = entry_price * 0.97
-                target = entry_price * 1.03
+                # HOLD: Still calculate proper stop/target for reference
+                stop_loss = entry_price * (1 - stop_pct)
+                target = entry_price * (1 + target_pct)  # Use target_pct with R:R ratio
             
             # Determine signal
             if score >= 0.2:
@@ -349,18 +383,12 @@ class TradeCalculator:
             else:
                 signal = "HOLD"
             
-            # Calculate risk/reward
-            if signal == "BUY":
-                risk = entry_price - stop_loss
-                reward = target - entry_price
-            elif signal == "SELL":
-                risk = stop_loss - entry_price
-                reward = entry_price - target
-            else:
-                risk = 0
-                reward = 0
+            # Calculate risk/reward based on prices
+            risk = abs(entry_price - stop_loss)
+            reward = abs(target - entry_price)
             
-            risk_reward_ratio = (reward / risk) if risk > 0 else 0
+            # Use the actual calculated R:R ratio (should match min_rr_ratio if properly calculated)
+            calculated_rr_ratio = (reward / risk) if risk > 0 else min_rr_ratio
             
             # Use RiskManager for position sizing if capital provided
             position_size = 0
@@ -368,21 +396,34 @@ class TradeCalculator:
             risk_message = "No capital provided"
             
             if capital:
-                # RiskManager.calculate_position_size expects (entry, stop, capital)
-                position_size = RiskManager.calculate_position_size(
-                    entry=entry_price,
-                    stop=stop_loss,
-                    capital=capital
-                )
-                risk_valid = position_size > 0
-                risk_message = "Position calculated" if risk_valid else "Invalid position"
+                # Calculate position based on risk percent
+                risk_amount = capital * risk_percent
+                risk_per_share = abs(entry_price - stop_loss)
+                
+                if risk_per_share > 0:
+                    # Position size based on risk
+                    position_by_risk = int(risk_amount / risk_per_share)
+                    
+                    # Position size based on position limit
+                    max_position_value = capital * position_limit
+                    position_by_limit = int(max_position_value / entry_price)
+                    
+                    # Take the smaller of the two
+                    position_size = min(position_by_risk, position_by_limit)
+                    
+                    risk_valid = position_size > 0
+                    risk_message = f"Position: {position_size} shares (risk: {risk_percent*100:.1f}%, limit: {position_limit*100:.1f}%)"
+                else:
+                    position_size = 0
+                    risk_valid = False
+                    risk_message = "Invalid stop loss"
             
             return {
                 'entry': entry_price,
                 'stop': stop_loss,
                 'target': target,
                 'signal': signal,
-                'risk_reward_ratio': risk_reward_ratio,
+                'risk_reward_ratio': calculated_rr_ratio,
                 'position_size': position_size,
                 'risk_valid': risk_valid,
                 'risk_message': risk_message
@@ -480,7 +521,8 @@ class AnalysisOrchestrator:
         ticker: str,
         indicators: Optional[List[str]] = None,
         capital: Optional[float] = None,
-        use_demo_data: bool = False
+        use_demo_data: bool = False,
+        analysis_config: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Execute complete ticker analysis pipeline.
@@ -490,17 +532,62 @@ class AnalysisOrchestrator:
             indicators: List of indicator names to use (None = all)
             capital: Available capital for position sizing
             use_demo_data: Use demo data instead of live data
+            analysis_config: Optional config dict with:
+                - risk_percent: Max risk per trade (default 2%)
+                - position_size_limit: Max position size as % of capital (default 20%)
+                - risk_reward_ratio: Min risk-reward ratio (default 1.5)
+                - data_period: Historical data period (default '200d')
+                - category_weights: Dict of category weights for scoring
+                - enabled_indicators: Dict of indicator toggles
             
         Returns:
             Complete analysis result dictionary
         """
+        # Merge config with defaults
+        config = analysis_config or {}
+        effective_capital = config.get('capital', capital) or capital
+        effective_demo = config.get('use_demo_data', use_demo_data)
+        category_weights = config.get('category_weights') or TYPE_BIAS
+        enabled_indicators = config.get('enabled_indicators')
+        
+        # Filter indicators based on enabled_indicators config
+        effective_indicators = indicators
+        if enabled_indicators and not indicators:
+            # Map enabled_indicators keys to indicator names
+            indicator_key_map = {
+                'rsi': 'RSI',
+                'macd': 'MACD',
+                'adx': 'ADX',
+                'parabolic_sar': 'Parabolic SAR',
+                'ema_crossover': 'EMA Crossover',
+                'stochastic': 'Stochastic',
+                'cci': 'CCI',
+                'williams_r': 'Williams %R',
+                'atr': 'ATR',
+                'bollinger_bands': 'Bollinger Bands',
+                'obv': 'OBV',
+                'cmf': 'Chaikin Money Flow'
+            }
+            effective_indicators = [
+                indicator_key_map[key] 
+                for key, enabled in enabled_indicators.items() 
+                if enabled and key in indicator_key_map
+            ]
+            if not effective_indicators:
+                effective_indicators = None  # Fall back to all if none enabled
+        
         try:
             logger.info(f"[ORCHESTRATOR] Starting analysis for ticker: {ticker}")
-            logger.debug(f"[ORCHESTRATOR] Analysis params - capital: {capital}, use_demo: {use_demo_data}, indicators: {indicators}")
+            logger.debug(f"[ORCHESTRATOR] Analysis params - capital: {effective_capital}, use_demo: {effective_demo}, indicators: {effective_indicators}")
+            if config:
+                logger.debug(f"[ORCHESTRATOR] Config: risk_percent={config.get('risk_percent')}, position_limit={config.get('position_size_limit')}, data_period={config.get('data_period')}")
+            
+            # Get data period from config (default 200d)
+            data_period = config.get('data_period', '200d') if config else '200d'
             
             # Step 1: Fetch and validate data
             df, source, data_valid, data_message, warnings = self.data_fetcher.fetch_and_validate(
-                ticker, use_demo_data
+                ticker, effective_demo, period=data_period
             )
             
             logger.info(f"[ORCHESTRATOR] Data fetch completed - ticker: {ticker}, source: {source}, valid: {data_valid}")
@@ -510,21 +597,21 @@ class AnalysisOrchestrator:
                 return self._error_result(ticker, data_message)
             
             # Step 2: Calculate indicators
-            indicator_results = self.indicator_engine.calculate_indicators(df, ticker, indicators)
+            indicator_results = self.indicator_engine.calculate_indicators(df, ticker, effective_indicators)
             
             if not indicator_results:
                 logger.warning(f"[ORCHESTRATOR] No indicators calculated for {ticker}")
                 return self._error_result(ticker, "No indicators calculated")
             
-            # Step 3: Aggregate signals
-            score = self.signal_aggregator.aggregate_votes(indicator_results)
+            # Step 3: Aggregate signals (with custom category weights if provided)
+            score = self.signal_aggregator.aggregate_votes(indicator_results, category_weights)
             verdict = self.signal_aggregator.get_verdict(score)
             
             logger.info(f"[ORCHESTRATOR] Signal analysis complete - ticker: {ticker}, score: {score}, verdict: {verdict}")
             
             # Step 4: Calculate trade parameters
             trade_params = self.trade_calculator.calculate_trade_parameters(
-                df, score, verdict, capital
+                df, score, verdict, effective_capital, config
             )
 
             # Step 5: Validate and fix trade parameters

@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addToWatchlist, analyzeStocks, cancelJob, getJobStatus, getStockHistory, getWatchlist, removeFromWatchlist } from '../api/api';
 import AddStockModal from '../components/AddStockModal';
+import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
+import { TradingViewLink } from '../utils/tradingViewUtils';
 
 function Dashboard() {
   const [watchlist, setWatchlist] = useState([]);
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -146,13 +149,18 @@ function Dashboard() {
       alert('Please select at least one stock to analyze');
       return;
     }
+    // Open config modal instead of directly analyzing
+    setShowConfigModal(true);
+  };
 
+  const handleAnalyzeWithConfig = async (config) => {
+    setShowConfigModal(false);
+    
     try {
       setAnalyzing(true);
       setAnalysisProgress(0);
 
-      const capital = 100000; // Default capital for analysis
-      const result = await analyzeStocks(selectedStocks, null, capital);
+      const result = await analyzeStocks(selectedStocks, config);
       const newJobId = result.job_id;
       setJobId(newJobId);
       
@@ -314,7 +322,12 @@ function Dashboard() {
                         onChange={() => handleSelectStock(stock.ticker)}
                       />
                     </td>
-                    <td className="px-4 py-3 font-mono">{stock.ticker}</td>
+                    <td className="px-4 py-3 font-mono">
+                      <TradingViewLink 
+                        ticker={stock.ticker}
+                        className="text-gray-900"
+                      />
+                    </td>
                     <td className="px-4 py-3">{stock.name || '-'}</td>
                     <td className={`px-4 py-3 ${getVerdictColor(stock.verdict)}`}>
                       {stock.verdict}
@@ -356,6 +369,16 @@ function Dashboard() {
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddStock}
           existingSymbols={watchlist.map(stock => stock.ticker)}
+        />
+      )}
+
+      {showConfigModal && (
+        <AnalysisConfigModal
+          onClose={() => setShowConfigModal(false)}
+          onConfirm={handleAnalyzeWithConfig}
+          stockCount={selectedStocks.length}
+          stockNames={selectedStocks}
+          title="Configure Analysis"
         />
       )}
     </div>

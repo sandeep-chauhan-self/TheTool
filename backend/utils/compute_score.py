@@ -20,7 +20,7 @@ from utils.analysis_orchestrator import (
 )
 
 # Main analysis function
-def analyze_ticker(ticker, indicator_list=None, capital=None, use_demo_data=False):
+def analyze_ticker(ticker, indicator_list=None, capital=None, use_demo_data=False, analysis_config=None):
     """
     Analyze a ticker symbol using technical indicators.
     
@@ -32,12 +32,19 @@ def analyze_ticker(ticker, indicator_list=None, capital=None, use_demo_data=Fals
         indicator_list: List of indicator names (None = all)
         capital: Available capital for position sizing
         use_demo_data: Use demo data instead of live data
+        analysis_config: Optional dict with additional config:
+            - risk_percent: Max risk per trade (default 2%)
+            - position_size_limit: Max position size as % of capital (default 20%)
+            - risk_reward_ratio: Min risk-reward ratio (default 1.5)
+            - data_period: Historical data period (default '200d')
+            - category_weights: Dict of category weights
+            - enabled_indicators: Dict of indicator toggles
         
     Returns:
         Dictionary with analysis results
     """
     orchestrator = AnalysisOrchestrator()
-    return orchestrator.analyze(ticker, indicator_list, capital, use_demo_data)
+    return orchestrator.analyze(ticker, indicator_list, capital, use_demo_data, analysis_config)
 
 
 # Helper functions

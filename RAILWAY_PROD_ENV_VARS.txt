@@ -1,0 +1,71 @@
+═══════════════════════════════════════════════════════════════════════════════
+RAILWAY PRODUCTION SERVICE (thetool-production.up.railway.app)
+═══════════════════════════════════════════════════════════════════════════════
+
+Copy these variables to Railway → backend-prod service → Settings → Variables
+
+SHARED CONFIGURATION
+───────────────────────────────────────────────────────────────────────────────
+API_KEY="_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI"
+MASTER_API_KEY="_ZQmwHptTFGeAyWWaWXGs1KlJwrZNZFVbxpurC3evBI"
+DEFAULT_CAPITAL="100000"
+FLASK_HOST="0.0.0.0"
+FLASK_PORT="5000"
+YAHOO_TIMEOUT="30"
+MAX_THREADS="10"
+ENABLE_VECTORIZATION="True"
+METRICS_PORT="9090"
+
+
+PRODUCTION-SPECIFIC CONFIGURATION
+───────────────────────────────────────────────────────────────────────────────
+APP_ENV="production"
+FLASK_ENV="production"
+DEBUG="False"
+LOG_LEVEL="INFO"
+SQL_DEBUG="False"
+TIME_REQUESTS="False"
+FLASK_DEBUG_TOOLBAR="False"
+USE_DEMO_DATA="False"
+
+# Production: Restrictive CORS (only production frontends/backends)
+CORS_ORIGINS="https://the-tool-theta.vercel.app,https://thetool-production.up.railway.app"
+
+CACHE_ENABLED="True"
+CACHE_MAX_SIZE="2000"
+CACHE_TTL="7200"
+
+RATE_LIMIT_ENABLED="True"
+RATE_LIMIT_PER_MINUTE="90"
+ANALYZE_RATE_LIMIT="5"
+
+REDIS_ENABLED="True"
+REDIS_DB="0"
+REDIS_MAX_CONNECTIONS="100"
+
+MAX_BULK_WORKERS="8"
+JOB_CLEANUP_INTERVAL="7200"
+JOB_STATE_TTL="172800"
+KEEP_LAST_ANALYSES="500"
+
+METRICS_ENABLED="True"
+ENABLE_NUMBA="False"
+
+
+AUTO-PROVIDED BY RAILWAY (DO NOT SET MANUALLY)
+───────────────────────────────────────────────────────────────────────────────
+DATABASE_URL          → Postgres connection string (production instance)
+REDIS_URL             → Redis connection string (production instance)
+
+
+VERIFICATION STEPS
+───────────────────────────────────────────────────────────────────────────────
+1. Go to Railway Dashboard → Select backend-prod service
+2. Click Settings → Variables
+3. Add all variables above
+4. Click Deploy to redeploy service
+5. Check logs: Should show "Environment: PRODUCTION (debug=False)" and "Log Level: INFO"
+6. Verify CORS: Only requests from https://the-tool-theta.vercel.app should succeed
+7. Verify API: Test stock analysis at https://thetool-production.up.railway.app/api/analysis/analyze
+
+═══════════════════════════════════════════════════════════════════════════════

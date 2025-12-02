@@ -13,7 +13,7 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 7
 
 
 def get_migration_conn():
@@ -49,7 +49,11 @@ def get_current_version(conn):
 
 
 def apply_migration(conn, version: int, description: str, migration_sql: str):
-    """Apply a single migration (PostgreSQL format with %s placeholders)"""
+    """
+    Apply a single migration.
+    
+    Uses PostgreSQL-only (%s placeholders).
+    """
     cursor = conn.cursor()
     try:
         # PostgreSQL: execute statements individually
@@ -65,7 +69,7 @@ def apply_migration(conn, version: int, description: str, migration_sql: str):
                     cursor.execute(stmt)
             logger.info(f"  ✓ SQL complete")
         
-        # Record migration using PostgreSQL format
+        # Record migration using PostgreSQL placeholder style
         logger.info(f"  Recording in db_version...")
         cursor.execute('''
             INSERT INTO db_version (version, description)
@@ -276,6 +280,9 @@ def migration_v4(conn):
     try:
         logger.info("Running migration v4: Ensure watchlist.ticker is primary key...")
         
+        # PostgreSQL only
+        logger.info("  PostgreSQL migration: checking columns...")
+        
         # Check current columns
         cursor.execute("""
             SELECT column_name FROM information_schema.columns 
@@ -311,19 +318,21 @@ def migration_v4(conn):
 
 def migration_v5(conn):
     """
-    Migration V5: Add analysis result tracking columns
+    Migration V5: Add analysis result tracking columns (job_id, started_at, completed_at)
+    PostgreSQL only.
     """
     cursor = conn.cursor()
     try:
-        logger.info("  Checking analysis_results table columns...")
+        logger.info("  Adding analysis result tracking columns...")
         
-        # Check existing columns
+        # PostgreSQL: Use information_schema
+        logger.info("    Checking existing columns (PostgreSQL)...")
         cursor.execute("""
             SELECT column_name FROM information_schema.columns 
             WHERE table_name='analysis_results'
         """)
         existing_cols = {row[0] for row in cursor.fetchall()}
-        logger.info(f"  Found {len(existing_cols)} columns")
+        logger.info(f"    Found {len(existing_cols)} columns")
         
         statements = []
         to_add = []
@@ -343,20 +352,146 @@ def migration_v5(conn):
         migration_sql = '\n'.join(statements)
         
         if not migration_sql.strip():
-            logger.info("  ✓ All columns already present")
+            logger.info("    ✓ All columns already present")
             cursor.execute('''
                 INSERT INTO db_version (version, description)
                 VALUES (%s, %s)
             ''', (5, "Analysis result tracking (already present)"))
             conn.commit()
-            logger.info("  ✓ v5 recorded (no-op)")
+            logger.info("    ✓ v5 recorded (no-op)")
             return True
         
-        logger.info(f"  Adding {len(to_add)} columns: {', '.join(to_add)}")
+        logger.info(f"    Adding {len(to_add)} columns: {', '.join(to_add)}")
         return apply_migration(conn, 5, "Add analysis result tracking columns", migration_sql)
     
     except Exception as e:
         logger.error(f"  ✗ v5 failed: {e}", exc_info=True)
+        conn.rollback()
+        return False
+
+
+def migration_v6(conn):
+    """
+    Migration V6: CRITICAL FIX - Ensure tickers_json column exists in analysis_jobs
+    
+    This migration explicitly adds tickers_json column if it doesn't exist.
+    The column is critical for:
+    1. Storing normalized ticker lists with jobs
+    2. Enabling duplicate job detection
+    3. Supporting bulk analysis request deduplication
+    
+    PostgreSQL only.
+    """
+    cursor = conn.cursor()
+    try:
+        logger.info("  [CRITICAL FIX] Ensuring tickers_json column in analysis_jobs...")
+        
+        # PostgreSQL: Use information_schema
+        logger.info("    PostgreSQL environment - checking column...")
+        
+        # Check if column exists
+        cursor.execute("""
+            SELECT EXISTS(
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='analysis_jobs' AND column_name='tickers_json'
+            )
+        """)
+        
+        if not cursor.fetchone()[0]:
+            logger.info("    Column missing - adding tickers_json...")
+            cursor.execute('ALTER TABLE analysis_jobs ADD COLUMN tickers_json TEXT')
+            conn.commit()
+            logger.info("      ✓ Added tickers_json column")
+        else:
+            logger.info("      ✓ Column already exists")
+        
+        return apply_migration(conn, 6, "CRITICAL FIX: Add tickers_json column", "")
+        
+    except Exception as e:
+        logger.error(f"  ✗ v6 failed: {e}", exc_info=True)
+        conn.rollback()
+        return False
+        
+    except Exception as e:
+        logger.error(f"  ✗ v6 failed: {e}", exc_info=True)
+        conn.rollback()
+        return False
+
+
+def migration_v7(conn):
+    """
+    Migration V7: Ensure analysis_jobs table has all required columns
+    
+    Final safety check that all critical columns are present:
+    - tickers_json (for duplicate detection)
+    - status, progress, total, completed, successful, errors (core fields)
+    - created_at, updated_at, started_at, completed_at (timestamps)
+    """
+    cursor = conn.cursor()
+    try:
+        logger.info("  Final safety check: Verify all analysis_jobs columns...")
+        
+        # List of required columns
+        required_columns = {
+            'job_id': 'TEXT PRIMARY KEY',
+            'status': 'TEXT NOT NULL',
+            'progress': 'INTEGER DEFAULT 0',
+            'total': 'INTEGER DEFAULT 0',
+            'completed': 'INTEGER DEFAULT 0',
+            'successful': 'INTEGER DEFAULT 0',
+            'errors': 'TEXT',
+            'tickers_json': 'TEXT',  # CRITICAL
+            'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            'updated_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            'started_at': 'TIMESTAMP',
+            'completed_at': 'TIMESTAMP'
+        }
+        
+        # Get existing columns
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name='analysis_jobs'
+            ORDER BY ordinal_position
+        """)
+        existing_columns = {row[0] for row in cursor.fetchall()}
+        
+        logger.info(f"    Found {len(existing_columns)} columns")
+        
+        # Check for missing columns
+        missing_columns = set(required_columns.keys()) - existing_columns
+        
+        if not missing_columns:
+            logger.info("    ✓ All required columns present")
+            # Just record the migration
+            cursor.execute('''
+                INSERT INTO db_version (version, description)
+                VALUES (%s, %s)
+            ''', (7, "Final safety check (all columns present)"))
+            conn.commit()
+            return True
+        
+        # Log which columns are missing
+        logger.warning(f"    ⚠ Missing {len(missing_columns)} columns: {', '.join(missing_columns)}")
+        logger.info("    Adding missing columns...")
+        
+        # Add missing columns one by one
+        for col_name, col_def in required_columns.items():
+            if col_name in missing_columns and col_name != 'job_id':  # Skip primary key
+                try:
+                    # Extract type from column definition
+                    col_type = col_def.split()[0]  # Get just the type part
+                    cursor.execute(f'ALTER TABLE analysis_jobs ADD COLUMN {col_name} {col_type}')
+                    logger.info(f"      ✓ Added {col_name}")
+                except Exception as e:
+                    logger.warning(f"      Could not add {col_name}: {e}")
+        
+        conn.commit()
+        logger.info("    ✓ Column addition complete")
+        
+        return apply_migration(conn, 7, "Final safety check: all columns present", "")
+        
+    except Exception as e:
+        logger.error(f"  ✗ v7 failed: {e}", exc_info=True)
         conn.rollback()
         return False
 
@@ -397,6 +532,8 @@ def run_migrations():
             (3, migration_v3),
             (4, migration_v4),
             (5, migration_v5),
+            (6, migration_v6),
+            (7, migration_v7),
         ]
         
         pending_count = sum(1 for v, _ in migrations if v > current_version)

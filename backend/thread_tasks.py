@@ -10,7 +10,7 @@ import json
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from database import get_db_connection, _convert_query_params, DATABASE_TYPE
+from database import get_db_connection, _convert_query_params
 from utils.compute_score import analyze_ticker
 
 logger = logging.getLogger('thread_tasks')
@@ -48,6 +48,29 @@ def convert_numpy_types(value):
     return value
 
 
+def _safe_execute(cursor, query, args, conn):
+    """
+    Safely execute a query with correct placeholder style for PostgreSQL.
+    
+    Converts ? placeholders to %s for PostgreSQL.
+    
+    Args:
+        cursor: Database cursor from the connection
+        query: SQL query with ? placeholders
+        args: Query arguments tuple
+        conn: Database connection object (for compatibility)
+    
+    Returns:
+        None (raises exception on error)
+    """
+    # PostgreSQL always needs %s placeholders
+    from database import _convert_query_params
+    converted_query, converted_args = _convert_query_params(query, args)
+    
+    # Execute with converted parameters
+    cursor.execute(converted_query, converted_args)
+
+
 # Global dictionary to track running jobs and their threads
 active_jobs: Dict[str, Dict[str, Any]] = {}
 job_threads: Dict[str, threading.Thread] = {}
@@ -73,8 +96,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             SET status = 'processing', started_at = ?
             WHERE job_id = ?
         '''
-        query, args = _convert_query_params(query, (datetime.now().isoformat(), job_id))
-        cursor.execute(query, args)
+        _safe_execute(cursor, query, (datetime.now().isoformat(), job_id), conn)
         conn.commit()
         
         total = len(tickers)
@@ -101,8 +123,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     SET status = 'cancelled', completed_at = ?
                     WHERE job_id = ?
                 '''
-                query, args = _convert_query_params(query, (datetime.now().isoformat(), job_id))
-                cursor.execute(query, args)
+                _safe_execute(cursor, query, (datetime.now().isoformat(), job_id), conn)
                 conn.commit()
                 break
             
@@ -121,7 +142,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         (job_id, ticker, score, verdict, entry, stop_loss, target, entry_method, data_source, is_demo_data, raw_data, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     '''
-                    query, args = _convert_query_params(query, (
+                    _safe_execute(cursor, query, (
                         job_id,
                         ticker,
                         convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
@@ -134,8 +155,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         convert_numpy_types(result.get('is_demo_data', 0)),
                         raw_data,
                         datetime.now().isoformat()
-                    ))
-                    cursor.execute(query, args)
+                    ), conn)
                     conn.commit()
                     successful += 1
                     
@@ -167,8 +187,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                 SET progress = ?, completed = ?, successful = ?, errors = ?
                 WHERE job_id = ?
             '''
-            query, args = _convert_query_params(query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
-            cursor.execute(query, args)
+            _safe_execute(cursor, query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id), conn)
             conn.commit()
             
             # Update active_jobs tracker
@@ -189,8 +208,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             SET status = ?, completed_at = ?, errors = ?
             WHERE job_id = ?
         '''
-        query, args = _convert_query_params(query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id))
-        cursor.execute(query, args)
+        _safe_execute(cursor, query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id), conn)
         conn.commit()
         conn.close()
         
@@ -212,8 +230,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                 SET status = 'failed', completed_at = ?, errors = ?
                 WHERE job_id = ?
             '''
-            query, args = _convert_query_params(query, (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id))
-            cursor.execute(query, args)
+            _safe_execute(cursor, query, (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id), conn)
             conn.commit()
             conn.close()
         except:
@@ -302,8 +319,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 SELECT MAX(id) FROM analysis_results WHERE symbol = ?
             )
         '''
-        query, args = _convert_query_params(query, (datetime.now().isoformat(), symbol, symbol))
-        cursor.execute(query, args)
+        _safe_execute(cursor, query, (datetime.now().isoformat(), symbol, symbol), conn)
         conn.commit()
         
         # Run analysis
@@ -319,7 +335,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                  entry_method, data_source, is_demo_data, raw_data, created_at, updated_at)
                 VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             '''
-            query, args = _convert_query_params(query, (
+            _safe_execute(cursor, query, (
                 symbol,
                 name,
                 yahoo_symbol,
@@ -334,8 +350,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 raw_data,
                 datetime.now().isoformat(),
                 datetime.now().isoformat()
-            ))
-            cursor.execute(query, args)
+            ), conn)
             conn.commit()
             
             # Auto-cleanup old analyses (keep last 10)

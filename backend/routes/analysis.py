@@ -13,6 +13,7 @@ from utils.api_utils import (
     validate_request,
     RequestValidator
 )
+from utils.timezone_util import get_ist_timestamp
 from database import query_db, execute_db, get_db_connection
 from models.job_state import get_job_state_manager
 from utils.db_utils import JobStateTransactions, get_job_status
@@ -29,11 +30,12 @@ def _get_active_job_for_tickers(tickers: list) -> dict:
     Tickers are normalized (sorted, uppercased) for reliable matching.
     """
     try:
-        from datetime import datetime, timedelta
+        from datetime import timedelta
+        from utils.timezone_util import get_ist_now
         
         # Normalize tickers for comparison: sort and uppercase
         normalized_tickers = json.dumps(sorted([t.upper().strip() for t in tickers]))
-        five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        five_min_ago = (get_ist_now() - timedelta(minutes=5)).isoformat()
         
         # Look for exact same tickers in queued/processing jobs from last 5 minutes
         active_job = query_db("""
@@ -104,7 +106,21 @@ def analyze():
         tickers = validated_data["tickers"]
         capital = validated_data["capital"]
         force = data.get("force", False)
+        
+        # Extract additional config parameters
+        analysis_config = {
+            "capital": capital,
+            "risk_percent": data.get("risk_percent"),
+            "position_size_limit": data.get("position_size_limit"),
+            "risk_reward_ratio": data.get("risk_reward_ratio"),
+            "data_period": data.get("data_period"),
+            "use_demo_data": data.get("use_demo_data", False),
+            "category_weights": data.get("category_weights"),
+            "enabled_indicators": data.get("enabled_indicators")
+        }
+        
         logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}, force: {force}")
+        logger.debug(f"[ANALYZE] Config: {analysis_config}")
         
         # Check for duplicate/active jobs (unless force=true)
         if not force:
@@ -166,7 +182,7 @@ def analyze():
         start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_success = start_analysis_job(job_id, tickers, None, capital, False)
+            start_success = start_analysis_job(job_id, tickers, None, capital, False, analysis_config)
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
@@ -295,10 +311,11 @@ def get_history(ticker):
                 400
             )
         
-        # Query analysis results including raw_data for indicators
+        # Query analysis results including raw_data for indicators and position_size
         results = query_db(
             """
-            SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data
+            SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data,
+                   position_size, risk_reward_ratio
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -317,7 +334,7 @@ def get_history(ticker):
         history = []
         for r in results:
             if isinstance(r, (tuple, list)):
-                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data)
+                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data, position_size, risk_reward_ratio)
                 raw_data = r[9]
                 indicators = []
                 if raw_data:
@@ -336,7 +353,9 @@ def get_history(ticker):
                     "stop_loss": r[6],
                     "target": r[7],
                     "created_at": str(r[8]) if r[8] else None,
-                    "indicators": indicators
+                    "indicators": indicators,
+                    "position_size": r[10] or 0,
+                    "risk_reward_ratio": r[11] or 0
                 })
             else:
                 # SQLite returns Row objects
@@ -349,6 +368,8 @@ def get_history(ticker):
                     except json.JSONDecodeError:
                         indicators = []
                 item_dict['indicators'] = indicators
+                item_dict['position_size'] = item_dict.get('position_size', 0) or 0
+                item_dict['risk_reward_ratio'] = item_dict.get('risk_reward_ratio', 0) or 0
                 history.append(item_dict)
         
         return jsonify({
@@ -379,10 +400,11 @@ def get_report(ticker):
         
         logger.info(f"[REPORT] Querying for ticker: {ticker}")
         
-        # Get latest analysis
+        # Get latest analysis (including position_size, risk_reward_ratio, and analysis_config)
         result = query_db(
             """
-            SELECT verdict, score, entry, stop_loss, target, created_at, raw_data
+            SELECT verdict, score, entry, stop_loss, target, created_at, raw_data,
+                   position_size, risk_reward_ratio, analysis_config
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -413,20 +435,34 @@ def get_report(ticker):
                 "score": result[1],
                 "entry": result[2],
                 "stop_loss": result[3],
-                "target": result[4]
+                "target": result[4],
+                "position_size": result[7] or 0,
+                "risk_reward_ratio": result[8] or 0
             }
             created_at = result[5]
             raw_data = result[6]
+            analysis_config = result[9]
         else:
             analysis_data = {
                 "verdict": result['verdict'],
                 "score": result['score'],
                 "entry": result['entry'],
                 "stop_loss": result['stop_loss'],
-                "target": result['target']
+                "target": result['target'],
+                "position_size": result.get('position_size', 0) or 0,
+                "risk_reward_ratio": result.get('risk_reward_ratio', 0) or 0
             }
             created_at = result['created_at']
             raw_data = result['raw_data']
+            analysis_config = result.get('analysis_config')
+        
+        # Parse analysis_config if present
+        config_data = None
+        if analysis_config:
+            try:
+                config_data = json.loads(analysis_config) if isinstance(analysis_config, str) else analysis_config
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse analysis_config JSON for {ticker}")
         
         # Parse indicators from raw_data JSON
         indicators = []
@@ -441,7 +477,8 @@ def get_report(ticker):
             "ticker": ticker,
             "analysis": analysis_data,
             "indicators": indicators,
-            "created_at": created_at
+            "created_at": created_at,
+            "analysis_config": config_data
         }), 200
         
     except Exception as e:
@@ -465,10 +502,10 @@ def download_report(ticker):
                 400
             )
         
-        # Get latest analysis
+        # Get latest analysis with raw_data (contains indicators)
         result = query_db(
             """
-            SELECT verdict, score, entry, stop_loss, target, created_at
+            SELECT verdict, score, entry, stop_loss, target, raw_data, created_at
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -487,27 +524,42 @@ def download_report(ticker):
         
         # Handle both tuple (PostgreSQL) and dict (SQLite) return types
         if isinstance(result, (tuple, list)):
+            raw_data_str = result[5]
             analysis_data = {
+                "ticker": ticker,
                 "verdict": result[0],
                 "score": result[1],
                 "entry": result[2],
-                "stop_loss": result[3],
-                "target": result[4]
+                "stop": result[3],  # export_to_excel expects 'stop' not 'stop_loss'
+                "target": result[4],
+                "indicators": []
             }
         else:
+            raw_data_str = result['raw_data']
             analysis_data = {
+                "ticker": ticker,
                 "verdict": result['verdict'],
                 "score": result['score'],
                 "entry": result['entry'],
-                "stop_loss": result['stop_loss'],
-                "target": result['target']
+                "stop": result['stop_loss'],  # export_to_excel expects 'stop' not 'stop_loss'
+                "target": result['target'],
+                "indicators": []
             }
         
-        # Export to Excel
-        analyze_ticker, export_to_excel = get_analyze_ticker()
-        excel_file = export_to_excel(ticker, analysis_data)
+        # Parse indicators from raw_data JSON
+        if raw_data_str:
+            try:
+                analysis_data["indicators"] = json.loads(raw_data_str)
+            except (json.JSONDecodeError, TypeError):
+                analysis_data["indicators"] = []
         
-        if not excel_file or not excel_file.exists():
+        # Export to Excel - pass the full result dict (not ticker separately)
+        analyze_ticker, export_to_excel = get_analyze_ticker()
+        excel_file = export_to_excel(analysis_data)
+        
+        # excel_file is a string path, check if file exists
+        import os
+        if not excel_file or not os.path.exists(excel_file):
             return StandardizedErrorResponse.format(
                 "EXPORT_FAILED",
                 "Failed to generate Excel report",
@@ -517,7 +569,7 @@ def download_report(ticker):
         return send_file(
             excel_file,
             as_attachment=True,
-            download_name=f"{ticker}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            download_name=f"{ticker}_analysis_{get_ist_timestamp()[:19].replace(':', '-')}.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         
