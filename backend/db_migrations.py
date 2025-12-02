@@ -13,7 +13,7 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 
 def get_migration_conn():
@@ -496,6 +496,89 @@ def migration_v7(conn):
         return False
 
 
+def migration_v8(conn):
+    """
+    Migration V8: Update unique constraint to allow multiple analyses per day with different strategies
+    
+    Old constraint: (ticker, created_at::date) - only one analysis per ticker per day
+    New constraint: (ticker, created_at::date, strategy_id) - one per ticker/day/strategy
+    
+    This allows users to run the same stock through different strategies on the same day.
+    """
+    cursor = conn.cursor()
+    try:
+        logger.info("  Updating unique constraint to include strategy_id...")
+        
+        # Step 1: Drop the old constraint
+        logger.info("    Dropping old idx_analysis_ticker_date constraint...")
+        try:
+            cursor.execute('DROP INDEX IF EXISTS idx_analysis_ticker_date')
+            logger.info("      ✓ Dropped old constraint")
+        except Exception as e:
+            logger.info(f"      (Constraint did not exist: {e})")
+        
+        # Step 2: Ensure strategy_id column exists with default
+        logger.info("    Ensuring strategy_id column exists...")
+        try:
+            cursor.execute('''
+                ALTER TABLE analysis_results 
+                ADD COLUMN IF NOT EXISTS strategy_id INTEGER DEFAULT 1
+            ''')
+            logger.info("      ✓ strategy_id column ready")
+        except Exception as e:
+            logger.info(f"      (Column already exists)")
+        
+        # Step 3: Update any NULL strategy_id values to 1 (default strategy)
+        logger.info("    Setting default strategy_id for existing records...")
+        cursor.execute('''
+            UPDATE analysis_results 
+            SET strategy_id = 1 
+            WHERE strategy_id IS NULL
+        ''')
+        updated_count = cursor.rowcount
+        logger.info(f"      ✓ Updated {updated_count} records")
+        
+        # Step 4: Create new unique constraint including strategy_id
+        logger.info("    Creating new idx_analysis_ticker_date_strategy constraint...")
+        try:
+            cursor.execute('''
+                CREATE UNIQUE INDEX idx_analysis_ticker_date_strategy
+                ON analysis_results(ticker, CAST(created_at AS DATE), strategy_id)
+            ''')
+            logger.info("      ✓ Created new constraint")
+        except Exception as e:
+            logger.warning(f"      ⚠ Could not create constraint: {e}")
+            # If we can't create due to duplicates, clean them up first
+            logger.info("    Cleaning up duplicate records...")
+            cursor.execute('''
+                DELETE FROM analysis_results a
+                USING analysis_results b
+                WHERE a.id < b.id 
+                  AND a.ticker = b.ticker 
+                  AND CAST(a.created_at AS DATE) = CAST(b.created_at AS DATE)
+                  AND COALESCE(a.strategy_id, 1) = COALESCE(b.strategy_id, 1)
+            ''')
+            deleted_count = cursor.rowcount
+            logger.info(f"      ✓ Removed {deleted_count} duplicates")
+            
+            # Try again
+            cursor.execute('''
+                CREATE UNIQUE INDEX idx_analysis_ticker_date_strategy
+                ON analysis_results(ticker, CAST(created_at AS DATE), strategy_id)
+            ''')
+            logger.info("      ✓ Created new constraint after cleanup")
+        
+        conn.commit()
+        logger.info("  ✓ Constraint update complete")
+        
+        return apply_migration(conn, 8, "Update unique constraint to include strategy_id", "")
+        
+    except Exception as e:
+        logger.error(f"  ✗ v8 failed: {e}", exc_info=True)
+        conn.rollback()
+        return False
+
+
 def run_migrations():
     """
     Main entry point: Apply all pending migrations in sequence.
@@ -534,6 +617,7 @@ def run_migrations():
             (5, migration_v5),
             (6, migration_v6),
             (7, migration_v7),
+            (8, migration_v8),
         ]
         
         pending_count = sum(1 for v, _ in migrations if v > current_version)

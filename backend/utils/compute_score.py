@@ -20,7 +20,7 @@ from utils.analysis_orchestrator import (
 )
 
 # Main analysis function
-def analyze_ticker(ticker, indicator_list=None, capital=None, use_demo_data=False, analysis_config=None):
+def analyze_ticker(ticker, indicator_list=None, capital=None, use_demo_data=False, analysis_config=None, strategy_id=1):
     """
     Analyze a ticker symbol using technical indicators.
     
@@ -39,12 +39,13 @@ def analyze_ticker(ticker, indicator_list=None, capital=None, use_demo_data=Fals
             - data_period: Historical data period (default '200d')
             - category_weights: Dict of category weights
             - enabled_indicators: Dict of indicator toggles
+        strategy_id: Strategy ID (1=Balanced, 2=Trend, 3=Mean Reversion, 4=Momentum)
         
     Returns:
         Dictionary with analysis results
     """
     orchestrator = AnalysisOrchestrator()
-    return orchestrator.analyze(ticker, indicator_list, capital, use_demo_data, analysis_config)
+    return orchestrator.analyze(ticker, indicator_list, capital, use_demo_data, analysis_config, strategy_id)
 
 
 # Helper functions

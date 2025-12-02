@@ -4,20 +4,54 @@ import { useEffect, useRef, useState } from 'react';
  * AnalysisConfigModal - Configuration popup for stock analysis
  * 
  * Opens before any analysis operation to allow users to configure:
+ * - Strategy selection (Strategy 1, 2, 3, 4...)
  * - Capital/Investment amount
  * - Risk management settings
  * - Data settings
  * - Indicator selection (collapsible advanced section)
  */
 
+// Strategy definitions (synced with backend strategies module)
+const STRATEGIES = [
+  {
+    id: 1,
+    name: 'Strategy 1 - Balanced',
+    shortName: 'Balanced',
+    description: 'Equal weights for all indicators - best for general market conditions',
+    icon: '⚖️'
+  },
+  {
+    id: 2,
+    name: 'Strategy 2 - Trend Following',
+    shortName: 'Trend',
+    description: 'Emphasizes MACD, ADX, EMA - best for trending markets',
+    icon: '📈'
+  },
+  {
+    id: 3,
+    name: 'Strategy 3 - Mean Reversion',
+    shortName: 'Reversion',
+    description: 'Emphasizes RSI, Bollinger, Stochastic - best for range-bound markets',
+    icon: '🔄'
+  },
+  {
+    id: 4,
+    name: 'Strategy 4 - Momentum Breakout',
+    shortName: 'Momentum',
+    description: 'Emphasizes OBV, CMF, ATR - best for breakout plays',
+    icon: '🚀'
+  }
+];
+
 // Default configuration values
 const DEFAULT_CONFIG = {
+  strategyId: 1,              // Default to Strategy 1 (Balanced)
   capital: 100000,
-  riskPercent: 2,           // Max risk per trade (%)
-  positionSizeLimit: 20,    // Max position size as % of capital
-  riskRewardRatio: 1.5,     // Minimum risk-reward ratio
-  dataPeriod: '200d',       // Historical data period
-  useDemoData: false,       // Use demo/simulated data
+  riskPercent: 2,             // Max risk per trade (%)
+  positionSizeLimit: 20,      // Max position size as % of capital
+  riskRewardRatio: 1.5,       // Minimum risk-reward ratio
+  dataPeriod: '200d',         // Historical data period
+  useDemoData: false,         // Use demo/simulated data
   // Indicator weights by category
   categoryWeights: {
     trend: 1.0,
@@ -227,6 +261,57 @@ function AnalysisConfigModal({
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Strategy Selection */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Analysis Strategy
+              </label>
+              <button
+                onClick={() => {
+                  const strategy = STRATEGIES.find(s => s.id === config.strategyId);
+                  if (strategy) {
+                    window.open(`/strategies/${strategy.id}`, '_blank');
+                  }
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                Learn more →
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {STRATEGIES.map(strategy => (
+                <button
+                  key={strategy.id}
+                  onClick={() => handleConfigChange('strategyId', strategy.id)}
+                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                    config.strategyId === strategy.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{strategy.icon}</span>
+                    <div>
+                      <div className={`font-medium text-sm ${
+                        config.strategyId === strategy.id ? 'text-blue-700' : 'text-gray-700'
+                      }`}>
+                        {strategy.shortName}
+                      </div>
+                      <div className="text-xs text-gray-500 line-clamp-1">
+                        {strategy.description.split(' - ')[0]}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {/* Selected strategy description */}
+            <div className="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
+              {STRATEGIES.find(s => s.id === config.strategyId)?.description}
+            </div>
+          </div>
+
           {/* Quick Presets */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

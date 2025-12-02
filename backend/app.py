@@ -27,6 +27,7 @@ from routes.analysis import bp as analysis_bp
 from routes.watchlist import bp as watchlist_bp
 from routes.stocks import bp as stocks_bp
 from routes.admin import bp as admin_bp
+from routes.strategies import strategies_bp
 
 
 def create_app(config_object=None):
@@ -183,6 +184,7 @@ def create_app(config_object=None):
     app.register_blueprint(analysis_bp)
     app.register_blueprint(watchlist_bp)
     app.register_blueprint(stocks_bp)
+    app.register_blueprint(strategies_bp)
     
     # Log initialization only once (main process)
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
