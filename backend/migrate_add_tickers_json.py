@@ -56,12 +56,10 @@ def migrate_sqlite():
         """)
         print("✓ tickers_json column added")
         
-        # Create composite index for duplicate detection
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_job_tickers 
-            ON analysis_jobs(tickers_json, status)
-        """)
-        print("✓ idx_job_tickers index created (for duplicate detection)")
+        # NOTE: No indexes created for analysis_jobs due to 8KB index limit overflow
+        # when combining tickers_json (large JSON string) with other columns.
+        # Job status queries will use table scan (acceptable - analysis_jobs is small,
+        # typically <100 rows in active use). This is a deliberate design decision.
         
         conn.commit()
         cursor.close()
@@ -104,12 +102,9 @@ def migrate_postgres():
         """)
         print("✓ tickers_json column added")
         
-        # Create composite index for duplicate detection
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_job_tickers 
-            ON analysis_jobs(tickers_json, status)
-        """)
-        print("✓ idx_job_tickers index created (for duplicate detection)")
+        # NOTE: No indexes created for analysis_jobs (see SQLite decision above).
+        # Keeping consistency between dev (SQLite) and production (PostgreSQL).
+        # Job status queries will use table scan.
         
         conn.commit()
         cursor.close()
@@ -150,12 +145,8 @@ def main():
         print("\n✅ Migration completed successfully!")
         print("\nWhat changed:")
         print("- Added 'tickers_json' column to analysis_jobs table")
-        print("- Created 'idx_job_tickers' composite index")
-        print("- Duplicate detection now uses exact ticker matching")
-        print("\nYour application is now ready to:")
-        print("1. Store normalized tickers with each job")
-        print("2. Detect true duplicates (same tickers) only")
-        print("3. Avoid false positives from unrelated jobs")
+        print("- No indexes created (table scan used for small analysis_jobs table)")
+        print("- Normalized tickers stored with each job for duplicate detection")
         return 0
     else:
         print("\n❌ Migration failed. Please check the errors above.")

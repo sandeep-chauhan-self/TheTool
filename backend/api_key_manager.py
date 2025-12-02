@@ -1,8 +1,8 @@
 """
 Persistent API Key Management Module
 
-Handles secure storage, validation, and auditing of API keys using database backend.
-Supports both PostgreSQL and SQLite with proper hashing and revocation.
+Handles secure storage, validation, and auditing of API keys using PostgreSQL backend.
+Uses proper hashing and supports revocation.
 
 SECURITY NOTES:
 - API keys are hashed with SHA-256 before storage
@@ -18,6 +18,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 from database import get_db, execute_query, _raise_critical_error
+from utils.timezone_util import get_ist_timestamp, get_ist_now
 
 logger = logging.getLogger(__name__)
 
@@ -25,32 +26,7 @@ logger = logging.getLogger(__name__)
 class APIKeyManager:
     """Manages persistent API key storage and validation"""
     
-    TABLE_SCHEMA_SQLITE = """
-    CREATE TABLE IF NOT EXISTS api_keys (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key_hash TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        permissions TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        revoked_at TIMESTAMP,
-        last_used_at TIMESTAMP,
-        created_by TEXT
-    );
-    
-    CREATE TABLE IF NOT EXISTS api_key_audit (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key_hash TEXT NOT NULL,
-        action TEXT NOT NULL,
-        details TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (key_hash) REFERENCES api_keys(key_hash) ON DELETE CASCADE
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_api_keys_revoked ON api_keys(revoked_at);
-    CREATE INDEX IF NOT EXISTS idx_audit_action ON api_key_audit(action);
-    """
-    
-    TABLE_SCHEMA_POSTGRES = """
+    TABLE_SCHEMA = """
     CREATE TABLE IF NOT EXISTS api_keys (
         id SERIAL PRIMARY KEY,
         key_hash TEXT UNIQUE NOT NULL,
@@ -76,33 +52,22 @@ class APIKeyManager:
     """
     
     @staticmethod
-    def initialize_storage(database_type: str) -> None:
+    def initialize_storage() -> None:
         """
-        Initialize API key storage tables in database.
-        
-        Args:
-            database_type: 'postgres' or 'sqlite'
+        Initialize API key storage tables in PostgreSQL database.
             
         Raises:
             Exception: If schema creation fails
         """
         try:
-            if database_type == 'postgres':
-                schema = APIKeyManager.TABLE_SCHEMA_POSTGRES
-                # Split into individual statements for PostgreSQL
-                for statement in schema.split(';'):
-                    statement = statement.strip()
-                    if statement:
-                        execute_query(statement)
-            else:  # sqlite
-                schema = APIKeyManager.TABLE_SCHEMA_SQLITE
-                # SQLite can handle multiple statements
-                for statement in schema.split(';'):
-                    statement = statement.strip()
-                    if statement:
-                        execute_query(statement)
+            schema = APIKeyManager.TABLE_SCHEMA
+            # Split into individual statements for PostgreSQL
+            for statement in schema.split(';'):
+                statement = statement.strip()
+                if statement:
+                    execute_query(statement)
             
-            logger.info(f"API key storage initialized for {database_type}")
+            logger.info("API key storage initialized for PostgreSQL")
         except Exception as e:
             logger.error(f"Failed to initialize API key storage: {e}")
             raise
@@ -164,7 +129,7 @@ class APIKeyManager:
             metadata = {
                 'name': name,
                 'permissions': permissions,
-                'created_at': datetime.now().isoformat(),
+                'created_at': get_ist_timestamp(),
                 'key_hash': key_hash
             }
             
@@ -204,7 +169,7 @@ class APIKeyManager:
             
             # Update last_used_at timestamp
             update_query = "UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?"
-            execute_query(update_query, (datetime.now().isoformat(), key_hash))
+            execute_query(update_query, (get_ist_timestamp(), key_hash))
             
             # Return metadata
             return {
@@ -245,7 +210,7 @@ class APIKeyManager:
             
             # Update revoked_at timestamp
             update_query = "UPDATE api_keys SET revoked_at = ? WHERE key_hash = ?"
-            execute_query(update_query, (datetime.now().isoformat(), key_hash))
+            execute_query(update_query, (get_ist_timestamp(), key_hash))
             
             # Audit log
             APIKeyManager._audit_log(

@@ -40,11 +40,12 @@ class Config:
     MASTER_API_KEY = os.getenv('MASTER_API_KEY')
     
     # =============================================================================
-    # DATABASE CONFIGURATION
+    # DATABASE CONFIGURATION (PostgreSQL Only)
     # =============================================================================
     
-    # Railway support: Postgres via DATABASE_URL env var (REQUIRED for persistence on Railway)
-    # Local development: SQLite at ./data/trading_app.db
+    # PostgreSQL via DATABASE_URL env var (REQUIRED)
+    # Local: postgresql://postgres:password@localhost:5432/trading_app
+    # Railway: Automatically set by Railway's PostgreSQL addon
     _raw_database_url = os.getenv('DATABASE_URL', None)
     
     # Fix PostgreSQL URL format (Railway might use postgres:// instead of postgresql://)
@@ -55,22 +56,16 @@ class Config:
         else:
             DATABASE_URL = _raw_database_url
     else:
-        DATABASE_URL = None    
-    DATABASE_TYPE = 'postgres' if DATABASE_URL else 'sqlite'
+        DATABASE_URL = None
     
-    # SQLite configuration (local development only)
-    DATA_PATH = os.getenv('DATA_PATH', './data')
-    DB_NAME = os.getenv('DB_NAME', 'trading_app.db')
+    # PostgreSQL is now required - no SQLite fallback
+    DATABASE_TYPE = 'postgres'
     
+    # Legacy property for backward compatibility (always returns None now)
     @property
     def DB_PATH(self) -> str:
-        """
-        Full path to database file (SQLite only)
-        
-        IMPORTANT: On Railway, do NOT use SQLite unless you have a persistent volume mounted.
-        Use PostgreSQL instead by setting DATABASE_URL environment variable.
-        """
-        return os.path.join(self.DATA_PATH, self.DB_NAME) if self.DATABASE_TYPE == 'sqlite' else None
+        """Legacy property - SQLite is no longer supported. Always returns None."""
+        return None
     
     # =============================================================================
     # APPLICATION CONFIGURATION
@@ -249,10 +244,11 @@ class Config:
         if self.CACHE_TTL < 60:
             messages.append(f"WARNING: CACHE_TTL={self.CACHE_TTL}s is very short. Cache effectiveness will be low.")
         
-        # Database validations
-        # Validate that production environments must have DATABASE_URL configured (independent of DATABASE_TYPE derivation)
-        if self.APP_ENV in ('production', 'prod') and not self.DATABASE_URL:
-            messages.append("ERROR: DATABASE_URL must be configured in production environment!")
+        # Database validations - PostgreSQL is now required
+        if not self.DATABASE_URL:
+            messages.append("ERROR: DATABASE_URL must be configured! PostgreSQL is required.")
+            messages.append("  Local: DATABASE_URL=postgresql://postgres:password@localhost:5432/trading_app")
+            messages.append("  Railway: Set automatically by Railway's PostgreSQL addon")
         
         # Redis validations
         if self.REDIS_ENABLED:
@@ -273,11 +269,7 @@ class Config:
         print(f"Environment: {self.APP_ENV.upper()}")
         print(f"Debug Mode: {self.DEBUG}")
         print(f"Log Level: {self.LOG_LEVEL}")
-        print(f"Database Type: {self.DATABASE_TYPE.upper()}")
-        if self.DATABASE_TYPE == 'sqlite':
-            print(f"  Path: {self.DB_PATH}")
-        else:
-            print(f"  Postgres: (via DATABASE_URL)")
+        print(f"Database: PostgreSQL (via DATABASE_URL)")
         print(f"Max Threads: {self.MAX_THREADS}")
         print(f"Cache Enabled: {self.CACHE_ENABLED}")
         print(f"Rate Limiting: {self.RATE_LIMIT_ENABLED}")

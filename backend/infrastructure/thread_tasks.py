@@ -17,8 +17,9 @@ import json
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from database import get_db_connection, get_db_session, close_thread_connection, _convert_query_params, DATABASE_TYPE
+from database import get_db_connection, get_db_session, close_thread_connection, _convert_query_params
 from utils.compute_score import analyze_ticker
+from utils.timezone_util import get_ist_timestamp
 from models.job_state import get_job_state_manager
 
 logger = logging.getLogger('thread_tasks')
@@ -50,9 +51,8 @@ def convert_numpy_types(value):
         return bool(value)
     elif isinstance(value, np.ndarray):
         return value.tolist()
-    # Convert 0/1 to False/True for boolean columns
-    elif isinstance(value, int) and value in (0, 1):
-        return bool(value)
+    # Don't convert regular Python int 0/1 to bool - causes issues with numeric columns
+    # Boolean conversion should be explicit in the calling code
     return value
 
 
@@ -64,7 +64,7 @@ job_threads: Dict[str, threading.Thread] = {}
 job_state = get_job_state_manager()
 
 
-def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indicators: Optional[List[str]] = None, use_demo_data: bool = True):
+def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indicators: Optional[List[str]] = None, use_demo_data: bool = True, analysis_config: Optional[Dict[str, Any]] = None):
     """
     Background task to analyze multiple stocks.
     Runs in separate thread with thread-safe database connections.
@@ -79,15 +79,23 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         capital: Trading capital amount
         indicators: Optional list of specific indicators to use
         use_demo_data: Whether to use demo data for testing
+        analysis_config: Optional dict with additional config (risk_percent, position_size_limit, etc.)
     """
+    # Merge config with defaults
+    config = analysis_config or {}
+    effective_capital = config.get('capital', capital) or capital
+    effective_demo = config.get('use_demo_data', use_demo_data)
+    
     try:
         logger.info("=" * 60)
         logger.info(f"THREAD TASK STARTED - Job ID: {job_id}")
         logger.info(f"Total stocks to analyze: {len(tickers)}")
         logger.info(f"Tickers: {tickers}")
-        logger.info(f"Capital: {capital}")
+        logger.info(f"Capital: {effective_capital}")
         logger.info(f"Indicators: {indicators if indicators else 'default'}")
-        logger.info(f"Demo mode: {use_demo_data}")
+        logger.info(f"Demo mode: {effective_demo}")
+        if config:
+            logger.info(f"Additional config: risk_percent={config.get('risk_percent')}, position_limit={config.get('position_size_limit')}, rr_ratio={config.get('risk_reward_ratio')}")
         logger.info("=" * 60)
         
         # ✅ FIX #11: Add retry logic for status update with exponential backoff
@@ -97,13 +105,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             try:
                 with get_db_session() as (conn, cursor):
                     # Need to convert query params for PostgreSQL compatibility
-                    from database import _convert_query_params, DATABASE_TYPE
+                    # PostgreSQL only - _convert_query_params already imported at top
                     query = '''
                         UPDATE analysis_jobs 
-                        SET status = 'processing', started_at = %s
-                        WHERE job_id = %s
+                        SET status = 'processing', started_at = ?
+                        WHERE job_id = ?
                     '''
-                    query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
+                    query, params = _convert_query_params(query, (get_ist_timestamp(), job_id))
                     cursor.execute(query, params)
                 status_updated = True
                 logger.info(f"✓ Job {job_id} status updated to 'processing'")
@@ -130,7 +138,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             'completed': 0,
             'successful': 0,
             'cancelled': False,
-            'started_at': datetime.now().isoformat()
+            'started_at': get_ist_timestamp()
         })
         
         # Process each stock
@@ -140,13 +148,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             if current_job and current_job.get('cancelled'):
                 logger.warning(f"Job {job_id}: CANCELLED by user at {completed}/{total}")
                 with get_db_session() as (conn, cursor):
-                    from database import _convert_query_params, DATABASE_TYPE
+                    # PostgreSQL only - _convert_query_params already imported at top
                     query = '''
                         UPDATE analysis_jobs 
-                        SET status = 'cancelled', completed_at = %s
-                        WHERE job_id = %s
+                        SET status = 'cancelled', completed_at = ?
+                        WHERE job_id = ?
                     '''
-                    query, params = _convert_query_params(query, (datetime.now().isoformat(), job_id), DATABASE_TYPE)
+                    query, params = _convert_query_params(query, (get_ist_timestamp(), job_id))
                     cursor.execute(query, params)
                 job_state.update_job(job_id, {'status': 'cancelled'})
                 break
@@ -154,8 +162,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             try:
                 logger.info(f"START analyzing {ticker} ({idx}/{total})")
                 
-                # Analyze the stock
-                result = analyze_ticker(ticker, indicator_list=indicators, capital=capital, use_demo_data=use_demo_data)
+                # Analyze the stock with config
+                result = analyze_ticker(
+                    ticker, 
+                    indicator_list=indicators, 
+                    capital=effective_capital, 
+                    use_demo_data=effective_demo,
+                    analysis_config=config
+                )
                 
                 if result:
                     # Store analysis result using thread-safe connection
@@ -173,32 +187,39 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     for insert_attempt in range(3):
                         try:
                             with get_db_session() as (conn, cursor):
+                                # Serialize config for storage
+                                config_json = json.dumps(config) if config else None
+                                
                                 query = '''
                                     INSERT INTO analysis_results 
                                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                                     position_size, risk_reward_ratio, analysis_config,
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 '''
                                 query, params = _convert_query_params(query, (
                                     ticker,
                                     symbol,
                                     None,  # name not available from watchlist analysis
                                     ticker,  # yahoo_symbol same as ticker
-                                    convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
+                                    float(convert_numpy_types(result.get('score', 0)) or 0),  # Ensure float
                                     result.get('verdict', 'Neutral'),
-                                    convert_numpy_types(result.get('entry')),
-                                    convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
-                                    convert_numpy_types(result.get('target')),
+                                    float(convert_numpy_types(result.get('entry')) or 0),
+                                    float(convert_numpy_types(result.get('stop')) or 0),  # Note: key is 'stop' not 'stop_loss'
+                                    float(convert_numpy_types(result.get('target')) or 0),
+                                    int(convert_numpy_types(result.get('position_size', 0)) or 0),  # Position size as int
+                                    float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),  # R:R ratio as float
+                                    config_json,  # Store config used for this analysis
                                     result.get('entry_method', 'Market Order'),
                                     result.get('data_source', 'real'),
-                                    convert_numpy_types(result.get('is_demo_data', 0)),
+                                    bool(result.get('is_demo_data', False)),  # Explicit boolean
                                     raw_data,
                                     'completed',
-                                    datetime.now().isoformat(),
-                                    datetime.now().isoformat(),
+                                    get_ist_timestamp(),
+                                    get_ist_timestamp(),
                                     'watchlist'  # Mark as watchlist analysis
-                                ), DATABASE_TYPE)
+                                ))
                                 cursor.execute(query, params)
                             insert_success = True
                             break
@@ -240,13 +261,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             for progress_attempt in range(3):
                 try:
                     with get_db_session() as (conn, cursor):
-                        from database import _convert_query_params, DATABASE_TYPE
+                        # PostgreSQL only - _convert_query_params already imported at top
                         query = '''
                             UPDATE analysis_jobs 
-                            SET progress = %s, completed = %s, successful = %s, errors = %s
-                            WHERE job_id = %s
+                            SET progress = ?, completed = ?, successful = ?, errors = ?
+                            WHERE job_id = ?
                         '''
-                        query, params = _convert_query_params(query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id), DATABASE_TYPE)
+                        query, params = _convert_query_params(query, (progress, completed, successful, json.dumps(errors, cls=NumpyEncoder), job_id))
                         cursor.execute(query, params)
                     progress_updated = True
                     break
@@ -275,13 +296,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         final_status = 'cancelled' if (current_job and current_job.get('cancelled')) else 'completed'
         
         with get_db_session() as (conn, cursor):
-            from database import _convert_query_params, DATABASE_TYPE
+            # PostgreSQL only - _convert_query_params already imported at top
             query = '''
                 UPDATE analysis_jobs 
-                SET status = %s, completed_at = %s, errors = %s
-                WHERE job_id = %s
+                SET status = ?, completed_at = ?, errors = ?
+                WHERE job_id = ?
             '''
-            query, params = _convert_query_params(query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id), DATABASE_TYPE)
+            query, params = _convert_query_params(query, (final_status, datetime.now().isoformat(), json.dumps(errors, cls=NumpyEncoder), job_id))
             cursor.execute(query, params)
         
         # Update job state
@@ -302,13 +323,13 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         logger.error(f"FATAL ERROR in job {job_id}: {e}", exc_info=True)
         try:
             with get_db_session() as (conn, cursor):
-                from database import _convert_query_params, DATABASE_TYPE
+                # PostgreSQL only - _convert_query_params already imported at top
                 query = '''
                     UPDATE analysis_jobs 
-                    SET status = 'failed', completed_at = %s, errors = %s
-                    WHERE job_id = %s
+                    SET status = ?, completed_at = ?, errors = ?
+                    WHERE job_id = ?
                 '''
-                query, params = _convert_query_params(query, (datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id), DATABASE_TYPE)
+                query, params = _convert_query_params(query, ('failed', datetime.now().isoformat(), json.dumps([{'error': str(e)}]), job_id))
                 cursor.execute(query, params)
             
             # Update job state
@@ -329,7 +350,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             del job_threads[job_id]
 
 
-def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[List[str]], capital: float, use_demo: bool) -> bool:
+def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[List[str]], capital: float, use_demo: bool, analysis_config: Optional[Dict[str, Any]] = None) -> bool:
     """
     Start a new analysis job in background thread
     Returns True if started successfully
@@ -337,11 +358,19 @@ def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[Lis
     CRITICAL: On Railway (and cloud platforms), we MUST use daemon=False
     to ensure threads actually run. Daemon threads are killed immediately
     on serverless/containerized platforms.
+    
+    Args:
+        job_id: Unique job identifier
+        tickers: List of stock ticker symbols
+        indicators: Optional list of specific indicators to use
+        capital: Trading capital amount
+        use_demo: Whether to use demo data
+        analysis_config: Optional dict with additional config (risk_percent, position_size_limit, etc.)
     """
     try:
         thread = threading.Thread(
             target=analyze_stocks_batch,
-            args=(job_id, tickers, capital, indicators, use_demo),
+            args=(job_id, tickers, capital, indicators, use_demo, analysis_config),
             daemon=False,  # CRITICAL: Must be False on Railway for threads to execute
             name=f"AnalysisJob-{job_id[:8]}"
         )
@@ -422,29 +451,33 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                 query = '''
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                     position_size, risk_reward_ratio, analysis_config,
                      entry_method, data_source, is_demo_data, raw_data, status, 
                      created_at, updated_at, analysis_source)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     yahoo_symbol,  # ticker = yahoo_symbol
                     symbol,        # symbol without suffix
                     name,          # company name
                     yahoo_symbol,  # yahoo_symbol with suffix
-                    convert_numpy_types(result.get('score', 0)),  # Convert numpy types to Python float
+                    float(convert_numpy_types(result.get('score', 0)) or 0),  # Ensure float
                     result.get('verdict', 'Neutral'),
-                    convert_numpy_types(result.get('entry')),
-                    convert_numpy_types(result.get('stop')),  # Note: key is 'stop' not 'stop_loss'
-                    convert_numpy_types(result.get('target')),
+                    float(convert_numpy_types(result.get('entry')) or 0),
+                    float(convert_numpy_types(result.get('stop')) or 0),  # Note: key is 'stop' not 'stop_loss'
+                    float(convert_numpy_types(result.get('target')) or 0),
+                    int(convert_numpy_types(result.get('position_size', 0)) or 0),  # Position size as int
+                    float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),  # R:R ratio as float
+                    None,  # No config for bulk analysis (uses defaults)
                     result.get('entry_method', 'Market Order'),
                     result.get('data_source', 'real'),
-                    convert_numpy_types(use_demo),
+                    bool(use_demo),  # Explicit boolean
                     raw_data,
                     'completed',
                     datetime.now().isoformat(),
                     datetime.now().isoformat(),
                     'bulk'  # Mark as bulk analysis
-                ), DATABASE_TYPE)
+                ))
                 cursor.execute(query, params)
             
             # Auto-cleanup old analyses (keep last 10) - using symbol parameter
@@ -467,7 +500,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, status, error_message, 
                      created_at, updated_at, analysis_source)
-                    VALUES (%s, %s, %s, %s, 0.0, 'Pending', 'failed', %s, %s, %s, 'bulk')
+                    VALUES (?, ?, ?, ?, 0.0, 'Pending', 'failed', ?, ?, ?, 'bulk')
                 '''
                 query, params = _convert_query_params(query, (
                     yahoo_symbol,
@@ -477,7 +510,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     str(e),
                     datetime.now().isoformat(),
                     datetime.now().isoformat()
-                ), DATABASE_TYPE)
+                ))
                 cursor.execute(query, params)
         except Exception as cleanup_error:
             logger.error(f"Failed to log error for {symbol}: {cleanup_error}")

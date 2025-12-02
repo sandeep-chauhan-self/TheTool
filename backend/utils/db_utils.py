@@ -14,18 +14,8 @@ from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from database import get_db_connection, query_db, execute_db
 
-# Import database-specific error classes
-try:
-    import sqlite3
-    sqlite3_available = True
-except ImportError:
-    sqlite3_available = False
-
-try:
-    import psycopg2
-    psycopg2_available = True
-except ImportError:
-    psycopg2_available = False
+# Import PostgreSQL driver
+import psycopg2
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +51,7 @@ class JobStateTransactions:
         Returns:
             True if created, False if failed or duplicate
         """
-        from database import get_db_session, _convert_query_params, DATABASE_TYPE
+        from database import get_db_session, _convert_query_params
         
         # Normalize tickers: sort and JSON dump for consistent duplicate detection
         tickers_json = None

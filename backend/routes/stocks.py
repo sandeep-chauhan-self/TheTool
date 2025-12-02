@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 from utils.logger import setup_logger
 from utils.api_utils import StandardizedErrorResponse, validate_request, RequestValidator
+from utils.timezone_util import get_ist_timestamp
 from database import query_db, execute_db, get_db_connection
 from utils.db_utils import JobStateTransactions, get_job_status
 
@@ -249,8 +250,9 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
         requested_json = json.dumps(normalized_symbols)
         
         # Get active jobs from last 5 minutes
-        from datetime import datetime, timedelta
-        five_min_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        from datetime import timedelta
+        from utils.timezone_util import get_ist_now
+        five_min_ago = (get_ist_now() - timedelta(minutes=5)).isoformat()
         
         active_jobs = query_db("""
             SELECT job_id, status, total, completed, created_at, tickers_json
@@ -322,29 +324,52 @@ def analyze_all_stocks():
         capital = validated_data.get("capital", 100000) if validated_data else 100000
         force = data.get("force", False)  # Force new job even if one is running
         
+        # Extract additional config parameters
+        analysis_config = {
+            "capital": capital,
+            "risk_percent": data.get("risk_percent"),
+            "position_size_limit": data.get("position_size_limit"),
+            "risk_reward_ratio": data.get("risk_reward_ratio"),
+            "data_period": data.get("data_period"),
+            "use_demo_data": data.get("use_demo_data", False),
+            "category_weights": data.get("category_weights"),
+            "enabled_indicators": data.get("enabled_indicators")
+        }
+        
         # Handle empty array: means "analyze ALL stocks"
         if len(symbols) == 0:
-            logger.info("Empty symbols array received - analyzing ALL stocks")
+            logger.info("Empty symbols array received - analyzing ALL stocks from NSE list")
             try:
-                # Get all stocks from database
-                all_stocks = query_db("""
-                    SELECT DISTINCT ticker FROM analysis_results
-                    UNION
-                    SELECT DISTINCT symbol AS ticker FROM watchlist
-                    ORDER BY ticker
-                """)
+                # Get all stocks from NSE CSV (not just from database)
+                csv_path = _data_root() / "nse_stocks_complete.csv"
+                
+                if not csv_path.exists():
+                    return StandardizedErrorResponse.format(
+                        "NO_STOCKS_FOUND",
+                        "NSE stock list not available. Please ensure nse_stocks_complete.csv exists.",
+                        400
+                    )
+                
+                all_stocks = []
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # Use yahoo_symbol (with .NS suffix) instead of bare symbol
+                        yahoo_symbol = row.get('yahoo_symbol', '').strip()
+                        if yahoo_symbol:
+                            all_stocks.append(yahoo_symbol)
                 
                 if not all_stocks:
                     return StandardizedErrorResponse.format(
                         "NO_STOCKS_FOUND",
-                        "No stocks found to analyze. Add stocks to watchlist first.",
+                        "No stocks found in NSE list.",
                         400
                     )
                 
-                symbols = [stock[0] for stock in all_stocks]
-                logger.info(f"Found {len(symbols)} stocks to analyze: {symbols[:10]}...")
+                symbols = all_stocks
+                logger.info(f"Found {len(symbols)} stocks to analyze from NSE list")
             except Exception as e:
-                logger.error(f"Failed to get all stocks: {e}")
+                logger.error(f"Failed to get all stocks from NSE list: {e}")
                 return StandardizedErrorResponse.format(
                     "STOCK_LOOKUP_ERROR",
                     "Failed to retrieve stocks for analysis",
@@ -435,7 +460,7 @@ def analyze_all_stocks():
         start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_success = start_analysis_job(job_id, symbols, None, capital, False)
+            start_success = start_analysis_job(job_id, symbols, None, capital, False, analysis_config)
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
@@ -479,7 +504,9 @@ def get_all_stocks_progress():
         """)
         
         # Calculate cutoff time for completed jobs (last 1 hour)
-        cutoff_time = (datetime.now() - timedelta(hours=1)).isoformat()
+        from datetime import timedelta
+        from utils.timezone_util import get_ist_now
+        cutoff_time = (get_ist_now() - timedelta(hours=1)).isoformat()
         
         # Also check for recently completed jobs (last 1 hour) - for continuity
         if config.DATABASE_TYPE == 'postgres':

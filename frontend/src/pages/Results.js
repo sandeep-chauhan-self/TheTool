@@ -1,17 +1,35 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
+import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
+import { extractBaseSymbol, getTradingViewUrl } from '../utils/tradingViewUtils';
 
 function Results() {
   const { ticker } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [history, setHistory] = useState([]);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+
+  // Determine the back URL - use referrer from state or fallback to checking URL pattern
+  const getBackUrl = () => {
+    // If we came from a specific page, use that
+    if (location.state?.from) {
+      return location.state.from;
+    }
+    // Check if referrer suggests all-stocks page
+    if (document.referrer.includes('/all-stocks')) {
+      return '/all-stocks';
+    }
+    // Default to dashboard
+    return '/';
+  };
 
   useEffect(() => {
     loadReport();
@@ -31,7 +49,10 @@ function Results() {
           score: data.analysis.score,
           entry: data.analysis.entry,
           stop: data.analysis.stop_loss,  // Note: API returns stop_loss, but UI expects stop
-          target: data.analysis.target
+          target: data.analysis.target,
+          position_size: data.analysis.position_size || 0,
+          risk_reward_ratio: data.analysis.risk_reward_ratio || 0,
+          risk_message: data.analysis.risk_message || ''
         });
       } else {
         setReport(data);
@@ -67,6 +88,8 @@ function Results() {
       entry: selectedAnalysis.entry,
       stop: selectedAnalysis.stop_loss,  // Map stop_loss to stop for UI
       target: selectedAnalysis.target,
+      position_size: selectedAnalysis.position_size || 0,
+      risk_reward_ratio: selectedAnalysis.risk_reward_ratio || 0,
       indicators: selectedAnalysis.indicators || [],
       created_at: selectedAnalysis.created_at
     });
@@ -82,19 +105,31 @@ function Results() {
   };
 
   const handleReanalyze = async () => {
+    if (reanalyzing) return; // Prevent double-clicks
+    setShowConfigModal(true);
+  };
+
+  const handleReanalyzeWithConfig = async (config) => {
+    setShowConfigModal(false);
+    
     try {
       setReanalyzing(true);
-      await analyzeStocks([ticker]);
+      console.log('Starting re-analysis for:', ticker, 'with config:', config);
       
-      // Wait a bit and reload
-      setTimeout(() => {
-        loadReport();
+      const result = await analyzeStocks([ticker], config);
+      console.log('Re-analysis started:', result);
+      
+      // Wait for analysis to complete and reload
+      setTimeout(async () => {
+        await loadReport();
+        await loadHistory();
         setReanalyzing(false);
-      }, 3000);
+      }, 5000); // Wait 5 seconds for analysis to complete
+      
     } catch (error) {
-      setReanalyzing(false);
       console.error('Failed to reanalyze:', error);
-      alert('Failed to reanalyze');
+      alert('Failed to start re-analysis: ' + (error.message || 'Unknown error'));
+      setReanalyzing(false);
     }
   };
 
@@ -147,10 +182,10 @@ function Results() {
             {error}
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            &lt; Back to Dashboard
+            &lt; Back
           </button>
         </div>
       </div>
@@ -162,6 +197,22 @@ function Results() {
       <Header title={`Analysis Results: ${ticker}`} />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* TradingView Link */}
+        <div className="mb-4">
+          <a
+            href={getTradingViewUrl(ticker)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
+            </svg>
+            View {extractBaseSymbol(ticker)} on TradingView
+          </a>
+        </div>
+
         {/* Historical Analysis Dropdown */}
         {history.length > 1 && (
           <div className="mb-6 bg-white rounded-lg shadow-md p-4">
@@ -260,22 +311,56 @@ function Results() {
             <div>
               <div className="text-sm text-gray-600">Entry Price</div>
               <div className="text-xl font-bold text-blue-600">
-                {report.entry != null ? `Rs. ${Number(report.entry).toFixed(2)}` : 'N/A'}
+                {report.entry != null ? `₹${Number(report.entry).toFixed(2)}` : 'N/A'}
               </div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Stop Loss</div>
               <div className="text-xl font-bold text-red-600">
-                {report.stop != null ? `Rs. ${Number(report.stop).toFixed(2)}` : 'N/A'}
+                {report.stop != null ? `₹${Number(report.stop).toFixed(2)}` : 'N/A'}
               </div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Target</div>
               <div className="text-xl font-bold text-green-600">
-                {report.target != null ? `Rs. ${Number(report.target).toFixed(2)}` : 'N/A'}
+                {report.target != null ? `₹${Number(report.target).toFixed(2)}` : 'N/A'}
               </div>
             </div>
           </div>
+
+          {/* Position Sizing & Risk Management */}
+          {report.position_size > 0 && (
+            <div className="mt-4 p-4 bg-purple-50 rounded border border-purple-200">
+              <h3 className="text-sm font-semibold text-purple-800 mb-3">📊 Position Sizing (Based on Your Config)</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-xs text-purple-600">Recommended Shares</div>
+                  <div className="text-lg font-bold text-purple-700">{report.position_size}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-purple-600">Position Value</div>
+                  <div className="text-lg font-bold text-purple-700">
+                    ₹{(report.position_size * report.entry).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-purple-600">Risk per Trade</div>
+                  <div className="text-lg font-bold text-red-600">
+                    ₹{((report.entry - report.stop) * report.position_size).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-purple-600">Reward Potential</div>
+                  <div className="text-lg font-bold text-green-600">
+                    ₹{((report.target - report.entry) * report.position_size).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              </div>
+              {report.risk_message && (
+                <div className="mt-2 text-xs text-purple-600 italic">{report.risk_message}</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Indicator Summary */}
@@ -330,13 +415,17 @@ function Results() {
           </button>
           <button
             onClick={handleReanalyze}
-            disabled={reanalyzing}
-            className="px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+            disabled={reanalyzing || loading}
+            className={`px-6 py-3 text-white rounded ${
+              reanalyzing || loading
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
             {reanalyzing ? 'Reanalyzing...' : 'Re-Analyze'}
           </button>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700"
           >
             &lt; Back
@@ -349,6 +438,17 @@ function Results() {
           </div>
         )}
       </div>
+
+      {/* Re-analysis Config Modal */}
+      {showConfigModal && (
+        <AnalysisConfigModal
+          onClose={() => setShowConfigModal(false)}
+          onConfirm={handleReanalyzeWithConfig}
+          stockCount={1}
+          stockNames={[ticker]}
+          title="Re-Analyze Configuration"
+        />
+      )}
     </div>
   );
 }
