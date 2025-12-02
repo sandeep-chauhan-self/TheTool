@@ -17,41 +17,26 @@ import axios from 'axios';
  */
 
 const getApiBaseUrl = () => {
-  // Development Railway backend override
-  if (process.env.REACT_APP_DEV_API_BASE_URL) {
-    return process.env.REACT_APP_DEV_API_BASE_URL;
-  }
-
-  // Production Railway backend override
+  // Explicit override takes precedence
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
 
-  // Check current hostname to auto-detect environment
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  let env = (process.env.REACT_APP_ENV || 'production').toLowerCase();
-  
-  // Auto-detect from Vercel preview URL
-  if (hostname.includes('the-tool-git-development')) {
-    env = 'development';
-  } else if (hostname.includes('the-tool-theta') || hostname.includes('vercel.app')) {
-    // Keep from REACT_APP_ENV if available, otherwise default to production
-    env = process.env.REACT_APP_ENV ? env : 'production';
-  }
-
+  // Environment-based selection
+  const env = (process.env.REACT_APP_ENV || 'local').toLowerCase();
   const backendUrls = {
     development: 'https://thetool-development.up.railway.app',
     production: 'https://thetool-production.up.railway.app',
     local: 'http://localhost:5000',
   };
 
-  const url = backendUrls[env] || backendUrls.production;
-  
+  const url = backendUrls[env] || backendUrls.local;
+
   // Log environment info in development
   if (process.env.REACT_APP_DEBUG === 'true') {
-    console.log(`[API] Hostname: ${hostname}, Environment: ${env}, Backend: ${url}`);
+    console.log(`[API] Environment: ${env}, Backend: ${url}`);
   }
-  
+
   return url;
 };
 
