@@ -17,24 +17,32 @@ def calculate_ema_crossover(df, fast=50, slow=200):
 def vote_and_confidence(df):
     """
     EMA Crossover voting logic:
-    - EMA50 > EMA200: Golden Cross ? Buy (+1)
-    - EMA50 < EMA200: Death Cross ? Sell (-1)
+    - EMA50 > EMA200: Golden Cross → Buy (+1)
+    - EMA50 < EMA200: Death Cross → Sell (-1)
     
-    Confidence:
-    - conf = min(|EMA50 - EMA200| / EMA200, 0.1) * 10
+    Confidence (how certain based on EMA separation):
+    - Wider gap = stronger trend = higher confidence
+    - Gap of 5%+ of price = 100% confidence
+    - Tiny gap = low confidence (trend just starting or ending)
     """
     ema_data = calculate_ema_crossover(df)
     ema_fast = ema_data['ema_fast']
     ema_slow = ema_data['ema_slow']
     
     if ema_fast > ema_slow:
-        vote = 1
+        vote = 1  # Bullish (golden cross)
     elif ema_fast < ema_slow:
-        vote = -1
+        vote = -1  # Bearish (death cross)
     else:
-        vote = 0
+        vote = 0  # Exactly equal (rare)
     
-    confidence = min(abs(ema_fast - ema_slow) / ema_slow, 0.1) * 10
+    # Confidence based on % separation between EMAs
+    # 5% separation = 100% confidence, 0% = 0% confidence
+    if ema_slow > 0:
+        separation_pct = abs(ema_fast - ema_slow) / ema_slow
+        confidence = min(separation_pct / 0.05, 1.0)  # 5% = max confidence
+    else:
+        confidence = 0.0
     
     return {
         "name": "EMA Crossover",

@@ -15,26 +15,30 @@ def calculate_cci(df, period=20):
 def vote_and_confidence(df):
     """
     CCI voting logic:
-    - CCI < -100: Oversold ? Buy (+1)
-    - CCI > 100: Overbought ? Sell (-1)
-    - -100 ? CCI ? 100: Neutral (0)
+    - CCI < -100: Oversold → Buy (+1)
+    - CCI > 100: Overbought → Sell (-1)
+    - -100 ≤ CCI ≤ 100: Neutral (0)
     
-    Confidence:
-    - If CCI < -100: conf = min((abs(CCI) - 100) / 100, 1.0)
-    - If CCI > 100: conf = min((CCI - 100) / 100, 1.0)
-    - Otherwise: conf = 0
+    Confidence (how certain the indicator is about its assessment):
+    - CCI at 0: 100% confident neutral (furthest from boundaries)
+    - CCI at ±100: Low confidence (at boundary)
+    - CCI at ±200+: 100% confident in signal (extreme)
     """
     cci = calculate_cci(df)
     
     if cci < -100:
-        vote = 1
-        confidence = min((abs(cci) - 100) / 100, 1.0)
+        vote = 1  # Buy (oversold)
+        confidence = min((abs(cci) - 100) / 100, 1.0)  # 0 at -100, 1.0 at -200
     elif cci > 100:
-        vote = -1
-        confidence = min((cci - 100) / 100, 1.0)
+        vote = -1  # Sell (overbought)
+        confidence = min((cci - 100) / 100, 1.0)  # 0 at 100, 1.0 at 200
     else:
-        vote = 0
-        confidence = 0.0
+        vote = 0  # Neutral
+        # Confidence highest at CCI=0 (furthest from ±100 boundaries)
+        distance_from_boundary = 100 - abs(cci)  # 0-100 range
+        confidence = distance_from_boundary / 100  # 0 at boundaries, 1.0 at CCI=0
+    
+    confidence = min(max(confidence, 0.0), 1.0)
     
     return {
         "name": "CCI",

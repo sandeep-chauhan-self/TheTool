@@ -44,23 +44,30 @@ def calculate_psar(df, af_start=0.02, af_increment=0.02, af_max=0.2):
 def vote_and_confidence(df):
     """
     Parabolic SAR voting logic:
-    - Price > SAR: Bullish ? Buy (+1)
-    - Price < SAR: Bearish ? Sell (-1)
+    - Price > SAR: Bullish → Buy (+1)
+    - Price < SAR: Bearish → Sell (-1)
     
-    Confidence:
-    - conf = min(|price - SAR| / (0.03 * price), 1.0)
+    Confidence (based on price-SAR separation):
+    - Wider gap = stronger trend = higher confidence
+    - Gap of 2% of price = 100% confidence
+    - Narrow gap = trend may be reversing = lower confidence
     """
     psar, is_bull = calculate_psar(df)
     close_price = df['Close'].iloc[-1]
     
     if close_price > psar:
-        vote = 1
+        vote = 1  # Bullish
     elif close_price < psar:
-        vote = -1
+        vote = -1  # Bearish
     else:
-        vote = 0
+        vote = 0  # Exactly at SAR (rare)
     
-    confidence = min(abs(close_price - psar) / (0.03 * close_price), 1.0)
+    # Confidence: 2% separation = 100% confidence
+    # This gives meaningful confidence for most price-SAR relationships
+    if close_price > 0:
+        confidence = min(abs(close_price - psar) / (0.02 * close_price), 1.0)
+    else:
+        confidence = 0.0
     
     return {
         "name": "Parabolic SAR",

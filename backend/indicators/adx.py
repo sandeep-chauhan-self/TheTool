@@ -48,13 +48,13 @@ import pandas as pd
 def vote_and_confidence(df):
     """
     ADX voting logic:
-    - DI+ > DI-: Bullish ? Buy (+1)
-    - DI+ < DI-: Bearish ? Sell (-1)
+    - DI+ > DI-: Bullish → Buy (+1)
+    - DI+ < DI-: Bearish → Sell (-1)
     
-    Confidence:
-    - If ADX > 25: Strong trend ? conf = min(ADX / 50, 1.0)
-    - If ADX < 20: Weak trend ? conf = 0.3
-    - Otherwise: conf = ADX / 40
+    Confidence (based on trend strength AND DI separation):
+    - ADX measures trend strength (0-100)
+    - DI separation measures how clear the direction is
+    - Combined for meaningful confidence
     """
     adx_data = calculate_adx(df)
     adx = adx_data['adx']
@@ -62,18 +62,26 @@ def vote_and_confidence(df):
     di_minus = adx_data['di_minus']
     
     if di_plus > di_minus:
-        vote = 1
+        vote = 1  # Bullish
     elif di_plus < di_minus:
-        vote = -1
+        vote = -1  # Bearish
     else:
-        vote = 0
+        vote = 0  # No clear direction
     
-    if adx > 25:
-        confidence = min(adx / 50, 1.0)
-    elif adx < 20:
-        confidence = 0.3
+    # ADX-based trend strength (0-100 scale)
+    # ADX > 25 = strong trend, ADX > 50 = very strong
+    adx_confidence = min(adx / 50, 1.0)  # 50+ ADX = 100% confidence
+    
+    # DI separation factor - how clear is the direction?
+    di_total = di_plus + di_minus
+    if di_total > 0:
+        di_separation = abs(di_plus - di_minus) / di_total  # 0-1 range
     else:
-        confidence = adx / 40
+        di_separation = 0.0
+    
+    # Combine: strong trend (ADX) + clear direction (DI separation)
+    confidence = (adx_confidence * 0.6) + (di_separation * 0.4)
+    confidence = min(max(confidence, 0.0), 1.0)
     
     return {
         "name": "ADX",

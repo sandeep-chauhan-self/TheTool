@@ -101,8 +101,31 @@ class CMFIndicator(VolumeIndicator):
         return VOTE_NEUTRAL
     
     def _get_confidence(self, value: float, df: pd.DataFrame) -> float:
-        """Calculate confidence based on CMF magnitude (MLRM-001)"""
-        return min(abs(value) * CMF_CONFIDENCE_MULTIPLIER, 1.0)
+        """Calculate confidence based on CMF magnitude and consistency (MLRM-001)
+        
+        Confidence reflects:
+        - CMF magnitude: Higher absolute value = stronger conviction
+        - CMF range: Typical CMF ranges from -1 to +1
+        - Values > 0.25 or < -0.25 indicate strong buying/selling pressure
+        - Values near 0 = balanced, moderate confidence in neutral reading
+        """
+        abs_cmf = abs(value)
+        
+        if abs_cmf > 0.25:
+            # Strong pressure - high confidence in directional signal
+            # CMF of 0.25 = 75% confidence, 0.5+ = 100%
+            confidence = 0.75 + min((abs_cmf - 0.25) / 0.25, 0.25)
+        elif abs_cmf > 0.1:
+            # Moderate pressure - moderate confidence
+            # CMF of 0.1 = 50%, 0.25 = 75%
+            confidence = 0.5 + ((abs_cmf - 0.1) / 0.15) * 0.25
+        else:
+            # Weak/balanced pressure - confidence based on how close to 0
+            # At 0 = most confident it's balanced (60%)
+            # At 0.1 = 50% (boundary where we're less sure if balanced or trending)
+            confidence = 0.6 - (abs_cmf / 0.1) * 0.1  # 50-60% range
+        
+        return min(max(confidence, 0.0), 1.0)
 
 
 # Backward compatibility
