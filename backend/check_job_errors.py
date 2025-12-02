@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
-"""Check analysis jobs and error details"""
-import sqlite3
+"""Check analysis jobs and error details - PostgreSQL version"""
+import os
 import json
+import psycopg2
+from dotenv import load_dotenv
 
-conn = sqlite3.connect('./data/trading_app.db')
+load_dotenv()
+
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    print("ERROR: DATABASE_URL environment variable not set")
+    exit(1)
+
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = 'postgresql://' + DATABASE_URL[11:]
+
+conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 # Get job details
@@ -37,4 +49,5 @@ for job in jobs:
                 error_msg = err.get('error', 'No message')[:80]
                 print(f'      {ticker}: {error_msg}')
 
+cursor.close()
 conn.close()

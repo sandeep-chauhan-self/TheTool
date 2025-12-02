@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
-"""Check all jobs"""
-import sqlite3
+"""Check all jobs - PostgreSQL version"""
+import os
 import json
+import psycopg2
+from dotenv import load_dotenv
 
-conn = sqlite3.connect('./data/trading_app.db')
+load_dotenv()
+
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    print("ERROR: DATABASE_URL environment variable not set")
+    print("Set it to: postgresql://user:password@host:port/dbname")
+    exit(1)
+
+# Fix postgres:// -> postgresql:// if needed
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = 'postgresql://' + DATABASE_URL[11:]
+
+conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 # Get ALL jobs
@@ -29,4 +43,5 @@ for job in jobs:
     if error_count > 0:
         print(f'    Errors ({error_count}): {sample_errors}')
 
+cursor.close()
 conn.close()

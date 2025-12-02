@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
-"""Check analysis results and errors"""
-import sqlite3
+"""Check analysis results and errors - PostgreSQL version"""
+import os
+import psycopg2
+from dotenv import load_dotenv
 
-conn = sqlite3.connect('./data/trading_app.db')
+load_dotenv()
+
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    print("ERROR: DATABASE_URL environment variable not set")
+    exit(1)
+
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = 'postgresql://' + DATABASE_URL[11:]
+
+conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 # Get all records count
@@ -45,4 +57,5 @@ print('\nRecent Errors:')
 for ticker, error in errors:
     print(f'  {ticker}: {error[:80]}')
 
+cursor.close()
 conn.close()
