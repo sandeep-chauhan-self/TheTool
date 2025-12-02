@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { getStrategyHelp, getStrategy } from '../api/api';
+import { Link, useParams } from 'react-router-dom';
+import { getStrategy, getStrategyHelp } from '../api/api';
 
 /**
  * StrategyHelp - Detailed help page for a specific strategy

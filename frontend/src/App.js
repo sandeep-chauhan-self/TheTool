@@ -1,9 +1,8 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import AnalysisConfig from './pages/AnalysisConfig';
-import Results from './pages/Results';
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import AllStocksAnalysis from './pages/AllStocksAnalysis';
+import AnalysisConfig from './pages/AnalysisConfig';
+import Dashboard from './pages/Dashboard';
+import Results from './pages/Results';
 import StrategyHelp from './pages/StrategyHelp';
 
 function App() {

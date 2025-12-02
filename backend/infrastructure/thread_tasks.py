@@ -186,6 +186,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                         symbol = ticker
                     
                     # ✅ FIX #12: Add dedicated try/except for INSERT with retry logic
+                    # ✅ FIX: Use UPSERT to allow re-running analysis with same strategy on same day
                     insert_success = False
                     for insert_attempt in range(3):
                         try:
@@ -193,6 +194,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                 # Serialize config for storage
                                 config_json = json.dumps(config) if config else None
                                 
+                                # Use INSERT ... ON CONFLICT DO UPDATE for PostgreSQL
+                                # This allows re-running analysis with the same strategy on the same day
                                 query = '''
                                     INSERT INTO analysis_results 
                                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
@@ -200,6 +203,19 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    ON CONFLICT (ticker, (created_at::date), strategy_id) 
+                                    DO UPDATE SET
+                                        score = EXCLUDED.score,
+                                        verdict = EXCLUDED.verdict,
+                                        entry = EXCLUDED.entry,
+                                        stop_loss = EXCLUDED.stop_loss,
+                                        target = EXCLUDED.target,
+                                        position_size = EXCLUDED.position_size,
+                                        risk_reward_ratio = EXCLUDED.risk_reward_ratio,
+                                        analysis_config = EXCLUDED.analysis_config,
+                                        raw_data = EXCLUDED.raw_data,
+                                        updated_at = EXCLUDED.updated_at,
+                                        status = EXCLUDED.status
                                 '''
                                 query, params = _convert_query_params(query, (
                                     ticker,
@@ -453,13 +469,26 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
             
             with get_db_session() as (conn, cursor):
+                # Use UPSERT for bulk analysis too
                 query = '''
                     INSERT INTO analysis_results 
                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
-                     position_size, risk_reward_ratio, analysis_config,
+                     position_size, risk_reward_ratio, analysis_config, strategy_id,
                      entry_method, data_source, is_demo_data, raw_data, status, 
                      created_at, updated_at, analysis_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (ticker, (created_at::date), strategy_id) 
+                    DO UPDATE SET
+                        score = EXCLUDED.score,
+                        verdict = EXCLUDED.verdict,
+                        entry = EXCLUDED.entry,
+                        stop_loss = EXCLUDED.stop_loss,
+                        target = EXCLUDED.target,
+                        position_size = EXCLUDED.position_size,
+                        risk_reward_ratio = EXCLUDED.risk_reward_ratio,
+                        raw_data = EXCLUDED.raw_data,
+                        updated_at = EXCLUDED.updated_at,
+                        status = EXCLUDED.status
                 '''
                 query, params = _convert_query_params(query, (
                     yahoo_symbol,  # ticker = yahoo_symbol
@@ -474,6 +503,7 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     int(convert_numpy_types(result.get('position_size', 0)) or 0),  # Position size as int
                     float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),  # R:R ratio as float
                     None,  # No config for bulk analysis (uses defaults)
+                    1,     # Default strategy_id for bulk analysis
                     result.get('entry_method', 'Market Order'),
                     result.get('data_source', 'real'),
                     bool(use_demo),  # Explicit boolean

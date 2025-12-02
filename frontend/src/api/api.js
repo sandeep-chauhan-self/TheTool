@@ -3,53 +3,58 @@ import axios from 'axios';
 /**
  * API Base URL Selection Strategy:
  * 
- * Priority Order:
- * 1. REACT_APP_API_BASE_URL - Explicit environment variable (production/staging builds)
- * 2. REACT_APP_ENV - Switch between development/production backends
- *    - "development" -> https://thetool-development.up.railway.app (debug Railway)
- *    - "production" -> https://thetool-production.up.railway.app (live Railway)
- * 3. localhost:5000 - Local development fallback
+ * Auto-detection based on frontend hostname:
+ * - localhost / 127.0.0.1 / 192.168.x.x -> Local backend (http://localhost:5000)
+ * - the-tool-git-development*.vercel.app -> Development Railway backend
+ * - the-tool-theta.vercel.app -> Production Railway backend
  * 
- * Environment Variables:
- * - REACT_APP_ENV: "development" | "production" | "local"
- * - REACT_APP_API_BASE_URL: Full backend URL override
+ * Override with environment variables:
+ * - REACT_APP_API_BASE_URL: Full backend URL override (highest priority)
  * - REACT_APP_DEBUG: "true" | "false" - Enable verbose logging
  */
 
 const getApiBaseUrl = () => {
-  // Development Railway backend override
-  if (process.env.REACT_APP_DEV_API_BASE_URL) {
-    return process.env.REACT_APP_DEV_API_BASE_URL;
-  }
-
-  // Production Railway backend override
+  // Explicit override takes highest priority
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
 
-  // Check current hostname to auto-detect environment
+  // Auto-detect environment from frontend hostname
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  let env = (process.env.REACT_APP_ENV || 'production').toLowerCase();
   
-  // Auto-detect from Vercel preview URL
-  if (hostname.includes('the-tool-git-development')) {
+  let env = 'local'; // Default to local
+  
+  // Check if running locally (localhost, 127.0.0.1, or local network IP)
+  const isLocal = hostname === 'localhost' || 
+                  hostname === '127.0.0.1' || 
+                  hostname.startsWith('192.168.') ||
+                  hostname.startsWith('10.') ||
+                  hostname === '';
+  
+  if (isLocal) {
+    env = 'local';
+  } else if (hostname.includes('the-tool-git-development')) {
+    // Vercel development preview -> Railway development backend
     env = 'development';
-  } else if (hostname.includes('the-tool-theta') || hostname.includes('vercel.app')) {
-    // Keep from REACT_APP_ENV if available, otherwise default to production
-    env = process.env.REACT_APP_ENV ? env : 'production';
+  } else if (hostname.includes('the-tool-theta')) {
+    // Vercel production -> Railway production backend
+    env = 'production';
+  } else if (hostname.includes('vercel.app')) {
+    // Other Vercel deployments -> default to development
+    env = 'development';
   }
 
   const backendUrls = {
+    local: 'http://localhost:5000',
     development: 'https://thetool-development.up.railway.app',
     production: 'https://thetool-production.up.railway.app',
-    local: 'http://localhost:5000',
   };
 
-  const url = backendUrls[env] || backendUrls.production;
+  const url = backendUrls[env];
   
-  // Log environment info in development
-  if (process.env.REACT_APP_DEBUG === 'true') {
-    console.log(`[API] Hostname: ${hostname}, Environment: ${env}, Backend: ${url}`);
+  // Always log in local development, or when debug is enabled
+  if (env === 'local' || process.env.REACT_APP_DEBUG === 'true') {
+    console.log(`[API] Frontend: ${hostname || 'unknown'}, Environment: ${env}, Backend: ${url}`);
   }
   
   return url;
