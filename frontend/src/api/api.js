@@ -74,6 +74,7 @@ export const analyzeStocks = async (tickers, config = {}) => {
   const payload = {
     tickers,
     capital: analysisConfig.capital || 100000,
+    strategy_id: analysisConfig.strategyId || 1,  // Default to Strategy 1 (Balanced)
     risk_percent: analysisConfig.riskPercent,
     position_size_limit: analysisConfig.positionSizeLimit,
     risk_reward_ratio: analysisConfig.riskRewardRatio,
@@ -198,6 +199,27 @@ export const getAllAnalysisResults = async (page = 1, per_page = 100) => {
 
 export const cancelJob = async (jobId) => {
   const response = await api.post(`/api/analysis/cancel/${jobId}`);
+  return response.data;
+};
+
+// Strategy API functions
+export const getStrategies = async () => {
+  const response = await api.get('/api/strategies');
+  return response.data;
+};
+
+export const getStrategy = async (strategyId) => {
+  const response = await api.get(`/api/strategies/${strategyId}`);
+  return response.data;
+};
+
+export const getStrategyHelp = async (strategyId) => {
+  const response = await api.get(`/api/strategies/${strategyId}/help`);
+  return response.data;
+};
+
+export const getStrategyWeights = async (strategyId) => {
+  const response = await api.get(`/api/strategies/${strategyId}/weights`);
   return response.data;
 };
 

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import AnalysisConfig from './pages/AnalysisConfig';
 import Results from './pages/Results';
 import AllStocksAnalysis from './pages/AllStocksAnalysis';
+import StrategyHelp from './pages/StrategyHelp';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/config" element={<AnalysisConfig />} />
           <Route path="/results/:ticker" element={<Results />} />
           <Route path="/all-stocks" element={<AllStocksAnalysis />} />
+          <Route path="/strategies/:id" element={<StrategyHelp />} />
         </Routes>
       </div>
     </Router>

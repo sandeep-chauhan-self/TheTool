@@ -64,7 +64,7 @@ job_threads: Dict[str, threading.Thread] = {}
 job_state = get_job_state_manager()
 
 
-def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indicators: Optional[List[str]] = None, use_demo_data: bool = True, analysis_config: Optional[Dict[str, Any]] = None):
+def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indicators: Optional[List[str]] = None, use_demo_data: bool = True, analysis_config: Optional[Dict[str, Any]] = None, strategy_id: int = 1):
     """
     Background task to analyze multiple stocks.
     Runs in separate thread with thread-safe database connections.
@@ -80,6 +80,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         indicators: Optional list of specific indicators to use
         use_demo_data: Whether to use demo data for testing
         analysis_config: Optional dict with additional config (risk_percent, position_size_limit, etc.)
+        strategy_id: Strategy ID (1=Balanced, 2=Trend, 3=Mean Reversion, 4=Momentum)
     """
     # Merge config with defaults
     config = analysis_config or {}
@@ -94,6 +95,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
         logger.info(f"Capital: {effective_capital}")
         logger.info(f"Indicators: {indicators if indicators else 'default'}")
         logger.info(f"Demo mode: {effective_demo}")
+        logger.info(f"Strategy ID: {strategy_id}")
         if config:
             logger.info(f"Additional config: risk_percent={config.get('risk_percent')}, position_limit={config.get('position_size_limit')}, rr_ratio={config.get('risk_reward_ratio')}")
         logger.info("=" * 60)
@@ -162,13 +164,14 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             try:
                 logger.info(f"START analyzing {ticker} ({idx}/{total})")
                 
-                # Analyze the stock with config
+                # Analyze the stock with config and strategy
                 result = analyze_ticker(
                     ticker, 
                     indicator_list=indicators, 
                     capital=effective_capital, 
                     use_demo_data=effective_demo,
-                    analysis_config=config
+                    analysis_config=config,
+                    strategy_id=strategy_id
                 )
                 
                 if result:
@@ -193,10 +196,10 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                 query = '''
                                     INSERT INTO analysis_results 
                                     (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
-                                     position_size, risk_reward_ratio, analysis_config,
+                                     position_size, risk_reward_ratio, analysis_config, strategy_id,
                                      entry_method, data_source, is_demo_data, raw_data, status, 
                                      created_at, updated_at, analysis_source)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 '''
                                 query, params = _convert_query_params(query, (
                                     ticker,
@@ -211,6 +214,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     int(convert_numpy_types(result.get('position_size', 0)) or 0),  # Position size as int
                                     float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),  # R:R ratio as float
                                     config_json,  # Store config used for this analysis
+                                    strategy_id,  # Store strategy ID used for this analysis
                                     result.get('entry_method', 'Market Order'),
                                     result.get('data_source', 'real'),
                                     bool(result.get('is_demo_data', False)),  # Explicit boolean
@@ -350,7 +354,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
             del job_threads[job_id]
 
 
-def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[List[str]], capital: float, use_demo: bool, analysis_config: Optional[Dict[str, Any]] = None) -> bool:
+def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[List[str]], capital: float, use_demo: bool, analysis_config: Optional[Dict[str, Any]] = None, strategy_id: int = 1) -> bool:
     """
     Start a new analysis job in background thread
     Returns True if started successfully
@@ -366,17 +370,18 @@ def start_analysis_job(job_id: str, tickers: List[str], indicators: Optional[Lis
         capital: Trading capital amount
         use_demo: Whether to use demo data
         analysis_config: Optional dict with additional config (risk_percent, position_size_limit, etc.)
+        strategy_id: Strategy ID (1=Balanced, 2=Trend, 3=Mean Reversion, 4=Momentum)
     """
     try:
         thread = threading.Thread(
             target=analyze_stocks_batch,
-            args=(job_id, tickers, capital, indicators, use_demo, analysis_config),
+            args=(job_id, tickers, capital, indicators, use_demo, analysis_config, strategy_id),
             daemon=False,  # CRITICAL: Must be False on Railway for threads to execute
             name=f"AnalysisJob-{job_id[:8]}"
         )
         thread.start()
         job_threads[job_id] = thread
-        logger.info(f"✅ DAEMON_FALSE_FIX: Started background thread for job {job_id} with daemon=False (threads will execute on Railway)")
+        logger.info(f"✅ DAEMON_FALSE_FIX: Started background thread for job {job_id} with daemon=False, strategy_id={strategy_id}")
         return True
     except Exception as e:
         logger.error(f"Failed to start thread for job {job_id}: {e}")
