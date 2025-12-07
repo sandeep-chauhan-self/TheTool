@@ -52,9 +52,10 @@ const getApiBaseUrl = () => {
 
   const url = backendUrls[env];
   
-  // Always log in local development, or when debug is enabled
+  // Always log for debugging CORS issues
+  console.log(`[API] Frontend hostname: ${hostname || 'unknown'}, Detected env: ${env}, Using backend: ${url}`);
   if (env === 'local' || process.env.REACT_APP_DEBUG === 'true') {
-    console.log(`[API] Frontend: ${hostname || 'unknown'}, Environment: ${env}, Backend: ${url}`);
+    console.log(`[API] DEBUG: REACT_APP_API_BASE_URL=${process.env.REACT_APP_API_BASE_URL}, REACT_APP_DEBUG=${process.env.REACT_APP_DEBUG}`);
   }
   
   return url;
