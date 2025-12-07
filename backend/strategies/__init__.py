@@ -99,11 +99,13 @@ class StrategyManager:
         from .strategy_2 import Strategy2
         from .strategy_3 import Strategy3
         from .strategy_4 import Strategy4
+        from .strategy_5 import Strategy5
         
         cls.register(Strategy1())
         cls.register(Strategy2())
         cls.register(Strategy3())
         cls.register(Strategy4())
+        cls.register(Strategy5())
 
 
 # =============================================================================
