@@ -119,9 +119,10 @@ class Config:
                 'https://thetool-production.up.railway.app',
             ]
         else:
-            # Production backend - restrictive
+            # Production backend - restrictive but includes dev frontend for testing
             return [
                 'https://the-tool-theta.vercel.app',
+                'https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app',
                 'https://thetool-production.up.railway.app',
             ]
     
