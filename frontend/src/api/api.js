@@ -50,7 +50,7 @@ const getApiBaseUrl = () => {
   const url = backendUrls[env];
   
   // Always log for debugging CORS issues - LOUD LOGGING
-  console.warn(`%c[API ROUTING] Frontend hostname: "${hostname}" → Detected env: "${env}" → Using backend: "${url}"`, 'background: #ff9900; color: #000; font-weight: bold; padding: 5px;');
+  console.warn(`%c[API ROUTING v2] Frontend hostname: "${hostname}" → Detected env: "${env}" → Using backend: "${url}"`, 'background: #ff9900; color: #000; font-weight: bold; padding: 5px;');
   
   if (process.env.REACT_APP_DEBUG === 'true') {
     console.log(`[API DEBUG]`, {
