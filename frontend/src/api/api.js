@@ -22,7 +22,7 @@ const getApiBaseUrl = () => {
   // Auto-detect environment from frontend hostname
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   
-  let env = 'local'; // Default to local
+  let env = 'development'; // Default to development (safer than production)
   
   // Check if running locally (localhost, 127.0.0.1, or local network IP)
   const isLocal = hostname === 'localhost' || 
@@ -33,14 +33,11 @@ const getApiBaseUrl = () => {
   
   if (isLocal) {
     env = 'local';
-  } else if (hostname.includes('the-tool-git-development')) {
-    // Vercel development preview -> Railway development backend
-    env = 'development';
-  } else if (hostname.includes('the-tool-theta')) {
-    // Vercel production -> Railway production backend
+  } else if (hostname === 'the-tool-theta.vercel.app') {
+    // Exact match for production frontend
     env = 'production';
-  } else if (hostname.includes('vercel.app')) {
-    // Other Vercel deployments -> default to development
+  } else {
+    // Everything else (including all Vercel preview/branch deployments) -> development
     env = 'development';
   }
 
@@ -52,10 +49,17 @@ const getApiBaseUrl = () => {
 
   const url = backendUrls[env];
   
-  // Always log for debugging CORS issues
-  console.log(`[API] Frontend hostname: ${hostname || 'unknown'}, Detected env: ${env}, Using backend: ${url}`);
-  if (env === 'local' || process.env.REACT_APP_DEBUG === 'true') {
-    console.log(`[API] DEBUG: REACT_APP_API_BASE_URL=${process.env.REACT_APP_API_BASE_URL}, REACT_APP_DEBUG=${process.env.REACT_APP_DEBUG}`);
+  // Always log for debugging CORS issues - LOUD LOGGING
+  console.warn(`%c[API ROUTING] Frontend hostname: "${hostname}" → Detected env: "${env}" → Using backend: "${url}"`, 'background: #ff9900; color: #000; font-weight: bold; padding: 5px;');
+  
+  if (process.env.REACT_APP_DEBUG === 'true') {
+    console.log(`[API DEBUG]`, {
+      hostname,
+      env,
+      url,
+      REACT_APP_API_BASE_URL: process.env.REACT_APP_API_BASE_URL,
+      REACT_APP_DEBUG: process.env.REACT_APP_DEBUG
+    });
   }
   
   return url;
