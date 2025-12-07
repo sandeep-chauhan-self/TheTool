@@ -14,12 +14,14 @@ import axios from 'axios';
  */
 
 const getApiBaseUrl = () => {
-  // Explicit override takes highest priority
+  // PRIORITY 1: Explicit override from environment variable (HIGHEST PRIORITY)
+  // For Vercel: Set REACT_APP_API_BASE_URL in Vercel dashboard → Environment Variables
   if (process.env.REACT_APP_API_BASE_URL) {
+    console.warn(`%c[API] Using REACT_APP_API_BASE_URL override: ${process.env.REACT_APP_API_BASE_URL}`, 'background: #0f0; color: #000; font-weight: bold;');
     return process.env.REACT_APP_API_BASE_URL;
   }
 
-  // Auto-detect environment from frontend hostname
+  // PRIORITY 2: Auto-detect environment from frontend hostname
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   
   let env = 'development'; // Default to development (safer than production)
@@ -34,10 +36,10 @@ const getApiBaseUrl = () => {
   if (isLocal) {
     env = 'local';
   } else if (hostname === 'the-tool-theta.vercel.app') {
-    // Exact match for production frontend
+    // Exact match for production frontend ONLY
     env = 'production';
   } else {
-    // Everything else (including all Vercel preview/branch deployments) -> development
+    // Everything else → development (includes all Vercel previews)
     env = 'development';
   }
 
@@ -49,18 +51,8 @@ const getApiBaseUrl = () => {
 
   const url = backendUrls[env];
   
-  // Always log for debugging CORS issues - LOUD LOGGING
-  console.warn(`%c[API ROUTING v2] Frontend hostname: "${hostname}" → Detected env: "${env}" → Using backend: "${url}"`, 'background: #ff9900; color: #000; font-weight: bold; padding: 5px;');
-  
-  if (process.env.REACT_APP_DEBUG === 'true') {
-    console.log(`[API DEBUG]`, {
-      hostname,
-      env,
-      url,
-      REACT_APP_API_BASE_URL: process.env.REACT_APP_API_BASE_URL,
-      REACT_APP_DEBUG: process.env.REACT_APP_DEBUG
-    });
-  }
+  // Verbose logging to help debug routing issues
+  console.warn(`%c[API ROUTING] hostname="${hostname}" → env="${env}" → backend="${url}"`, 'background: #ff9900; color: #000; font-weight: bold; padding: 5px;');
   
   return url;
 };

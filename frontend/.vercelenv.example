@@ -1,0 +1,13 @@
+# Vercel Preview Deployment Environment Variables
+# This ensures preview deployments (from any branch) use development backend
+# 
+# Set these in Vercel Dashboard → TheTool Project → Settings → Environment Variables
+# Under "Preview" environment
+
+# Force all preview deployments to use development backend
+REACT_APP_API_BASE_URL=https://thetool-development.up.railway.app
+REACT_APP_DEBUG=true
+
+# For Production deployment (main/master branch only):
+# REACT_APP_API_BASE_URL should NOT be set, allowing hostname detection
+# Which will detect "the-tool-theta.vercel.app" and use production backend
