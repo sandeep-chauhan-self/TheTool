@@ -14,37 +14,15 @@ import axios from 'axios';
  */
 
 const getApiBaseUrl = () => {
-  // PRIORITY 1: Explicit override from environment variable (HIGHEST PRIORITY)
-  // For Vercel: Set REACT_APP_API_BASE_URL in Vercel dashboard → Environment Variables
-  // IMPORTANT: For preview deployments, MUST be: https://thetool-development.up.railway.app
+  // Explicit override takes highest priority
   if (process.env.REACT_APP_API_BASE_URL) {
-    const url = process.env.REACT_APP_API_BASE_URL.trim();
-    
-    // Validation: If on development frontend but URL points to production, warn user
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-    const isDevFrontend = hostname.includes('the-tool-git-development') || hostname === 'localhost';
-    const isProductionUrl = url.includes('thetool-production');
-    
-    if (isDevFrontend && isProductionUrl) {
-      console.error(
-        `%c[API ERROR] Development frontend detected but REACT_APP_API_BASE_URL points to production!`,
-        'background: #f00; color: #fff; font-weight: bold;'
-      );
-      console.error(
-        `%c[API ERROR] Set REACT_APP_API_BASE_URL to: https://thetool-development.up.railway.app`,
-        'background: #f00; color: #fff; font-weight: bold;'
-      );
-      // Fall through to hostname detection instead
-    } else {
-      console.warn(`%c[API] Using REACT_APP_API_BASE_URL override: ${url}`, 'background: #0f0; color: #000; font-weight: bold;');
-      return url;
-    }
+    return process.env.REACT_APP_API_BASE_URL;
   }
 
-  // PRIORITY 2: Auto-detect environment from frontend hostname
+  // Auto-detect environment from frontend hostname
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   
-  let env = 'development'; // Default to development (safer than production)
+  let env = 'local'; // Default to local
   
   // Check if running locally (localhost, 127.0.0.1, or local network IP)
   const isLocal = hostname === 'localhost' || 
@@ -55,11 +33,14 @@ const getApiBaseUrl = () => {
   
   if (isLocal) {
     env = 'local';
-  } else if (hostname === 'the-tool-theta.vercel.app') {
-    // Exact match for production frontend ONLY
+  } else if (hostname.includes('the-tool-git-development')) {
+    // Vercel development preview -> Railway development backend
+    env = 'development';
+  } else if (hostname.includes('the-tool-theta')) {
+    // Vercel production -> Railway production backend
     env = 'production';
-  } else {
-    // Everything else → development (includes all Vercel previews)
+  } else if (hostname.includes('vercel.app')) {
+    // Other Vercel deployments -> default to development
     env = 'development';
   }
 
@@ -71,8 +52,11 @@ const getApiBaseUrl = () => {
 
   const url = backendUrls[env];
   
-  // Verbose logging to help debug routing issues
-  console.warn(`%c[API ROUTING] hostname="${hostname}" → env="${env}" → backend="${url}"`, 'background: #ff9900; color: #000; font-weight: bold; padding: 5px;');
+  // Always log for debugging CORS issues
+  console.log(`[API] Frontend hostname: ${hostname || 'unknown'}, Detected env: ${env}, Using backend: ${url}`);
+  if (env === 'local' || process.env.REACT_APP_DEBUG === 'true') {
+    console.log(`[API] DEBUG: REACT_APP_API_BASE_URL=${process.env.REACT_APP_API_BASE_URL}, REACT_APP_DEBUG=${process.env.REACT_APP_DEBUG}`);
+  }
   
   return url;
 };
