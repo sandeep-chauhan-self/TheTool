@@ -16,9 +16,29 @@ import axios from 'axios';
 const getApiBaseUrl = () => {
   // PRIORITY 1: Explicit override from environment variable (HIGHEST PRIORITY)
   // For Vercel: Set REACT_APP_API_BASE_URL in Vercel dashboard → Environment Variables
+  // IMPORTANT: For preview deployments, MUST be: https://thetool-development.up.railway.app
   if (process.env.REACT_APP_API_BASE_URL) {
-    console.warn(`%c[API] Using REACT_APP_API_BASE_URL override: ${process.env.REACT_APP_API_BASE_URL}`, 'background: #0f0; color: #000; font-weight: bold;');
-    return process.env.REACT_APP_API_BASE_URL;
+    const url = process.env.REACT_APP_API_BASE_URL.trim();
+    
+    // Validation: If on development frontend but URL points to production, warn user
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isDevFrontend = hostname.includes('the-tool-git-development') || hostname === 'localhost';
+    const isProductionUrl = url.includes('thetool-production');
+    
+    if (isDevFrontend && isProductionUrl) {
+      console.error(
+        `%c[API ERROR] Development frontend detected but REACT_APP_API_BASE_URL points to production!`,
+        'background: #f00; color: #fff; font-weight: bold;'
+      );
+      console.error(
+        `%c[API ERROR] Set REACT_APP_API_BASE_URL to: https://thetool-development.up.railway.app`,
+        'background: #f00; color: #fff; font-weight: bold;'
+      );
+      // Fall through to hostname detection instead
+    } else {
+      console.warn(`%c[API] Using REACT_APP_API_BASE_URL override: ${url}`, 'background: #0f0; color: #000; font-weight: bold;');
+      return url;
+    }
   }
 
   // PRIORITY 2: Auto-detect environment from frontend hostname
