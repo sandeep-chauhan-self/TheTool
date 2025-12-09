@@ -83,22 +83,21 @@ def create_app(config_object=None):
     logger.info(f"Log Level: {config.LOG_LEVEL}")
     logger.info("=" * 70)
     
-    # Determine active config for CORS and rate limiting
-    active_config = config_object if isinstance(config_object, dict) else config
-    
-    # Configure CORS using centralized configuration
-    # config.CORS_ORIGINS uses CORS_CONFIG from constants.py
-    cors_origins = active_config.get('CORS_ORIGINS', config.CORS_ORIGINS) if isinstance(active_config, dict) else getattr(active_config, 'CORS_ORIGINS', config.CORS_ORIGINS)
+    # Configure CORS - use config.CORS_ORIGINS property directly
+    # This is a property that returns list of allowed origins
+    cors_origins = config.CORS_ORIGINS
     
     logger.info(f"CORS enabled for origins: {cors_origins}")
     
+    # Apply CORS to all routes
     CORS(
         app,
         resources={r"/*": {"origins": cors_origins}},
         supports_credentials=False,
         allow_headers=["Content-Type", "Authorization", "X-API-Key"],
         expose_headers=["Content-Type", "X-API-Key"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        max_age=3600
     )
     
     # Configure rate limiting if available (log only in main process)
@@ -106,10 +105,10 @@ def create_app(config_object=None):
         from flask_limiter import Limiter
         from flask_limiter.util import get_remote_address
         
-        rate_limit_enabled = active_config.get('RATE_LIMIT_ENABLED', config.RATE_LIMIT_ENABLED) if isinstance(active_config, dict) else getattr(active_config, 'RATE_LIMIT_ENABLED', config.RATE_LIMIT_ENABLED)
+        rate_limit_enabled = config.RATE_LIMIT_ENABLED
         
         if rate_limit_enabled:
-            rate_limit_per_minute = active_config.get('RATE_LIMIT_PER_MINUTE', config.RATE_LIMIT_PER_MINUTE) if isinstance(active_config, dict) else getattr(active_config, 'RATE_LIMIT_PER_MINUTE', config.RATE_LIMIT_PER_MINUTE)
+            rate_limit_per_minute = config.RATE_LIMIT_PER_MINUTE
             
             limiter = Limiter(
                 app=app,
@@ -134,7 +133,7 @@ def create_app(config_object=None):
     # Initialize database on app startup (CRITICAL for Railway PostgreSQL)
     try:
         init_db()
-        database_type = active_config.get('DATABASE_TYPE', config.DATABASE_TYPE) if isinstance(active_config, dict) else getattr(active_config, 'DATABASE_TYPE', config.DATABASE_TYPE)
+        database_type = config.DATABASE_TYPE
         if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
             logger.info(f"[OK] Database initialized on startup ({database_type.upper()})")
     except Exception as e:
@@ -190,9 +189,9 @@ def create_app(config_object=None):
     
     # Log initialization only once (main process)
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):
-        flask_env = active_config.get('FLASK_ENV', config.FLASK_ENV) if isinstance(active_config, dict) else getattr(active_config, 'FLASK_ENV', config.FLASK_ENV)
-        database_type = active_config.get('DATABASE_TYPE', config.DATABASE_TYPE) if isinstance(active_config, dict) else getattr(active_config, 'DATABASE_TYPE', config.DATABASE_TYPE)
-        debug = active_config.get('DEBUG', config.DEBUG) if isinstance(active_config, dict) else getattr(active_config, 'DEBUG', config.DEBUG)
+        flask_env = config.FLASK_ENV
+        database_type = config.DATABASE_TYPE
+        debug = config.DEBUG
         
         logger.info(f"Application created - Environment: {flask_env}")
         logger.info(f"Database: {database_type}")

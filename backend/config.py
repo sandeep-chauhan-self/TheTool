@@ -97,44 +97,30 @@ class Config:
         
         Can be overridden with CORS_ORIGINS environment variable.
         """
+        # Check for explicit environment variable override first
         env_override = os.getenv('CORS_ORIGINS')
         if env_override:
-            return [o.strip() for o in env_override.split(',')]
+            origins = [o.strip() for o in env_override.split(',')]
+            return origins
         
-        # Default configuration by backend environment
-        if self.APP_ENV == 'development':
-            # Development backend accepts from everywhere (for testing)
-            return [
-                # Local development
-                'http://localhost:3000',
-                'http://localhost:5173',
-                'http://127.0.0.1:3000',
-                'http://127.0.0.1:5173',
-                # Production frontend URLs
-                'https://the-tool-theta.vercel.app',
-                # Vercel preview deployment (development)
-                'https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app',
-                # Railway backends (both)
-                'https://thetool-development.up.railway.app',
-                'https://thetool-production.up.railway.app',
-            ]
-        else:
-            # Production backend accepts from all verified frontends
-            return [
-                # Production Vercel frontend
-                'https://the-tool-theta.vercel.app',
-                # Development/preview Vercel frontend
-                'https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app',
-                # Production Railway backend (for internal API calls)
-                'https://thetool-production.up.railway.app',
-                # Development Railway backend (for cross-environment testing)
-                'https://thetool-development.up.railway.app',
-                # Local development (for testing)
-                'http://localhost:3000',
-                'http://localhost:5173',
-                'http://127.0.0.1:3000',
-                'http://127.0.0.1:5173',
-            ]
+        # Default: Allow all common origins (both dev and prod)
+        # This is safe since we're not exposing sensitive data through CORS
+        default_origins = [
+            # Local development
+            'http://localhost:3000',
+            'http://localhost:5173',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:5173',
+            # Production Vercel frontend
+            'https://the-tool-theta.vercel.app',
+            # Development/preview Vercel frontends
+            'https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app',
+            # Railway backends (both - for internal and cross-env testing)
+            'https://thetool-development.up.railway.app',
+            'https://thetool-production.up.railway.app',
+        ]
+        
+        return default_origins
     
     # =============================================================================
     # THREADING CONFIGURATION

@@ -545,13 +545,9 @@ def migration_v8(conn):
                 CREATE UNIQUE INDEX idx_analysis_ticker_date_strategy
                 ON analysis_results(ticker, CAST(created_at AS DATE), strategy_id)
             ''')
-            conn.commit()
             logger.info("      ✓ Created new constraint")
         except Exception as e:
             logger.warning(f"      ⚠ Could not create constraint: {e}")
-            # Transaction is aborted - rollback to reset state
-            conn.rollback()
-            
             # If we can't create due to duplicates, clean them up first
             logger.info("    Cleaning up duplicate records...")
             cursor.execute('''
@@ -564,21 +560,15 @@ def migration_v8(conn):
             ''')
             deleted_count = cursor.rowcount
             logger.info(f"      ✓ Removed {deleted_count} duplicates")
-            conn.commit()
             
-            # Try again with fresh transaction
-            try:
-                cursor.execute('''
-                    CREATE UNIQUE INDEX idx_analysis_ticker_date_strategy
-                    ON analysis_results(ticker, CAST(created_at AS DATE), strategy_id)
-                ''')
-                conn.commit()
-                logger.info("      ✓ Created new constraint after cleanup")
-            except Exception as e2:
-                logger.error(f"      ✗ Still could not create constraint after cleanup: {e2}")
-                conn.rollback()
-                raise
+            # Try again
+            cursor.execute('''
+                CREATE UNIQUE INDEX idx_analysis_ticker_date_strategy
+                ON analysis_results(ticker, CAST(created_at AS DATE), strategy_id)
+            ''')
+            logger.info("      ✓ Created new constraint after cleanup")
         
+        conn.commit()
         logger.info("  ✓ Constraint update complete")
         
         return apply_migration(conn, 8, "Update unique constraint to include strategy_id", "")
