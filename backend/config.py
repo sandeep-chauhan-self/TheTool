@@ -119,11 +119,21 @@ class Config:
                 'https://thetool-production.up.railway.app',
             ]
         else:
-            # Production backend - restrictive but includes dev frontend for testing
+            # Production backend accepts from all verified frontends
             return [
+                # Production Vercel frontend
                 'https://the-tool-theta.vercel.app',
+                # Development/preview Vercel frontend
                 'https://the-tool-git-development-sandeep-chauhan-selfs-projects.vercel.app',
+                # Production Railway backend (for internal API calls)
                 'https://thetool-production.up.railway.app',
+                # Development Railway backend (for cross-environment testing)
+                'https://thetool-development.up.railway.app',
+                # Local development (for testing)
+                'http://localhost:3000',
+                'http://localhost:5173',
+                'http://127.0.0.1:3000',
+                'http://127.0.0.1:5173',
             ]
     
     # =============================================================================
