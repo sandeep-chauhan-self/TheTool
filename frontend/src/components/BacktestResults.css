@@ -29,6 +29,25 @@
   margin: 0;
 }
 
+.back-to-analysis-btn {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.back-to-analysis-btn:hover {
+  background: #4f46e5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
 /* Input Controls */
 .backtest-inputs {
   display: flex;

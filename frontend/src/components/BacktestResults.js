@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import './BacktestResults.css';
 
 export default function BacktestResults() {
-  const [ticker, setTicker] = useState('RELIANCE.NS');
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const initialTicker = searchParams.get('ticker') || '';
+  
+  const [ticker, setTicker] = useState(initialTicker);
   const [days, setDays] = useState(90);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -12,10 +17,17 @@ export default function BacktestResults() {
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 
                        (window.location.hostname === 'localhost' 
                          ? 'http://localhost:5000' 
-                         : 'https://thetool-development.up.railway.app');
+                         : 'https://thetool-production.up.railway.app');
 
-  const runBacktest = async () => {
-    if (!ticker.trim()) {
+  // Auto-run backtest if ticker is provided via URL
+  useEffect(() => {
+    if (initialTicker) {
+      runBacktest(initialTicker);
+    }
+  }, [initialTicker]);
+
+  const runBacktest = async (tickerToTest = ticker) => {
+    if (!tickerToTest.trim()) {
       setError('Please enter a ticker symbol');
       return;
     }
@@ -26,7 +38,7 @@ export default function BacktestResults() {
     
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/backtest/ticker/${ticker}?days=${days}`
+        `${API_BASE_URL}/api/backtest/ticker/${tickerToTest}?days=${days}`
       );
 
       if (!response.ok) {
@@ -59,6 +71,14 @@ export default function BacktestResults() {
       <div className="backtest-header">
         <h1>📊 Strategy 5 Backtest Analysis</h1>
         <p>Test Strategy 5 (Weekly 4% Target) on historical data</p>
+        {initialTicker && (
+          <button 
+            onClick={() => navigate(`/results/${encodeURIComponent(initialTicker)}`)}
+            className="back-to-analysis-btn"
+          >
+            ← Back to {initialTicker} Analysis
+          </button>
+        )}
       </div>
 
       <div className="backtest-inputs">
@@ -92,7 +112,7 @@ export default function BacktestResults() {
         </div>
 
         <button 
-          onClick={runBacktest} 
+          onClick={() => runBacktest(ticker)} 
           disabled={loading}
           className="backtest-button"
         >

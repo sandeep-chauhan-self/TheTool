@@ -406,7 +406,7 @@ function Results() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap">
           <button
             onClick={handleDownload}
             className="px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -423,6 +423,12 @@ function Results() {
             }`}
           >
             {reanalyzing ? 'Reanalyzing...' : 'Re-Analyze'}
+          </button>
+          <button
+            onClick={() => navigate(`/backtest?ticker=${encodeURIComponent(ticker)}`)}
+            className="px-6 py-3 bg-purple-600 text-white rounded hover:bg-purple-700"
+          >
+            📊 Backtest Strategy
           </button>
           <button
             onClick={() => navigate(-1)}
