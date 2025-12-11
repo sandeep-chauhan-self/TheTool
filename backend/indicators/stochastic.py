@@ -20,29 +20,31 @@ def calculate_stochastic(df, k_period=14, d_period=3, smooth=3):
 def vote_and_confidence(df):
     """
     Stochastic voting logic:
-    - K < 20: Oversold ? Buy (+1)
-    - K > 80: Overbought ? Sell (-1)
-    - 20 ? K ? 80: Neutral (0)
+    - K < 20: Oversold → Buy (+1)
+    - K > 80: Overbought → Sell (-1)
+    - 20 ≤ K ≤ 80: Neutral (0)
     
-    Confidence:
-    - If K < 20: conf = (20 - K) / 20
-    - If K > 80: conf = (K - 80) / 20
-    - Otherwise: conf = 0
+    Confidence (how certain the indicator is about its assessment):
+    - K at 50: 100% confident neutral (furthest from boundaries)
+    - K at 20 or 80: Low confidence (at boundary)
+    - K at 0 or 100: 100% confident in signal (extreme)
     """
     stoch_data = calculate_stochastic(df)
     k = stoch_data['k']
     
     if k < 20:
-        vote = 1
-        confidence = (20 - k) / 20
+        vote = 1  # Buy (oversold)
+        confidence = (20 - k) / 20  # 0 at K=20, 1.0 at K=0
     elif k > 80:
-        vote = -1
-        confidence = (k - 80) / 20
+        vote = -1  # Sell (overbought)
+        confidence = (k - 80) / 20  # 0 at K=80, 1.0 at K=100
     else:
-        vote = 0
-        confidence = 0.0
+        vote = 0  # Neutral
+        # Confidence highest at K=50 (furthest from boundaries)
+        distance_from_boundary = min(k - 20, 80 - k)  # 0-30 range
+        confidence = distance_from_boundary / 30  # 0 at boundaries, 1.0 at K=50
     
-    confidence = min(confidence, 1.0)
+    confidence = min(max(confidence, 0.0), 1.0)
     
     return {
         "name": "Stochastic",

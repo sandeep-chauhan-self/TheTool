@@ -33,7 +33,8 @@ class JobStateTransactions:
         status: str,
         total: int,
         description: str = "",
-        tickers: Optional[List[str]] = None
+        tickers: Optional[List[str]] = None,
+        strategy_id: int = 1
     ) -> bool:
         """
         Create a job record atomically.
@@ -47,6 +48,7 @@ class JobStateTransactions:
             total: Total items to process
             description: Optional job description
             tickers: List of tickers being analyzed (for duplicate detection)
+            strategy_id: Strategy ID (default 1)
             
         Returns:
             True if created, False if failed or duplicate
@@ -67,8 +69,8 @@ class JobStateTransactions:
                 query = '''
                     INSERT INTO analysis_jobs 
                     (job_id, status, total, completed, progress, errors,
-                     tickers_json, created_at, updated_at, successful)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     tickers_json, strategy_id, created_at, updated_at, successful)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 '''
                 query, params = _convert_query_params(query, (
                     job_id,
@@ -78,6 +80,7 @@ class JobStateTransactions:
                     0,  # progress
                     '[]',  # errors
                     tickers_json,  # normalized tickers
+                    strategy_id,  # strategy ID
                     now,
                     now,
                     0  # successful
@@ -85,7 +88,7 @@ class JobStateTransactions:
                 
                 cursor.execute(query, params)
                 # commit() is called automatically by context manager
-                logger.info(f"Job {job_id} created atomically")
+                logger.info(f"Job {job_id} created atomically with strategy_id={strategy_id}")
                 return True
                 
         except Exception as e:

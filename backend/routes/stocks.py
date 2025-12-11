@@ -129,18 +129,52 @@ def get_nse_list():
 
 @bp.route("/nse-stocks", methods=["GET"])
 def get_nse_stocks():
-    """Get NSE stocks from database"""
+    """Get NSE stocks - tries database first, falls back to CSV file"""
     try:
-        stocks = query_db("""
-            SELECT ticker, symbol, name, sector, industry, market_cap
-            FROM nse_stocks
-            ORDER BY market_cap DESC
-            LIMIT ?
-        """, (100,))
+        # First try to get from database
+        try:
+            stocks = query_db("""
+                SELECT ticker, symbol, name, sector, industry, market_cap
+                FROM nse_stocks
+                ORDER BY market_cap DESC
+                LIMIT ?
+            """, (100,))
+            
+            if stocks and len(stocks) > 0:
+                return jsonify({
+                    "stocks": [dict(s) for s in stocks],
+                    "count": len(stocks)
+                }), 200
+        except Exception as db_error:
+            logger.warning(f"Database query failed, falling back to CSV: {db_error}")
         
+        # Fall back to CSV file
+        csv_path = _data_root() / "nse_stocks_complete.csv"
+        if csv_path.exists():
+            import csv
+            stocks = []
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    stocks.append({
+                        'symbol': row.get('SYMBOL', row.get('symbol', '')),
+                        'name': row.get('NAME OF COMPANY', row.get('name', row.get('company_name', ''))),
+                        'ticker': f"{row.get('SYMBOL', row.get('symbol', ''))}.NS",
+                        'sector': row.get('sector', ''),
+                        'industry': row.get('industry', ''),
+                        'market_cap': row.get('market_cap', 0)
+                    })
+            
+            return jsonify({
+                "stocks": stocks[:500],  # Limit to 500 for performance
+                "count": len(stocks)
+            }), 200
+        
+        # No data available
         return jsonify({
-            "stocks": [dict(s) for s in stocks],
-            "count": len(stocks)
+            "stocks": [],
+            "count": 0,
+            "message": "NSE stocks data not available. Please run fetch_nse_stocks.py to populate."
         }), 200
         
     except Exception as e:

@@ -1,9 +1,10 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import AnalysisConfig from './pages/AnalysisConfig';
-import Results from './pages/Results';
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import AllStocksAnalysis from './pages/AllStocksAnalysis';
+import AnalysisConfig from './pages/AnalysisConfig';
+import Dashboard from './pages/Dashboard';
+import Results from './pages/Results';
+import StrategyHelp from './pages/StrategyHelp';
+import BacktestResults from './components/BacktestResults';
 
 function App() {
   return (
@@ -14,6 +15,8 @@ function App() {
           <Route path="/config" element={<AnalysisConfig />} />
           <Route path="/results/:ticker" element={<Results />} />
           <Route path="/all-stocks" element={<AllStocksAnalysis />} />
+          <Route path="/strategies/:id" element={<StrategyHelp />} />
+          <Route path="/backtest" element={<BacktestResults />} />
         </Routes>
       </div>
     </Router>

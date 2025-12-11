@@ -7,7 +7,7 @@ into modular components following Single Responsibility Principle.
 Architecture:
 - DataFetcher: Data acquisition and validation
 - IndicatorEngine: Technical indicator calculations
-- SignalAggregator: Vote aggregation logic
+- SignalAggregator: Vote aggregation logic (with strategy support)
 - TradeCalculator: Entry/stop/target calculations
 - ResultFormatter: Output formatting
 
@@ -16,6 +16,7 @@ Benefits:
 - Improved testability and maintainability
 - Clear separation of concerns
 - 100% backward compatibility maintained
+- Strategy-based analysis support (strategy_id parameter)
 """
 
 import logging
@@ -234,19 +235,24 @@ class SignalAggregator:
     Aggregates indicator votes into composite score.
     
     Responsibilities:
-    - Apply category-based weighting
+    - Apply strategy-based weighting (indicator + category weights)
     - Calculate composite score
     - Generate verdict from score
     """
     
     @staticmethod
-    def aggregate_votes(indicator_results: List[Dict[str, Any]], category_weights: Optional[Dict[str, float]] = None) -> float:
+    def aggregate_votes(
+        indicator_results: List[Dict[str, Any]], 
+        category_weights: Optional[Dict[str, float]] = None,
+        indicator_weights: Optional[Dict[str, float]] = None
+    ) -> float:
         """
-        Aggregate indicator votes with category-based weighting.
+        Aggregate indicator votes with strategy-based weighting.
         
         Args:
             indicator_results: List of indicator results
             category_weights: Optional custom category weights (defaults to TYPE_BIAS)
+            indicator_weights: Optional per-indicator weights from strategy
             
         Returns:
             Composite score (-1.0 to 1.0)
@@ -254,21 +260,47 @@ class SignalAggregator:
         if not indicator_results:
             return 0.0
         
-        weights = category_weights or TYPE_BIAS
+        cat_weights = category_weights or TYPE_BIAS
+        ind_weights = indicator_weights or {}
         
         total_weighted_vote = 0.0
         total_weight = 0.0
+        
+        # Map indicator display names to weight keys
+        indicator_name_map = {
+            'RSI': 'rsi',
+            'MACD': 'macd',
+            'ADX': 'adx',
+            'Parabolic SAR': 'psar',
+            'EMA Crossover': 'ema',
+            'Stochastic': 'stochastic',
+            'CCI': 'cci',
+            'Williams %R': 'williams',
+            'ATR': 'atr',
+            'Bollinger Bands': 'bollinger',
+            'OBV': 'obv',
+            'Chaikin Money Flow': 'cmf'
+        }
         
         for result in indicator_results:
             vote = result.get('vote', 0)
             confidence = result.get('confidence', 0.5)
             category = result.get('category', 'unknown')
+            indicator_name = result.get('name', '')
             
-            # Get category bias from provided weights or default
-            bias = weights.get(category, 0.5)
+            # Get category weight
+            cat_bias = cat_weights.get(category, 0.5)
             
-            # Calculate weighted vote
-            weight = confidence * bias
+            # Get indicator-specific weight from strategy
+            indicator_key = indicator_name_map.get(indicator_name, indicator_name.lower())
+            ind_weight = ind_weights.get(indicator_key, 1.0)
+            
+            # Skip disabled indicators (weight = 0)
+            if ind_weight == 0:
+                continue
+            
+            # Calculate combined weight: confidence * category_bias * indicator_weight
+            weight = confidence * cat_bias * ind_weight
             total_weighted_vote += vote * weight
             total_weight += weight
         
@@ -522,7 +554,8 @@ class AnalysisOrchestrator:
         indicators: Optional[List[str]] = None,
         capital: Optional[float] = None,
         use_demo_data: bool = False,
-        analysis_config: Optional[Dict[str, Any]] = None
+        analysis_config: Optional[Dict[str, Any]] = None,
+        strategy_id: int = 1
     ) -> Dict[str, Any]:
         """
         Execute complete ticker analysis pipeline.
@@ -539,15 +572,23 @@ class AnalysisOrchestrator:
                 - data_period: Historical data period (default '200d')
                 - category_weights: Dict of category weights for scoring
                 - enabled_indicators: Dict of indicator toggles
+            strategy_id: Strategy ID (1=Balanced, 2=Trend, 3=Mean Reversion, 4=Momentum)
             
         Returns:
             Complete analysis result dictionary
         """
+        # Load strategy
+        from strategies import StrategyManager
+        strategy = StrategyManager.get(strategy_id)
+        
         # Merge config with defaults
         config = analysis_config or {}
         effective_capital = config.get('capital', capital) or capital
         effective_demo = config.get('use_demo_data', use_demo_data)
-        category_weights = config.get('category_weights') or TYPE_BIAS
+        
+        # Get weights from strategy (can be overridden by config)
+        category_weights = config.get('category_weights') or strategy.get_category_weights()
+        indicator_weights = config.get('indicator_weights') or strategy.get_indicator_weights()
         enabled_indicators = config.get('enabled_indicators')
         
         # Filter indicators based on enabled_indicators config
@@ -603,8 +644,12 @@ class AnalysisOrchestrator:
                 logger.warning(f"[ORCHESTRATOR] No indicators calculated for {ticker}")
                 return self._error_result(ticker, "No indicators calculated")
             
-            # Step 3: Aggregate signals (with custom category weights if provided)
-            score = self.signal_aggregator.aggregate_votes(indicator_results, category_weights)
+            # Step 3: Aggregate signals (with strategy-based weights)
+            score = self.signal_aggregator.aggregate_votes(
+                indicator_results, 
+                category_weights,
+                indicator_weights
+            )
             verdict = self.signal_aggregator.get_verdict(score)
             
             logger.info(f"[ORCHESTRATOR] Signal analysis complete - ticker: {ticker}, score: {score}, verdict: {verdict}")
@@ -642,6 +687,10 @@ class AnalysisOrchestrator:
                 data_message=data_message,
                 warnings=warnings
             )
+            
+            # Add strategy info to result
+            result['strategy_id'] = strategy_id
+            result['strategy_name'] = strategy.name
 
             return result
             

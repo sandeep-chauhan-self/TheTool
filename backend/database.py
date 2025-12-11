@@ -319,7 +319,8 @@ def _init_postgres_db():
                 error_message TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP,
-                analysis_source TEXT
+                analysis_source TEXT,
+                strategy_id INTEGER DEFAULT 1
             )
         ''')
         
@@ -328,6 +329,8 @@ def _init_postgres_db():
             cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS position_size INTEGER DEFAULT 0")
             cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS risk_reward_ratio REAL DEFAULT 0")
             cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS analysis_config TEXT")
+            cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS strategy_id INTEGER DEFAULT 1")
+            cursor.execute("ALTER TABLE analysis_jobs ADD COLUMN IF NOT EXISTS strategy_id INTEGER DEFAULT 1")
             conn.commit()
         except Exception as col_error:
             logger.debug(f"Columns may already exist: {col_error}")
@@ -347,8 +350,31 @@ def _init_postgres_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 started_at TIMESTAMP,
-                completed_at TIMESTAMP
+                completed_at TIMESTAMP,
+                strategy_id INTEGER DEFAULT 1
             )
+        ''')
+        
+        # Strategies metadata table (code-defined strategies, DB stores metadata only)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS strategies (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Insert default strategies if they don't exist
+        cursor.execute('''
+            INSERT INTO strategies (id, name, description, is_active)
+            VALUES 
+                (1, 'Strategy 1', 'Balanced Analysis - Equal weight to all 12 indicators', TRUE),
+                (2, 'Strategy 2', 'Trend Following - Emphasizes MACD, ADX, EMA crossovers', TRUE),
+                (3, 'Strategy 3', 'Mean Reversion - Emphasizes RSI, Bollinger Bands, Stochastic', TRUE),
+                (4, 'Strategy 4', 'Momentum Breakout - Volume-confirmed momentum signals', TRUE)
+            ON CONFLICT (id) DO NOTHING
         ''')
         
         # Create indexes for faster queries on unified analysis_results table
@@ -362,6 +388,8 @@ def _init_postgres_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_created ON analysis_results(symbol, created_at DESC)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_source_symbol ON analysis_results(analysis_source, symbol)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON analysis_results(updated_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_strategy_id ON analysis_results(strategy_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_jobs_strategy_id ON analysis_jobs(strategy_id)')
         
         conn.commit()
         logger.debug("PostgreSQL database schema initialized successfully")

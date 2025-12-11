@@ -106,6 +106,15 @@ def analyze():
         tickers = validated_data["tickers"]
         capital = validated_data["capital"]
         force = data.get("force", False)
+        strategy_id = data.get("strategy_id", 1)  # Default to Strategy 1 (Balanced)
+        
+        # Validate strategy_id is a valid integer
+        try:
+            strategy_id = int(strategy_id)
+            if strategy_id < 1:
+                strategy_id = 1
+        except (ValueError, TypeError):
+            strategy_id = 1
         
         # Extract additional config parameters
         analysis_config = {
@@ -119,7 +128,7 @@ def analyze():
             "enabled_indicators": data.get("enabled_indicators")
         }
         
-        logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}, force: {force}")
+        logger.info(f"[ANALYZE] Validation passed - tickers: {tickers}, capital: {capital}, force: {force}, strategy_id: {strategy_id}")
         logger.debug(f"[ANALYZE] Config: {analysis_config}")
         
         # Check for duplicate/active jobs (unless force=true)
@@ -152,7 +161,8 @@ def analyze():
                     status="queued",
                     total=len(tickers),
                     description=f"Analyze {len(tickers)} ticker(s) with capital {capital}",
-                    tickers=tickers
+                    tickers=tickers,
+                    strategy_id=strategy_id
                 )
                 if created:
                     break
@@ -182,18 +192,19 @@ def analyze():
         start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_success = start_analysis_job(job_id, tickers, None, capital, False, analysis_config)
+            start_success = start_analysis_job(job_id, tickers, None, capital, False, analysis_config, strategy_id)
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
             logger.exception(f"Failed to start analysis job {job_id}")
         
-        logger.info(f"Analysis job created: {job_id} for {tickers}")
+        logger.info(f"Analysis job created: {job_id} for {tickers} with strategy_id={strategy_id}")
         return jsonify({
             "job_id": job_id,
             "status": "queued",
             "tickers": tickers,
             "capital": capital,
+            "strategy_id": strategy_id,
             "thread_started": start_success
         }), 201
         

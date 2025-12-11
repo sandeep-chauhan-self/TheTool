@@ -95,19 +95,40 @@ class OBVIndicator(VolumeIndicator):
             return VOTE_NEUTRAL
     
     def _get_confidence(self, value: tuple, df: pd.DataFrame) -> float:
-        """Calculate confidence based on OBV change magnitude (MLRM-001)
+        """Calculate confidence based on OBV-price alignment (MLRM-001)
         
-        Confidence = min(|OBV_change| / (multiplier * avg_volume), 1.0)
-        This normalizes OBV momentum relative to typical volume without scaling
-        down confidence artificially as dataset size grows.
+        Confidence reflects how strongly OBV confirms (or diverges from) price:
+        - Strong confirmation (same direction, large OBV move): High confidence
+        - Divergence (opposite directions): Lower confidence, but still meaningful
+          because divergence itself is a signal worth noting
+        - Flat/no change: Moderate confidence (market consolidating)
         """
         obv_current, obv_prev = value
+        price_current = df['Close'].iloc[-1]
+        price_prev = df['Close'].iloc[-2]
         avg_volume = df['Volume'].mean()
-        obv_change = obv_current - obv_prev
         
-        if avg_volume > 0:
-            return min(abs(obv_change) / (OBV_CONFIDENCE_MULTIPLIER * avg_volume), 1.0)
-        return 0.0
+        obv_change = obv_current - obv_prev
+        price_change = price_current - price_prev
+        
+        if avg_volume <= 0:
+            return 0.5  # Default moderate confidence
+        
+        # Base confidence on OBV magnitude relative to average volume
+        obv_magnitude = min(abs(obv_change) / (OBV_CONFIDENCE_MULTIPLIER * avg_volume), 1.0)
+        
+        # Check alignment between OBV and price
+        if (obv_change > 0 and price_change > 0) or (obv_change < 0 and price_change < 0):
+            # Confirmation - OBV and price moving same direction
+            confidence = 0.5 + (obv_magnitude * 0.5)  # 50-100% range
+        elif (obv_change > 0 and price_change < 0) or (obv_change < 0 and price_change > 0):
+            # Divergence - still meaningful, indicates potential reversal
+            confidence = 0.3 + (obv_magnitude * 0.4)  # 30-70% range
+        else:
+            # No clear movement
+            confidence = 0.5  # Moderate confidence
+        
+        return min(max(confidence, 0.0), 1.0)
 
 
 # Backward compatibility

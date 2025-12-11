@@ -43,6 +43,19 @@ function NavigationBar() {
             >
               All Stocks Analysis
             </button>
+
+            <span className="flex items-center text-gray-300 px-2">|</span>
+
+            <button
+              onClick={() => navigate('/backtest')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive('/backtest')
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              Backtest
+            </button>
           </div>
         </div>
       </div>
