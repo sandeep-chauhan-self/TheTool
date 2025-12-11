@@ -37,9 +37,11 @@ class BacktestEngine:
     """
     
     # Strategy 5 parameters (synchronized with strategy_5.py)
-    TARGET_PCT = 4.0       # 4% target
-    STOP_LOSS_PCT = 3.0    # 3% default stop
-    ATR_MULTIPLIER = 2.0   # Dynamic stop = Entry - (2 × ATR)
+    TARGET_PCT = 5.0       # 5% target (aggressive)
+    STOP_LOSS_PCT = 3.0    # Base stop: 3%
+    MAX_STOP_LOSS_PCT = 4.0  # Maximum stop: 4% (cap)
+    ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR × 1.5)
+    USE_WIDER_STOP = True  # Use wider stop in volatile conditions
     MIN_VOLUME_RATIO = 1.3 # Minimum 1.3x average volume
     RSI_MIN = 35           # Minimum RSI for healthy momentum  
     RSI_MAX = 75           # Maximum RSI (avoid overbought)
@@ -303,12 +305,19 @@ class BacktestEngine:
     
     def _simulate_trades(self, df: pd.DataFrame, signals: List[Dict]) -> List[Dict]:
         """
-        Simulate trades from entry signals using Strategy 5 rules.
+        Simulate trades from entry signals using Strategy 5 SMART STOP LOSS.
+        
+        SMART STOP LOSS LOGIC:
+        1. Base stop: 3% below entry
+        2. ATR-based stop: entry - (ATR × 1.5) for volatile conditions
+        3. Maximum cap: 4% (never lose more than 4%)
+        4. Use WIDER stop when ATR indicates high volatility
+           (reduces stop-and-reverse scenarios)
         
         For each signal:
         - Entry at signal close price
-        - Target: 4% above entry (Strategy 5)
-        - Stop: Dynamic using ATR (2×ATR) or 3% fixed, whichever is tighter
+        - Target: 5% above entry
+        - Stop: Smart dynamic (3-4% based on volatility)
         - Lookback: 10 bars (~2 weeks) to find exit
         """
         trades = []
@@ -320,18 +329,25 @@ class BacktestEngine:
                 entry_date = signal['date']
                 atr = signal.get('atr', 0)
                 
-                # Calculate target (4%)
+                # Calculate target (5%)
                 target = entry_price * (1 + self.TARGET_PCT / 100)
                 
-                # Calculate stop loss (dynamic ATR-based or fixed 3%)
-                fixed_stop = entry_price * (1 - self.STOP_LOSS_PCT / 100)
+                # SMART STOP LOSS CALCULATION
+                # Base stop: 3%
+                base_stop = entry_price * (1 - self.STOP_LOSS_PCT / 100)
+                # Maximum stop: 4% (cap)
+                max_stop = entry_price * (1 - self.MAX_STOP_LOSS_PCT / 100)
                 
-                if atr > 0:
-                    dynamic_stop = entry_price - (self.ATR_MULTIPLIER * atr)
-                    # Use the TIGHTER stop (higher price = less risk)
-                    stop_loss = max(fixed_stop, dynamic_stop)
+                if atr > 0 and self.USE_WIDER_STOP:
+                    # ATR-based dynamic stop
+                    atr_stop = entry_price - (self.ATR_MULTIPLIER * atr)
+                    
+                    # SMART LOGIC: Use WIDER stop in volatile conditions
+                    # but cap at maximum (4%)
+                    # wider stop = lower price = more room before stop hit
+                    stop_loss = min(base_stop, max(atr_stop, max_stop))
                 else:
-                    stop_loss = fixed_stop
+                    stop_loss = base_stop
                 
                 # Find exit point (look forward up to 10 bars)
                 outcome = self._find_exit(df, entry_index, entry_price, target, stop_loss)

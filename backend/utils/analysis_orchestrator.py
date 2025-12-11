@@ -372,10 +372,12 @@ class TradeCalculator:
             
             # Strategy-specific stop/target (from Strategy's risk_profile)
             # These come from strategy.get_risk_profile() merged into config
-            strategy_stop_pct = cfg.get('stop_loss_pct', 3.0) / 100  # e.g., 3% for Strategy 5
-            strategy_target_pct = cfg.get('target_pct', 4.0) / 100  # e.g., 4% for Strategy 5
+            strategy_stop_pct = cfg.get('stop_loss_pct', 3.0) / 100  # Base stop: 3%
+            max_stop_pct = cfg.get('max_stop_loss_pct', 4.0) / 100   # Max stop: 4%
+            strategy_target_pct = cfg.get('target_pct', 4.0) / 100   # Target %
             use_dynamic_stop = cfg.get('use_dynamic_stop', False)
-            atr_multiplier = cfg.get('atr_multiplier', 2.0)
+            atr_multiplier = cfg.get('atr_multiplier', 1.5)          # ATR × 1.5
+            use_wider_stop = cfg.get('use_wider_stop_for_volatility', False)
             
             # Get current price
             current_price = float(df['Close'].iloc[-1])
@@ -397,16 +399,23 @@ class TradeCalculator:
                 tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
                 atr = tr.rolling(window=14).mean().iloc[-1]
             
-            # Use STRATEGY-SPECIFIC stop and target percentages
-            # This is the KEY FIX - each strategy now uses its own risk profile
+            # SMART STOP LOSS CALCULATION
+            # Base stop from strategy (e.g., 3%)
             stop_pct = strategy_stop_pct
             target_pct = strategy_target_pct
             
-            # If dynamic stop is enabled (Strategy 5), use ATR-based stop if tighter
+            # If dynamic stop is enabled, calculate ATR-based stop
             if use_dynamic_stop and atr > 0:
                 atr_stop_pct = (atr_multiplier * atr) / entry_price
-                # Use whichever is TIGHTER (smaller percentage)
-                stop_pct = min(stop_pct, atr_stop_pct)
+                
+                if use_wider_stop:
+                    # SMART LOGIC: Use WIDER stop in volatile conditions
+                    # This reduces stop-and-reverse scenarios
+                    # But cap at max_stop_pct (e.g., 4%)
+                    stop_pct = max(strategy_stop_pct, min(atr_stop_pct, max_stop_pct))
+                else:
+                    # Traditional: Use TIGHTER stop
+                    stop_pct = min(strategy_stop_pct, atr_stop_pct)
             
             if verdict in ["Buy", "Strong Buy"]:
                 stop_loss = entry_price * (1 - stop_pct)
@@ -621,6 +630,10 @@ class AnalysisOrchestrator:
             'use_dynamic_stop': risk_profile.get('use_dynamic_stop_loss', False),
             'atr_multiplier': risk_profile.get('atr_multiplier', 2.0),
             'max_position_size_pct': risk_profile.get('max_position_size_pct', 20),
+            # Smart stop loss parameters
+            'max_stop_loss_pct': risk_profile.get('max_stop_loss_pct', 4.0),
+            'atr_stop_multiplier': risk_profile.get('atr_stop_multiplier', 1.5),
+            'use_wider_stop_for_volatility': risk_profile.get('use_wider_stop_for_volatility', False),
         }
         # Merge strategy config into user config (user config overrides strategy defaults)
         for key, value in strategy_config.items():
