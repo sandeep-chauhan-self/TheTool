@@ -40,6 +40,13 @@ const STRATEGIES = [
     shortName: 'Momentum',
     description: 'Emphasizes OBV, CMF, ATR - best for breakout plays',
     icon: '🚀'
+  },
+  {
+    id: 5,
+    name: 'Strategy 5 - Weekly 4% Target',
+    shortName: '4% Weekly',
+    description: 'Aggressive swing trading - 4% target, 3% stop, smart filters',
+    icon: '🎯'
   }
 ];
 
