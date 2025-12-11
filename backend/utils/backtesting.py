@@ -428,13 +428,21 @@ class BacktestEngine:
             pnl_pct = ((last_close - entry_price) / entry_price) * 100
             outcome = 'WIN' if pnl_pct > 0 else 'LOSS'
             
+            # Determine reason based on actual bars held
+            if max_bars >= 10:
+                reason = 'Time exit (10 bars)'
+            elif max_bars > 0:
+                reason = f'End of data ({max_bars} bars)'
+            else:
+                reason = 'No data available'
+            
             return {
                 'outcome': outcome,
                 'exit_price': round(last_close, 2),
                 'exit_date': exit_date.strftime('%Y-%m-%d') if hasattr(exit_date, 'strftime') else str(exit_date),
                 'pnl_pct': round(pnl_pct, 2),
                 'bars_held': max_bars,
-                'reason': 'Time exit (10 bars)'
+                'reason': reason
             }
             
         except Exception as e:
