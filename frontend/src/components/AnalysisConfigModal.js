@@ -43,9 +43,9 @@ const STRATEGIES = [
   },
   {
     id: 5,
-    name: 'Strategy 5 - Weekly 4% Target',
-    shortName: '4% Weekly',
-    description: 'Aggressive swing trading - 4% target, 3% stop, smart filters',
+    name: 'Strategy 5 - Weekly 5% Target',
+    shortName: '5% Weekly',
+    description: 'AGGRESSIVE swing trading - 5% target, 3% stop, heavy momentum bias',
     icon: '🎯'
   }
 ];

@@ -357,7 +357,8 @@ class TradeCalculator:
             score: Composite score
             verdict: Trading verdict
             capital: Available capital
-            config: Optional config with risk_percent, position_size_limit, risk_reward_ratio
+            config: Optional config with risk_percent, position_size_limit, risk_reward_ratio,
+                   AND strategy-specific values: stop_loss_pct, target_pct, use_dynamic_stop, atr_multiplier
             
         Returns:
             Dictionary with trade parameters
@@ -368,6 +369,13 @@ class TradeCalculator:
             risk_percent = cfg.get('risk_percent', 2) / 100  # Convert to decimal (default 2%)
             position_limit = cfg.get('position_size_limit', 20) / 100  # Convert to decimal (default 20%)
             min_rr_ratio = cfg.get('risk_reward_ratio', 1.5)  # Default 1.5:1
+            
+            # Strategy-specific stop/target (from Strategy's risk_profile)
+            # These come from strategy.get_risk_profile() merged into config
+            strategy_stop_pct = cfg.get('stop_loss_pct', 3.0) / 100  # e.g., 3% for Strategy 5
+            strategy_target_pct = cfg.get('target_pct', 4.0) / 100  # e.g., 4% for Strategy 5
+            use_dynamic_stop = cfg.get('use_dynamic_stop', False)
+            atr_multiplier = cfg.get('atr_multiplier', 2.0)
             
             # Get current price
             current_price = float(df['Close'].iloc[-1])
@@ -380,21 +388,25 @@ class TradeCalculator:
                 signal=verdict
             )
             
-            # Calculate stop loss and target based on risk/reward settings
-            # Use ATR-based stop for volatility awareness, with config-based fallback
-            # Conservative uses tighter stops (2%), Aggressive uses wider stops (4%)
-            atr_multiplier = 2.0  # Standard ATR multiplier for stop loss
+            # Calculate ATR for dynamic stop loss
+            atr = 0
+            if use_dynamic_stop and len(df) >= 14:
+                high_low = df['High'] - df['Low']
+                high_close = abs(df['High'] - df['Close'].shift())
+                low_close = abs(df['Low'] - df['Close'].shift())
+                tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+                atr = tr.rolling(window=14).mean().iloc[-1]
             
-            # Get ATR-based stop percentage or use risk_percent as basis
-            # risk_percent is already converted to decimal (e.g., 0.01 for 1%)
-            # Use 2x risk_percent as stop % (Conservative: 2%, Balanced: 4%, Aggressive: 6%)
-            stop_pct = risk_percent * 2  # risk_percent is 0.01 (1%), 0.02 (2%), etc.
-            if stop_pct < 0.02:
-                stop_pct = 0.02  # Minimum 2% stop
-            elif stop_pct > 0.08:
-                stop_pct = 0.08  # Maximum 8% stop
+            # Use STRATEGY-SPECIFIC stop and target percentages
+            # This is the KEY FIX - each strategy now uses its own risk profile
+            stop_pct = strategy_stop_pct
+            target_pct = strategy_target_pct
             
-            target_pct = stop_pct * min_rr_ratio
+            # If dynamic stop is enabled (Strategy 5), use ATR-based stop if tighter
+            if use_dynamic_stop and atr > 0:
+                atr_stop_pct = (atr_multiplier * atr) / entry_price
+                # Use whichever is TIGHTER (smaller percentage)
+                stop_pct = min(stop_pct, atr_stop_pct)
             
             if verdict in ["Buy", "Strong Buy"]:
                 stop_loss = entry_price * (1 - stop_pct)
@@ -405,7 +417,7 @@ class TradeCalculator:
             else:
                 # HOLD: Still calculate proper stop/target for reference
                 stop_loss = entry_price * (1 - stop_pct)
-                target = entry_price * (1 + target_pct)  # Use target_pct with R:R ratio
+                target = entry_price * (1 + target_pct)
             
             # Determine signal
             if score >= 0.2:
@@ -585,6 +597,35 @@ class AnalysisOrchestrator:
         config = analysis_config or {}
         effective_capital = config.get('capital', capital) or capital
         effective_demo = config.get('use_demo_data', use_demo_data)
+        
+        # Get strategy's risk profile and merge into config
+        # This ensures Strategy 5's 4% target, 3% stop are used in trade calculations
+        risk_profile = strategy.get_risk_profile()
+        
+        # Calculate target_pct based on strategy's approach:
+        # - Strategy 5: Uses 'min_reward_pct' (fixed 4% target)
+        # - Strategy 1-4: Uses 'default_target_multiplier' (R:R ratio based on stop)
+        stop_loss_pct = risk_profile.get('default_stop_loss_pct', 3.0)
+        
+        if 'min_reward_pct' in risk_profile:
+            # Strategy 5 style: fixed target percentage
+            target_pct = risk_profile.get('min_reward_pct', 4.0)
+        else:
+            # Strategies 1-4 style: target based on stop × multiplier
+            target_multiplier = risk_profile.get('default_target_multiplier', 2.0)
+            target_pct = stop_loss_pct * target_multiplier
+        
+        strategy_config = {
+            'stop_loss_pct': stop_loss_pct,
+            'target_pct': target_pct,
+            'use_dynamic_stop': risk_profile.get('use_dynamic_stop_loss', False),
+            'atr_multiplier': risk_profile.get('atr_multiplier', 2.0),
+            'max_position_size_pct': risk_profile.get('max_position_size_pct', 20),
+        }
+        # Merge strategy config into user config (user config overrides strategy defaults)
+        for key, value in strategy_config.items():
+            if key not in config:
+                config[key] = value
         
         # Get weights from strategy (can be overridden by config)
         category_weights = config.get('category_weights') or strategy.get_category_weights()

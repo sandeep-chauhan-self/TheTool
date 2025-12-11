@@ -1,15 +1,15 @@
 """
-Strategy 5: Weekly 4% Target (Aggressive Swing Trading)
+Strategy 5: Weekly 5% Target (AGGRESSIVE Swing Trading)
 
-ENHANCED VERSION with intelligent filters:
-- Momentum confirmation (RSI, MACD, Stochastic alignment)
+AGGRESSIVE VERSION with intelligent filters:
+- Heavy momentum bias (RSI, MACD, Stochastic dominate scoring)
 - Volume surge validation (OBV, CMF, volume ratio checks)
 - ATR-based dynamic stop losses (adapts to volatility)
 - Signal contradiction detection (confidence scoring)
-- Volatility regime adaptation (4-5% targets based on market conditions)
+- Higher risk tolerance for larger gains
 
-Optimized for 4% minimum weekly gains with intelligent risk management.
-High momentum focus with risk protection filters.
+Optimized for 5% weekly gains with calculated risk.
+Maximum momentum focus for decisive BUY/SELL signals.
 """
 
 from typing import Dict, Any, Tuple
@@ -60,45 +60,44 @@ class Strategy5(BaseStrategy):
     
     id = 5
     name = "Strategy 5"
-    description = "Weekly 4% Target (Enhanced) - Aggressive swing trading with intelligence filters. Smart momentum + volume + dynamic stops."
+    description = "Weekly 5% Target (AGGRESSIVE) - High-conviction swing trading. Heavy momentum bias, 5% target, 3% stop. For experienced traders."
     
     def get_indicator_weights(self) -> Dict[str, float]:
         """
-        Prioritize momentum and fast-moving indicators for quick reversals.
-        De-emphasize slower trend confirmation.
+        AGGRESSIVE: Heavy momentum bias for decisive signals.
+        Much higher weights than other strategies = different scores.
         """
         return {
-            # Trend indicators (lower weight for faster signals)
-            'macd': 1.2,          # MACD crossovers for momentum
-            'adx': 0.7,           # ADX (lower priority - slow trend)
-            'ema': 0.8,           # EMA (lower priority)
-            'psar': 1.0,          # SAR for quick exits
+            # Trend indicators (de-prioritized - we want FAST signals)
+            'macd': 1.5,          # MACD crossovers (momentum component)
+            'adx': 0.5,           # ADX (ignore - too slow)
+            'ema': 0.6,           # EMA (ignore - too slow)
+            'psar': 1.2,          # SAR for quick exits
             
-            # Momentum indicators (HIGHEST PRIORITY for quick moves)
-            'rsi': 1.6,           # Oversold/overbought (fast reversal signals)
-            'stochastic': 1.6,    # Stochastic (fast oscillator)
-            'cci': 1.4,           # CCI (commodity channel for swing trading)
-            'williams': 1.3,      # Williams %R (momentum extremes)
+            # Momentum indicators (DOMINANT - drives the score)
+            'rsi': 2.0,           # RSI is KING for swing trading
+            'stochastic': 2.0,    # Stochastic equally important
+            'cci': 1.8,           # CCI for swing extremes
+            'williams': 1.6,      # Williams %R momentum
             
-            # Volatility indicators (for risk management)
-            'bollinger': 1.2,     # Bollinger Bands (breakout confirmation)
-            'atr': 1.0,           # ATR (position sizing)
+            # Volatility indicators (for sizing, not signals)
+            'bollinger': 1.3,     # Bollinger Bands breakouts
+            'atr': 0.8,           # ATR (just for stop calculation)
             
-            # Volume indicators (confirmation only)
-            'obv': 1.0,           # OBV (volume trend)
-            'cmf': 1.0,           # CMF (money flow confirmation)
+            # Volume indicators (confirmation boost)
+            'obv': 1.2,           # OBV trend confirmation
+            'cmf': 1.2,           # CMF money flow confirmation
         }
     
     def get_category_weights(self) -> Dict[str, float]:
         """
-        Momentum category dominates for quick price moves.
-        Volatility important for risk management.
-        Trend and volume are secondary.
+        AGGRESSIVE: Momentum dominates everything.
+        70% of signal comes from momentum indicators.
         """
         return {
-            'momentum': 1.6,      # Highest priority - quick price moves
-            'volatility': 1.2,    # Risk management
-            'trend': 0.8,         # Lower priority - we want faster signals
+            'momentum': 2.0,      # DOMINANT - drives 70% of decision
+            'volatility': 1.0,    # Neutral weight
+            'trend': 0.5,         # Heavily de-prioritized (too slow)
             'volume': 0.9         # Confirmation only
         }
     
@@ -120,20 +119,22 @@ class Strategy5(BaseStrategy):
     
     def get_risk_profile(self) -> Dict[str, Any]:
         """
-        Enhanced risk profile for 4% weekly target:
-        - Stop Loss: Dynamic (2×ATR, typically 2-5%)
-        - Target: 4-5% (adapts to volatility)
-        - 1.33-1.67:1 risk-reward ratio
-        - Larger position sizing for short-term trades
+        AGGRESSIVE risk profile for 5% weekly target:
+        - Stop Loss: 3% (tight stop for defined risk)
+        - Target: 5% (higher reward)
+        - Risk-Reward: 1.67:1
+        - Larger position sizing for conviction trades
         
-        NOTE: Actual stop loss calculated dynamically using ATR
+        This creates DIFFERENT results from Strategy 1:
+        - Strategy 1: 2% stop, 4% target (2:1 R:R)
+        - Strategy 5: 3% stop, 5% target (1.67:1 R:R)
         """
         return {
-            'default_stop_loss_pct': 3.0,          # Fallback if ATR unavailable (100 -> 97)
-            'default_target_multiplier': 1.33,    # 1.33 × 3% = 4% target (100 -> 104)
-            'max_position_size_pct': 30,           # Can take bigger positions for short term
-            'min_reward_pct': 4.0,                 # Enforce minimum 4% reward
-            'use_dynamic_stop_loss': True,         # Use ATR-based stops instead of fixed
+            'default_stop_loss_pct': 3.0,          # 3% stop (100 -> 97)
+            'default_target_multiplier': 1.67,     # Fallback multiplier
+            'max_position_size_pct': 35,           # Bigger positions for high-conviction
+            'min_reward_pct': 5.0,                 # 5% TARGET (100 -> 105) - MORE AGGRESSIVE
+            'use_dynamic_stop_loss': True,         # Use ATR-based stops when available
             'atr_multiplier': 2.0,                 # Stop = Entry - (2 × ATR)
         }
     
