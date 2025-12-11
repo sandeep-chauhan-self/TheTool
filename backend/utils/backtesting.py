@@ -54,7 +54,6 @@ class BacktestEngine:
         """
         self.strategy_id = strategy_id
         self.data_fetcher = DataFetcher()
-        self.indicator_engine = IndicatorEngine()
     
     def backtest_ticker(self, ticker: str, days: int = 90) -> Dict[str, Any]:
         """
