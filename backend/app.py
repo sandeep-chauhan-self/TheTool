@@ -5,7 +5,7 @@ Flask application factory with modular blueprint architecture
 import os
 import sys
 from pathlib import Path
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 import logging
@@ -99,6 +99,18 @@ def create_app(config_object=None):
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         max_age=3600
     )
+    
+    # Add explicit CORS response headers as fallback (sometimes Flask-CORS doesn't work reliably)
+    @app.after_request
+    def add_cors_headers(response):
+        """Add CORS headers to all responses as fallback"""
+        origin = request.headers.get('Origin')
+        if origin in cors_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
+            response.headers['Access-Control-Max-Age'] = '3600'
+        return response
     
     # Configure rate limiting if available (log only in main process)
     try:
