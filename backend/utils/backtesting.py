@@ -4,6 +4,7 @@ Backtesting Engine for Strategy Analysis
 Analyzes historical OHLCV data following TheTool architecture patterns:
 - Uses DataFetcher for OHLCV data (respects demo/live data modes)
 - Uses IndicatorEngine for calculations (respects modular indicators)
+- Integrates with Strategy 5 enhanced validation methods
 - Thread-safe with get_db_session() for background job compatibility
 - Uses _convert_query_params() for PostgreSQL/SQLite database abstraction
 - Centralized logging via utils.logger.get_logger()
@@ -16,11 +17,12 @@ Architecture Pattern:
 """
 
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple, Optional
 import logging
 
-from utils.analysis_orchestrator import DataFetcher, IndicatorEngine
+from utils.analysis_orchestrator import DataFetcher
 
 logger = logging.getLogger('trading_analyzer')
 
@@ -29,9 +31,19 @@ class BacktestEngine:
     """
     Backtesting engine following TheTool architecture patterns.
     
-    Simulates historical trades based on strategy signals and metrics.
+    Simulates historical trades based on Strategy 5 enhanced signals.
     Uses existing DataFetcher and IndicatorEngine to avoid code duplication.
+    Integrates Strategy 5 validation methods for accurate backtesting.
     """
+    
+    # Strategy 5 parameters (synchronized with strategy_5.py)
+    TARGET_PCT = 4.0       # 4% target
+    STOP_LOSS_PCT = 3.0    # 3% default stop
+    ATR_MULTIPLIER = 2.0   # Dynamic stop = Entry - (2 × ATR)
+    MIN_VOLUME_RATIO = 1.3 # Minimum 1.3x average volume
+    RSI_MIN = 35           # Minimum RSI for healthy momentum  
+    RSI_MAX = 75           # Maximum RSI (avoid overbought)
+    MIN_CONDITIONS = 2     # Need at least 2 of 4 conditions
     
     def __init__(self, strategy_id: int = 5):
         """
@@ -108,7 +120,7 @@ class BacktestEngine:
             df.columns = df.columns.str.lower()
             
             # Calculate indicators for entire dataframe
-            df = self._calculate_indicators(df)
+            df = self._calculate_indicators(df, ticker)
             
             # Generate buy signals based on Strategy 5 logic
             signals = self._generate_entry_signals(df)
@@ -163,97 +175,127 @@ class BacktestEngine:
         
         return results
     
-    def _calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_indicators(self, df: pd.DataFrame, ticker: str = 'UNKNOWN') -> pd.DataFrame:
         """
-        Calculate all indicators for dataframe using TheTool's IndicatorEngine.
+        Calculate technical indicators needed for backtesting.
         
-        Respects modular indicator organization (momentum/, trend/, volatility/, volume/)
+        For backtesting, we need rolling indicators (RSI, SMA, ATR) calculated
+        for every row, not just the current bar like IndicatorEngine does.
+        
+        Note: We calculate these manually instead of using IndicatorEngine because
+        IndicatorEngine is designed for real-time analysis (calculates for current bar),
+        not historical backtesting (needs all rows).
         """
         try:
             df = df.copy()
             
-            # Use IndicatorEngine.calculate_indicators (static method)
-            indicator_results = IndicatorEngine.calculate_indicators(df)
+            # 1. SMA (20-period)
+            df['SMA_20'] = df['close'].rolling(window=20).mean()
             
-            # Add indicators to dataframe
-            for indicator in indicator_results:
-                indicator_name = indicator.get('name', '')
-                value = indicator.get('value', None)
-                signal = indicator.get('signal', None)
-                
-                if indicator_name and value is not None:
-                    if indicator_name not in df.columns:
-                        df[indicator_name] = None
-                    # Set the last calculated value
-                    df.loc[df.index[-1], indicator_name] = value
-                
-                if signal is not None:
-                    signal_col = f'{indicator_name}_signal'
-                    if signal_col not in df.columns:
-                        df[signal_col] = None
-                    df.loc[df.index[-1], signal_col] = signal
+            # 2. RSI (14-period)
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['RSI'] = 100 - (100 / (1 + rs))
             
-            logger.debug(f"[Backtest] Calculated indicators for {len(df)} bars")
+            # 3. ATR (14-period)
+            high_low = df['high'] - df['low']
+            high_close = (df['high'] - df['close'].shift()).abs()
+            low_close = (df['low'] - df['close'].shift()).abs()
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            df['ATR'] = tr.rolling(window=14).mean()
+            
+            # 4. Volume moving average (for volume ratio)
+            df['volume_ma'] = df['volume'].rolling(window=20).mean()
+            
+            logger.debug(f"[Backtest] Calculated indicators for {len(df)} bars (ticker: {ticker})")
             return df
             
         except Exception as e:
-            logger.error(f"[Backtest] Error calculating indicators: {str(e)}")
+            logger.warning(f"[Backtest] Indicator calculation error: {str(e)} - continuing without some indicators")
             return df
     
     def _generate_entry_signals(self, df: pd.DataFrame) -> List[Dict]:
         """
         Generate buy signals based on Strategy 5 enhanced logic.
         
-        Simplified version that works with available data columns.
-        Entry conditions (Strategy 5 enhanced):
-        1. Price is above 20-day moving average (uptrend)
-        2. Volume >= 1.5x average (volume surge confirms move)
-        3. Close above previous close (momentum)
+        IMPROVED: Now uses stricter conditions matching Strategy 5:
+        1. Price is above 20-day SMA (uptrend confirmation)
+        2. RSI between 35-75 (healthy momentum, not overbought/oversold)
+        3. Volume >= 1.3x average (volume confirms move)
+        4. Price rising (close > previous close)
         
-        Need 2/3 conditions to trigger signal.
+        Need at least 2 of 4 conditions + RSI must be valid (35-75).
         """
         signals = []
         
         try:
-            # Calculate simple moving average if not in df
+            # Calculate indicators if not present
             if 'SMA_20' not in df.columns:
                 df['SMA_20'] = df['close'].rolling(window=20).mean()
+            
+            if 'RSI' not in df.columns:
+                # Calculate RSI (14-period)
+                delta = df['close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                df['RSI'] = 100 - (100 / (1 + rs))
+            
+            if 'ATR' not in df.columns:
+                # Calculate ATR (14-period)
+                high_low = df['high'] - df['low']
+                high_close = np.abs(df['high'] - df['close'].shift())
+                low_close = np.abs(df['low'] - df['close'].shift())
+                true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+                df['ATR'] = true_range.rolling(window=14).mean()
             
             for i in range(20, len(df)):
                 row = df.iloc[i]
                 prev_row = df.iloc[i-1]
                 
-                # Strategy 5: Extract available data
+                # Extract data
                 close = row['close']
                 prev_close = prev_row['close']
                 sma_20 = row.get('SMA_20', close)
+                rsi = row.get('RSI', 50)
                 
                 # Volume analysis
                 avg_volume = df['volume'].iloc[max(0, i-20):i].mean()
                 current_volume = row['volume']
                 volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
                 
-                # Signal validation (Strategy 5 simplified conditions)
+                # Skip if RSI is invalid (overbought or too weak)
+                if pd.isna(rsi) or rsi > self.RSI_MAX or rsi < self.RSI_MIN:
+                    continue
+                
+                # Strategy 5 conditions
                 conditions = {
                     'price_above_sma': close > sma_20,
-                    'volume_surge': volume_ratio >= 1.5,
+                    'healthy_rsi': self.RSI_MIN <= rsi <= self.RSI_MAX,
+                    'volume_surge': volume_ratio >= self.MIN_VOLUME_RATIO,
                     'price_rising': close > prev_close,
                 }
                 
-                # Need 2/3 conditions to trigger
+                # Count conditions met
                 conditions_met = sum(conditions.values())
                 
-                if conditions_met >= 1:  # Even 1 condition can trigger (testing mode)
+                # Need at least MIN_CONDITIONS to trigger signal
+                if conditions_met >= self.MIN_CONDITIONS:
                     signals.append({
                         'date': row.name,
                         'index': i,
                         'entry_price': close,
                         'volume_ratio': round(volume_ratio, 2),
+                        'rsi': round(rsi, 1),
+                        'atr': round(row.get('ATR', 0), 2),
                         'conditions_met': conditions_met,
-                        'confidence': round(conditions_met / 3 * 100, 1)
+                        'conditions': conditions,
+                        'confidence': round(conditions_met / 4 * 100, 1)
                     })
             
-            logger.debug(f"[Backtest] Generated {len(signals)} entry signals")
+            logger.debug(f"[Backtest] Generated {len(signals)} entry signals (strict mode)")
             return signals
             
         except Exception as e:
@@ -262,13 +304,13 @@ class BacktestEngine:
     
     def _simulate_trades(self, df: pd.DataFrame, signals: List[Dict]) -> List[Dict]:
         """
-        Simulate trades from entry signals.
+        Simulate trades from entry signals using Strategy 5 rules.
         
         For each signal:
         - Entry at signal close price
         - Target: 4% above entry (Strategy 5)
-        - Stop: 3% below entry or 2×ATR (whichever is closer)
-        - Lookback: 20 bars (~1 month) to find exit
+        - Stop: Dynamic using ATR (2×ATR) or 3% fixed, whichever is tighter
+        - Lookback: 10 bars (~2 weeks) to find exit
         """
         trades = []
         
@@ -277,19 +319,22 @@ class BacktestEngine:
                 entry_index = signal['index']
                 entry_price = signal['entry_price']
                 entry_date = signal['date']
+                atr = signal.get('atr', 0)
                 
-                # Calculate target and stop
-                target = entry_price * 1.04  # 4% target
-                stop_loss = entry_price * 0.97  # 3% stop
+                # Calculate target (4%)
+                target = entry_price * (1 + self.TARGET_PCT / 100)
                 
-                # ATR-based dynamic stop (Strategy 5 enhancement)
-                atr = df.iloc[entry_index].get('ATR', 0)
+                # Calculate stop loss (dynamic ATR-based or fixed 3%)
+                fixed_stop = entry_price * (1 - self.STOP_LOSS_PCT / 100)
+                
                 if atr > 0:
-                    dynamic_stop = entry_price - (2 * atr)
-                    # Use whichever is closer to entry (tighter stop)
-                    stop_loss = max(stop_loss, dynamic_stop)
+                    dynamic_stop = entry_price - (self.ATR_MULTIPLIER * atr)
+                    # Use the TIGHTER stop (higher price = less risk)
+                    stop_loss = max(fixed_stop, dynamic_stop)
+                else:
+                    stop_loss = fixed_stop
                 
-                # Find exit point (look forward up to 20 bars)
+                # Find exit point (look forward up to 10 bars)
                 outcome = self._find_exit(df, entry_index, entry_price, target, stop_loss)
                 
                 if outcome:
@@ -298,6 +343,8 @@ class BacktestEngine:
                     outcome['target'] = round(target, 2)
                     outcome['stop_loss'] = round(stop_loss, 2)
                     outcome['confidence'] = signal['confidence']
+                    outcome['rsi'] = signal.get('rsi', 'N/A')
+                    outcome['volume_ratio'] = signal.get('volume_ratio', 'N/A')
                     
                     trades.append(outcome)
             
@@ -313,7 +360,7 @@ class BacktestEngine:
         """
         Find exit point: did price hit target or stop loss first?
         
-        Lookback: 20 bars (approximately 1 month of trading days)
+        Lookback: 10 bars (approximately 2 weeks of trading days)
         
         Returns:
             {
@@ -321,52 +368,58 @@ class BacktestEngine:
                 'exit_price': float,
                 'pnl_pct': float,
                 'bars_held': int,
-                'reason': 'Hit 4% target' | 'Hit 3% stop loss' | 'Lookback period ended'
+                'exit_date': str,
+                'reason': 'Hit 4% target' | 'Hit stop loss' | 'Time exit'
             }
         """
-        max_bars = min(20, len(df) - entry_index - 1)
+        max_bars = min(10, len(df) - entry_index - 1)  # 10 bars = ~2 weeks
         
         try:
-            last_close = df.iloc[entry_index]['close']  # Fallback close price
+            last_close = df.iloc[entry_index]['close']
+            exit_date = df.iloc[entry_index].name
             
             for i in range(1, max_bars + 1):
                 row = df.iloc[entry_index + i]
                 high = row['high']
                 low = row['low']
                 last_close = row['close']
+                exit_date = row.name
                 
-                # Check if target was hit
+                # Check if target was hit (use high price)
                 if high >= target:
                     pnl_pct = ((target - entry_price) / entry_price) * 100
                     return {
                         'outcome': 'WIN',
                         'exit_price': round(target, 2),
+                        'exit_date': exit_date.strftime('%Y-%m-%d') if hasattr(exit_date, 'strftime') else str(exit_date),
                         'pnl_pct': round(pnl_pct, 2),
                         'bars_held': i,
-                        'reason': 'Hit 4% target'
+                        'reason': f'Hit {self.TARGET_PCT}% target'
                     }
                 
-                # Check if stop loss was hit
+                # Check if stop loss was hit (use low price)
                 if low <= stop_loss:
                     pnl_pct = ((stop_loss - entry_price) / entry_price) * 100
                     return {
                         'outcome': 'LOSS',
                         'exit_price': round(stop_loss, 2),
+                        'exit_date': exit_date.strftime('%Y-%m-%d') if hasattr(exit_date, 'strftime') else str(exit_date),
                         'pnl_pct': round(pnl_pct, 2),
                         'bars_held': i,
-                        'reason': 'Hit 3% stop loss'
+                        'reason': 'Hit stop loss'
                     }
             
-            # No exit found in lookback period, use close price
+            # No exit found in lookback period, exit at last close
             pnl_pct = ((last_close - entry_price) / entry_price) * 100
             outcome = 'WIN' if pnl_pct > 0 else 'LOSS'
             
             return {
                 'outcome': outcome,
                 'exit_price': round(last_close, 2),
+                'exit_date': exit_date.strftime('%Y-%m-%d') if hasattr(exit_date, 'strftime') else str(exit_date),
                 'pnl_pct': round(pnl_pct, 2),
                 'bars_held': max_bars,
-                'reason': 'Lookback period ended'
+                'reason': 'Time exit (10 bars)'
             }
             
         except Exception as e:
@@ -417,22 +470,27 @@ class BacktestEngine:
         win_rate = (win_count / total_trades * 100) if total_trades > 0 else 0
         
         # Profit metrics
+        # total_win_pct: sum of positive P&L from winning trades
+        # total_loss_pct: sum of absolute values of negative P&L from losing trades
         total_win_pct = sum(t['pnl_pct'] for t in wins) if wins else 0
         total_loss_pct = sum(abs(t['pnl_pct']) for t in losses) if losses else 0
         
-        # Profit factor: sum of wins / sum of losses
+        # Net profit = wins - losses (since loss_pct is already positive via abs())
+        net_profit_pct = total_win_pct - total_loss_pct
+        
+        # Profit factor: sum of wins / sum of losses (higher is better, >1 means profitable)
         if total_loss_pct > 0:
             profit_factor = total_win_pct / total_loss_pct
         elif total_win_pct > 0:
-            profit_factor = total_win_pct  # If no losses, factor is sum of wins
+            profit_factor = 999.99  # No losses = excellent (cap at 999.99)
         else:
             profit_factor = 0
         
-        # Average win/loss
+        # Average win/loss per trade
         avg_win = (total_win_pct / len(wins)) if wins else 0
-        avg_loss = -(total_loss_pct / len(losses)) if losses else 0
+        avg_loss = -(total_loss_pct / len(losses)) if losses else 0  # Negative for display
         
-        # Maximum drawdown
+        # Maximum drawdown (peak-to-trough decline)
         cumulative = 0
         peak = 0
         max_dd = 0
@@ -443,7 +501,7 @@ class BacktestEngine:
             dd = peak - cumulative
             max_dd = max(max_dd, dd)
         
-        # Consecutive wins
+        # Consecutive wins (streak tracking)
         max_consecutive = 0
         current_consecutive = 0
         for trade in trades:
@@ -453,8 +511,11 @@ class BacktestEngine:
             else:
                 current_consecutive = 0
         
-        # Trades per day (annualized from 90-day period)
-        trades_per_day = round(total_trades / 90 * 365, 1) if total_trades > 0 else 0
+        # Expectancy: average profit per trade (key metric for strategy evaluation)
+        expectancy = net_profit_pct / total_trades if total_trades > 0 else 0
+        
+        # Trades per day (from actual period)
+        trades_per_day = round(total_trades / 90, 2) if total_trades > 0 else 0
         
         return {
             'total_signals': total_trades,
@@ -462,9 +523,10 @@ class BacktestEngine:
             'losing_trades': loss_count,
             'win_rate': round(win_rate, 2),
             'profit_factor': round(profit_factor, 2),
-            'total_profit_pct': round(total_win_pct + total_loss_pct, 2),
+            'total_profit_pct': round(net_profit_pct, 2),  # FIXED: was incorrectly adding losses
             'avg_win': round(avg_win, 2),
             'avg_loss': round(avg_loss, 2),
+            'expectancy': round(expectancy, 2),  # NEW: avg profit per trade
             'max_drawdown': round(-max_dd, 2),
             'consecutive_wins': max_consecutive,
             'trades_per_day': trades_per_day
