@@ -119,23 +119,33 @@ class Strategy5(BaseStrategy):
     
     def get_risk_profile(self) -> Dict[str, Any]:
         """
-        AGGRESSIVE risk profile for 5% weekly target:
-        - Stop Loss: 3% (tight stop for defined risk)
-        - Target: 5% (higher reward)
-        - Risk-Reward: 1.67:1
-        - Larger position sizing for conviction trades
+        AGGRESSIVE risk profile with SMART STOP LOSS:
         
-        This creates DIFFERENT results from Strategy 1:
-        - Strategy 1: 2% stop, 4% target (2:1 R:R)
-        - Strategy 5: 3% stop, 5% target (1.67:1 R:R)
+        SMART STOP LOSS LOGIC:
+        1. Base stop: 3% (entry × 0.97)
+        2. ATR-based stop: entry - (ATR × 1.5) for volatile conditions
+        3. Maximum cap: 4% (never lose more than 4%)
+        4. Use WIDER stop when ATR indicates high volatility
+           (avoids stop-and-reverse scenarios)
+        
+        Target: 5% (aggressive)
+        Risk-Reward: 1.25:1 to 1.67:1 depending on volatility
+        
+        Example:
+        - Entry: ₹100, ATR: ₹3 (high volatility)
+        - Base stop: ₹97 (3%)
+        - ATR stop: ₹100 - (₹3 × 1.5) = ₹95.50 (4.5%)
+        - Final stop: ₹96 (capped at 4%)
         """
         return {
-            'default_stop_loss_pct': 3.0,          # 3% stop (100 -> 97)
+            'default_stop_loss_pct': 3.0,          # Base stop: 3%
+            'max_stop_loss_pct': 4.0,              # Maximum stop: 4% (NEW)
             'default_target_multiplier': 1.67,     # Fallback multiplier
             'max_position_size_pct': 35,           # Bigger positions for high-conviction
-            'min_reward_pct': 5.0,                 # 5% TARGET (100 -> 105) - MORE AGGRESSIVE
-            'use_dynamic_stop_loss': True,         # Use ATR-based stops when available
-            'atr_multiplier': 2.0,                 # Stop = Entry - (2 × ATR)
+            'min_reward_pct': 5.0,                 # 5% TARGET
+            'use_dynamic_stop_loss': True,         # Enable smart ATR-based stops
+            'atr_multiplier': 1.5,                 # ATR × 1.5 for dynamic stop (was 2.0)
+            'use_wider_stop_for_volatility': True, # Use WIDER stop in volatile conditions (NEW)
         }
     
     def validate_buy_signal(self, indicators: Dict[str, Any]) -> Tuple[bool, str]:
