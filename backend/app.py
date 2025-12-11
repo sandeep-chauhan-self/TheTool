@@ -89,28 +89,41 @@ def create_app(config_object=None):
     
     logger.info(f"CORS enabled for origins: {cors_origins}")
     
-    # Apply CORS to all routes
+    # Apply CORS to all routes with wildcard for maximum compatibility
     CORS(
         app,
-        resources={r"/*": {"origins": cors_origins}},
+        resources={r"/*": {"origins": "*"}},  # Allow all origins - Railway edge may interfere
         supports_credentials=False,
-        allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+        allow_headers=["Content-Type", "Authorization", "X-API-Key", "Accept", "Origin"],
         expose_headers=["Content-Type", "X-API-Key"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        max_age=3600
+        max_age=3600,
+        send_wildcard=True  # Send * instead of echoing origin
     )
     
-    # Add explicit CORS response headers as fallback (sometimes Flask-CORS doesn't work reliably)
+    # CRITICAL: Add CORS headers to ALL responses including errors
+    # This runs AFTER every request, including OPTIONS preflight
     @app.after_request
     def add_cors_headers(response):
-        """Add CORS headers to all responses as fallback"""
-        origin = request.headers.get('Origin')
-        if origin in cors_origins:
-            response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
-            response.headers['Access-Control-Max-Age'] = '3600'
+        """Add CORS headers to ALL responses unconditionally"""
+        # Always add CORS headers - don't check origin (Railway edge may strip it)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, Accept, Origin'
+        response.headers['Access-Control-Max-Age'] = '3600'
         return response
+    
+    # Handle OPTIONS preflight requests explicitly
+    @app.before_request
+    def handle_preflight():
+        """Handle CORS preflight requests explicitly"""
+        if request.method == 'OPTIONS':
+            response = app.make_default_options_response()
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key, Accept, Origin'
+            response.headers['Access-Control-Max-Age'] = '3600'
+            return response
     
     # Configure rate limiting if available (log only in main process)
     try:
