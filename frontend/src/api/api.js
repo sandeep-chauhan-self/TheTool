@@ -180,6 +180,7 @@ export const analyzeAllStocks = async (symbols = [], config = {}) => {
   const payload = {
     symbols,
     capital: config.capital || 100000,
+    strategy_id: config.strategyId || 1,
     risk_percent: config.riskPercent,
     position_size_limit: config.positionSizeLimit,
     risk_reward_ratio: config.riskRewardRatio,

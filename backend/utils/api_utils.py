@@ -220,9 +220,17 @@ class RequestValidator:
             return v
     
     class BulkAnalyzeRequest(BaseModel):
-        """Schema for /bulk-analyze endpoint"""
+        """Schema for /analyze-all-stocks endpoint"""
         symbols: Optional[List[str]] = None
-        use_demo_data: Optional[bool] = True
+        capital: Optional[float] = 100000
+        strategy_id: Optional[int] = 1
+        use_demo_data: Optional[bool] = False
+        risk_percent: Optional[float] = None
+        position_size_limit: Optional[float] = None
+        risk_reward_ratio: Optional[float] = None
+        data_period: Optional[str] = None
+        category_weights: Optional[Dict[str, float]] = None
+        enabled_indicators: Optional[Dict[str, bool]] = None
         max_workers: Optional[int] = 5
         
         @validator('symbols')
@@ -231,9 +239,23 @@ class RequestValidator:
                 return v
             return [s.strip().upper() for s in v]
         
+        @validator('capital')
+        def validate_capital(cls, v):
+            if v is not None and v <= 0:
+                raise ValueError('capital must be positive')
+            if v is not None and v > 10_000_000:
+                raise ValueError('capital cannot exceed 10,000,000')
+            return v
+        
+        @validator('strategy_id')
+        def validate_strategy_id(cls, v):
+            if v is not None and (v < 1 or v > 10):
+                raise ValueError('strategy_id must be between 1 and 10')
+            return v
+        
         @validator('max_workers')
         def validate_workers(cls, v):
-            if v < 1 or v > 10:
+            if v is not None and (v < 1 or v > 10):
                 raise ValueError('max_workers must be between 1 and 10')
             return v
     
