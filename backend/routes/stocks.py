@@ -266,36 +266,38 @@ def get_stock_history(symbol):
         )
 
 
-def _get_active_job_for_symbols(symbols: list) -> dict:
+def _get_active_job_for_symbols(symbols: list, strategy_id: int = 1) -> dict:
     """
-    Check if an identical job is already running for the exact same symbol set.
+    Check if an identical job is already running for the exact same symbol set AND strategy.
     Returns the existing job info or None if safe to create new job.
     
     Only considers jobs "duplicate" if:
     - Same symbols (in any order) - normalized by uppercase + trim
+    - Same strategy_id (different strategies can run concurrently)
     - Status is 'queued' or 'processing'
     - Within last 5 minutes (to avoid stale locks)
     
-    Different symbol sets are NOT blocked and can run concurrently.
+    Different symbol sets or different strategies are NOT blocked and can run concurrently.
     """
     try:
         # Normalize requested symbols: uppercase, trim, sort
         normalized_symbols = sorted([s.upper().strip() for s in symbols])
         requested_json = json.dumps(normalized_symbols)
         
-        # Get active jobs from last 5 minutes
+        # Get active jobs from last 5 minutes WITH SAME STRATEGY
         from datetime import timedelta
         from utils.timezone_util import get_ist_now
         five_min_ago = (get_ist_now() - timedelta(minutes=5)).isoformat()
         
         active_jobs = query_db("""
-            SELECT job_id, status, total, completed, created_at, tickers_json
+            SELECT job_id, status, total, completed, created_at, tickers_json, strategy_id
             FROM analysis_jobs
             WHERE status IN ('queued', 'processing')
               AND created_at > ?
+              AND strategy_id = ?
             ORDER BY created_at DESC
             LIMIT 20
-        """, (five_min_ago,))
+        """, (five_min_ago, strategy_id))
         
         if not active_jobs:
             return None
@@ -304,7 +306,7 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
         is_bulk_request = len(symbols) > 100
         
         # Check each active job for exact symbol match
-        for job_id, status, total, completed, created_at, tickers_json in active_jobs:
+        for job_id, status, total, completed, created_at, tickers_json, job_strategy_id in active_jobs:
             # Skip jobs with no tickers_json (shouldn't happen, but be safe)
             if not tickers_json:
                 continue
@@ -314,9 +316,9 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
                 
                 # Handle bulk marker format: {"type": "bulk", "count": 2000}
                 if isinstance(job_data, dict) and job_data.get("type") == "bulk":
-                    # Both are bulk jobs - consider as duplicate if same count
+                    # Both are bulk jobs - consider as duplicate if same count AND same strategy
                     if is_bulk_request and job_data.get("count") == len(symbols):
-                        logger.info(f"Found active bulk job {job_id} with same count ({len(symbols)})")
+                        logger.info(f"Found active bulk job {job_id} with same count ({len(symbols)}) and strategy {strategy_id}")
                         return {
                             "job_id": job_id,
                             "status": status,
@@ -330,7 +332,7 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
                 if isinstance(job_data, list):
                     # Compare normalized symbol sets
                     if job_data == normalized_symbols:
-                        logger.info(f"Found active job {job_id} with matching symbols, status {status}")
+                        logger.info(f"Found active job {job_id} with matching symbols and strategy {strategy_id}, status {status}")
                         return {
                             "job_id": job_id,
                             "status": status,
@@ -435,7 +437,7 @@ def analyze_all_stocks():
         
         # Check for duplicate/active jobs (unless force=true)
         if not force:
-            active_job = _get_active_job_for_symbols(symbols)
+            active_job = _get_active_job_for_symbols(symbols, strategy_id)
             if active_job:
                 logger.info(f"Duplicate job request detected. Returning existing job {active_job['job_id']}")
                 return jsonify({
@@ -463,8 +465,9 @@ def analyze_all_stocks():
                     job_id=job_id,
                     status="queued",
                     total=len(symbols),
-                    description=f"Bulk analyze {len(symbols)} stock(s)",
-                    tickers=symbols  # Include symbols for duplicate detection
+                    description=f"Bulk analyze {len(symbols)} stock(s) (Strategy {strategy_id})",
+                    tickers=symbols,  # Include symbols for duplicate detection
+                    strategy_id=strategy_id  # Include strategy for duplicate detection
                 )
                 if created:
                     break
@@ -477,7 +480,7 @@ def analyze_all_stocks():
                     # Check if job was created by concurrent request
                     if attempt == max_retries - 1:
                         try:
-                            active_job = _get_active_job_for_symbols(symbols)
+                            active_job = _get_active_job_for_symbols(symbols, strategy_id)
                             if active_job:
                                 logger.info(f"Found existing job {active_job['job_id']} created by concurrent request")
                                 return jsonify({

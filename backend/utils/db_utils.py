@@ -62,9 +62,9 @@ class JobStateTransactions:
         if tickers and len(tickers) <= 100:
             tickers_json = json.dumps(sorted([t.upper().strip() for t in tickers]))
         elif tickers and len(tickers) > 100:
-            # Store just the count and "ALL" marker for bulk analysis
-            tickers_json = json.dumps({"type": "bulk", "count": len(tickers)})
-            logger.info(f"Large batch ({len(tickers)} stocks) - using bulk marker instead of full ticker list")
+            # Store count, strategy_id, and "bulk" marker for bulk analysis duplicate detection
+            tickers_json = json.dumps({"type": "bulk", "count": len(tickers), "strategy_id": strategy_id})
+            logger.info(f"Large batch ({len(tickers)} stocks) - using bulk marker with strategy_id={strategy_id}")
         
         # Use get_db_session() for proper transaction handling with rollback
         try:
