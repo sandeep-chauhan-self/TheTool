@@ -359,8 +359,10 @@ def analyze_all_stocks():
         force = data.get("force", False)  # Force new job even if one is running
         
         # Extract additional config parameters
+        strategy_id = data.get("strategy_id", 1)  # Default to Strategy 1
         analysis_config = {
             "capital": capital,
+            "strategy_id": strategy_id,
             "risk_percent": data.get("risk_percent"),
             "position_size_limit": data.get("position_size_limit"),
             "risk_reward_ratio": data.get("risk_reward_ratio"),
@@ -494,7 +496,7 @@ def analyze_all_stocks():
         start_success = False
         try:
             from infrastructure.thread_tasks import start_analysis_job
-            start_success = start_analysis_job(job_id, symbols, None, capital, False, analysis_config)
+            start_success = start_analysis_job(job_id, symbols, None, capital, False, analysis_config, strategy_id)
             if not start_success:
                 logger.error(f"Failed to start thread for job {job_id}")
         except Exception as e:
