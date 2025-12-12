@@ -300,6 +300,9 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
         if not active_jobs:
             return None
         
+        # Check if this is a bulk analysis request (> 100 symbols)
+        is_bulk_request = len(symbols) > 100
+        
         # Check each active job for exact symbol match
         for job_id, status, total, completed, created_at, tickers_json in active_jobs:
             # Skip jobs with no tickers_json (shouldn't happen, but be safe)
@@ -307,17 +310,34 @@ def _get_active_job_for_symbols(symbols: list) -> dict:
                 continue
             
             try:
-                job_symbols = json.loads(tickers_json)
-                # Compare normalized symbol sets
-                if job_symbols == normalized_symbols:
-                    logger.info(f"Found active job {job_id} with matching symbols, status {status}")
-                    return {
-                        "job_id": job_id,
-                        "status": status,
-                        "total": total,
-                        "completed": completed,
-                        "created_at": created_at
-                    }
+                job_data = json.loads(tickers_json)
+                
+                # Handle bulk marker format: {"type": "bulk", "count": 2000}
+                if isinstance(job_data, dict) and job_data.get("type") == "bulk":
+                    # Both are bulk jobs - consider as duplicate if same count
+                    if is_bulk_request and job_data.get("count") == len(symbols):
+                        logger.info(f"Found active bulk job {job_id} with same count ({len(symbols)})")
+                        return {
+                            "job_id": job_id,
+                            "status": status,
+                            "total": total,
+                            "completed": completed,
+                            "created_at": created_at
+                        }
+                    continue
+                
+                # Handle normal list format
+                if isinstance(job_data, list):
+                    # Compare normalized symbol sets
+                    if job_data == normalized_symbols:
+                        logger.info(f"Found active job {job_id} with matching symbols, status {status}")
+                        return {
+                            "job_id": job_id,
+                            "status": status,
+                            "total": total,
+                            "completed": completed,
+                            "created_at": created_at
+                        }
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse tickers_json for job {job_id}")
                 continue
