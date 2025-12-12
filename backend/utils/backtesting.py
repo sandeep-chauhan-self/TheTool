@@ -37,15 +37,22 @@ class BacktestEngine:
     """
     
     # Strategy 5 parameters (synchronized with strategy_5.py)
-    TARGET_PCT = 5.0       # 5% target (aggressive)
+    # OPTIMIZED based on 15-stock backtest analysis (Dec 2025)
+    # Key findings:
+    # 1. Volume filter HURTS performance (reduces expectancy by 46%) - DISABLED
+    # 2. 4% target more achievable than 5% (19% vs expected 25% hit rate)
+    # 3. 15-bar holding captures more gains (time exits have 71% win rate)
+    TARGET_PCT = 4.0       # 4% target (was 5% - optimization finding)
+    MAX_BARS = 15          # 15 bars holding (was 10 - optimization finding)
     STOP_LOSS_PCT = 3.0    # Base stop: 3%
     MAX_STOP_LOSS_PCT = 4.0  # Maximum stop: 4% (cap)
-    ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR × 1.5)
+    ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR x 1.5)
     USE_WIDER_STOP = True  # Use wider stop in volatile conditions
-    MIN_VOLUME_RATIO = 1.3 # Minimum 1.3x average volume
-    RSI_MIN = 35           # Minimum RSI for healthy momentum  
+    REQUIRE_VOLUME_FILTER = False  # DISABLED - optimization showed this hurts performance
+    MIN_VOLUME_RATIO = 1.0 # Set to 1.0 (effectively disabled) - was 1.3
+    RSI_MIN = 30           # Minimum RSI for healthy momentum (was 35, widened for more trades)
     RSI_MAX = 75           # Maximum RSI (avoid overbought)
-    MIN_CONDITIONS = 2     # Need at least 2 of 4 conditions
+    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions (volume excluded)
     
     def __init__(self, strategy_id: int = 5):
         """
@@ -271,13 +278,16 @@ class BacktestEngine:
                 if pd.isna(rsi) or rsi > self.RSI_MAX or rsi < self.RSI_MIN:
                     continue
                 
-                # Strategy 5 conditions
+                # Strategy 5 conditions (OPTIMIZED - volume filter disabled)
+                # Optimization found volume filter reduced expectancy by 46%
                 conditions = {
                     'price_above_sma': close > sma_20,
                     'healthy_rsi': self.RSI_MIN <= rsi <= self.RSI_MAX,
-                    'volume_surge': volume_ratio >= self.MIN_VOLUME_RATIO,
                     'price_rising': close > prev_close,
                 }
+                
+                # Track volume for reporting but don't filter on it
+                has_volume_surge = volume_ratio >= 1.3  # Track but don't require
                 
                 # Count conditions met
                 conditions_met = sum(conditions.values())
@@ -289,11 +299,12 @@ class BacktestEngine:
                         'index': i,
                         'entry_price': close,
                         'volume_ratio': round(volume_ratio, 2),
+                        'has_volume_surge': has_volume_surge,
                         'rsi': round(rsi, 1),
                         'atr': round(row.get('ATR', 0), 2),
                         'conditions_met': conditions_met,
                         'conditions': conditions,
-                        'confidence': round(conditions_met / 4 * 100, 1)
+                        'confidence': round(conditions_met / 3 * 100, 1)  # 3 conditions now
                     })
             
             logger.debug(f"[Backtest] Generated {len(signals)} entry signals (strict mode)")
@@ -387,7 +398,7 @@ class BacktestEngine:
                 'reason': 'Hit 4% target' | 'Hit stop loss' | 'Time exit'
             }
         """
-        max_bars = min(10, len(df) - entry_index - 1)  # 10 bars = ~2 weeks
+        max_bars = min(self.MAX_BARS, len(df) - entry_index - 1)  # Use class constant
         
         try:
             last_close = df.iloc[entry_index]['close']
@@ -429,8 +440,8 @@ class BacktestEngine:
             outcome = 'WIN' if pnl_pct > 0 else 'LOSS'
             
             # Determine reason based on actual bars held
-            if max_bars >= 10:
-                reason = 'Time exit (10 bars)'
+            if max_bars >= self.MAX_BARS:
+                reason = f'Time exit ({self.MAX_BARS} bars)'
             elif max_bars > 0:
                 reason = f'End of data ({max_bars} bars)'
             else:
