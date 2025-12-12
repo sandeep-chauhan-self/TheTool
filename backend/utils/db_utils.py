@@ -56,9 +56,15 @@ class JobStateTransactions:
         from database import get_db_session, _convert_query_params
         
         # Normalize tickers: sort and JSON dump for consistent duplicate detection
+        # For very large batches (> 100 stocks), skip storing tickers to avoid
+        # database performance issues and potential timeouts
         tickers_json = None
-        if tickers:
+        if tickers and len(tickers) <= 100:
             tickers_json = json.dumps(sorted([t.upper().strip() for t in tickers]))
+        elif tickers and len(tickers) > 100:
+            # Store just the count and "ALL" marker for bulk analysis
+            tickers_json = json.dumps({"type": "bulk", "count": len(tickers)})
+            logger.info(f"Large batch ({len(tickers)} stocks) - using bulk marker instead of full ticker list")
         
         # Use get_db_session() for proper transaction handling with rollback
         try:
