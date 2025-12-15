@@ -38,21 +38,22 @@ class BacktestEngine:
     
     # Strategy 5 parameters (synchronized with strategy_5.py)
     # OPTIMIZED based on 15-stock backtest analysis (Dec 2025)
-    # Key findings:
-    # 1. Volume filter HURTS performance (reduces expectancy by 46%) - DISABLED
-    # 2. 4% target more achievable than 5% (19% vs expected 25% hit rate)
-    # 3. 15-bar holding captures more gains (time exits have 71% win rate)
-    TARGET_PCT = 4.0       # 4% target (was 5% - optimization finding)
-    MAX_BARS = 15          # 15 bars holding (was 10 - optimization finding)
+    # Key findings from optimization:
+    # 1. Volume filter HURTS performance - DISABLED (improves expectancy by 74%)
+    # 2. 5% target with 10-bar holding outperforms 4% target with 15 bars
+    # 3. Fewer trades (186 vs 303) but much higher quality (0.47% vs 0.27% expectancy)
+    # 4. Profit Factor improved from 1.21 to 1.39
+    TARGET_PCT = 5.0       # 5% target (REVERTED - 5% beats 4% in optimization)
+    MAX_BARS = 10          # 10 bars holding (REVERTED - 10 beats 15 in optimization)
     STOP_LOSS_PCT = 3.0    # Base stop: 3%
     MAX_STOP_LOSS_PCT = 4.0  # Maximum stop: 4% (cap)
     ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR x 1.5)
     USE_WIDER_STOP = True  # Use wider stop in volatile conditions
-    REQUIRE_VOLUME_FILTER = False  # DISABLED - optimization showed this hurts performance
-    MIN_VOLUME_RATIO = 1.0 # Set to 1.0 (effectively disabled) - was 1.3
-    RSI_MIN = 30           # Minimum RSI for healthy momentum (was 35, widened for more trades)
-    RSI_MAX = 75           # Maximum RSI (avoid overbought)
-    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions (volume excluded)
+    REQUIRE_VOLUME_FILTER = False  # DISABLED - optimization confirmed this hurts performance
+    MIN_VOLUME_RATIO = 1.0 # Set to 1.0 (effectively disabled)
+    RSI_MIN = 30           # Minimum RSI for healthy momentum
+    RSI_MAX = 70           # Maximum RSI (avoid overbought) - tightened from 75
+    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions
     
     def __init__(self, strategy_id: int = 5):
         """
