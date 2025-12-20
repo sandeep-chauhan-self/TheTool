@@ -612,10 +612,12 @@ class BacktestEngine:
                         continue
                 
                 # Track volume for reporting but don't filter on it (unless breakout)
-                has_volume_surge = volume_ratio >= 1.3
+                # Cast to Python bool to ensure JSON serializable (numpy.bool_ is not)
+                has_volume_surge = bool(volume_ratio >= 1.3)
                 
                 # Check if in uptrend (for reporting)
-                in_uptrend = pd.notna(sma_50) and close > sma_50 and sma_20 > sma_50
+                # Cast to Python bool to ensure JSON serializable (numpy.bool_ is not)
+                in_uptrend = bool(pd.notna(sma_50) and close > sma_50 and sma_20 > sma_50)
                 
                 # Calculate confidence based on validation results
                 confidence = conditions_met / 3 * 100
@@ -637,7 +639,7 @@ class BacktestEngine:
                     'adx': round(adx, 1),
                     'atr': round(row.get('ATR', 0), 2),
                     'conditions_met': conditions_met,
-                    'conditions': conditions,
+                    'conditions': {k: bool(v) for k, v in conditions.items()},  # Convert numpy.bool_ to Python bool
                     'confidence': round(min(confidence, 100), 1)
                 })
             
