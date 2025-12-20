@@ -408,8 +408,10 @@ class BacktestEngine:
             dm_minus = np.where((low_diff > high_diff) & (low_diff > 0), low_diff, 0.0)
             
             # Wilder smoothing (alpha = 1/14)
+            # FIX: Use .values to ensure consistent indexing - tr has datetime index,
+            # dm_plus/dm_minus are numpy arrays. Without .values, index mismatch causes NaN.
             alpha = 1.0 / 14
-            tr_smooth = pd.Series(tr).ewm(alpha=alpha, adjust=False).mean()
+            tr_smooth = pd.Series(tr.values).ewm(alpha=alpha, adjust=False).mean()
             dm_plus_smooth = pd.Series(dm_plus).ewm(alpha=alpha, adjust=False).mean()
             dm_minus_smooth = pd.Series(dm_minus).ewm(alpha=alpha, adjust=False).mean()
             
@@ -419,9 +421,9 @@ class BacktestEngine:
             
             # DX and ADX
             dx = 100 * np.abs(di_plus - di_minus) / (di_plus + di_minus + 1e-10)
-            df['ADX'] = pd.Series(dx).ewm(alpha=alpha, adjust=False).mean()
-            df['DI_plus'] = di_plus
-            df['DI_minus'] = di_minus
+            df['ADX'] = pd.Series(dx.values).ewm(alpha=alpha, adjust=False).mean().values
+            df['DI_plus'] = di_plus.values
+            df['DI_minus'] = di_minus.values
             
             # 6. MACD for Strategy 5 validation
             exp1 = df['close'].ewm(span=12, adjust=False).mean()
