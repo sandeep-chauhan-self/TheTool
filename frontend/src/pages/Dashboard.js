@@ -1,25 +1,40 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addToWatchlist, analyzeStocks, cancelJob, getJobStatus, getStockHistory, getWatchlist, removeFromWatchlist } from '../api/api';
+import { addToWatchlist, analyzeStocks, cancelJob, getJobStatus, removeFromWatchlist } from '../api/api';
 import AddStockModal from '../components/AddStockModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
+import { useStocks } from '../context/StocksContext';
 import { TradingViewLink } from '../utils/tradingViewUtils';
 
 function Dashboard() {
-  const [watchlist, setWatchlist] = useState([]);
+  // Use global stocks context for watchlist caching
+  const { 
+    watchlist: cachedWatchlist, 
+    watchlistLoading, 
+    fetchWatchlistData,
+    addToWatchlistCache,
+    removeFromWatchlistCache,
+    getTimeSinceLastFetch,
+    lastWatchlistFetch
+  } = useStocks();
+
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState({});
   const navigate = useNavigate();
 
+  // Use cached watchlist
+  const watchlist = cachedWatchlist;
+  const loading = watchlistLoading;
+
   useEffect(() => {
+    // Load watchlist from cache or fetch if needed (respects TTL)
     loadWatchlist();
     
     // Check for active job in sessionStorage
@@ -31,63 +46,23 @@ function Dashboard() {
     }
   }, []);
 
-  const loadWatchlist = async () => {
-    try {
-      setLoading(true);
-      const data = await getWatchlist();
-      
-      // Filter out watchlist items with empty ticker (defensive validation)
-      const validWatchlist = data.filter(stock => {
-        if (!stock.ticker || stock.ticker.trim() === '') {
-          console.warn(`Skipping watchlist item with empty ticker: ${JSON.stringify(stock)}`);
-          return false;
-        }
-        return true;
-      });
-      
-      if (validWatchlist.length < data.length) {
-        console.error(`Found ${data.length - validWatchlist.length} invalid watchlist items with empty tickers`);
-      }
-      
-      // Fetch latest analysis results for each stock
-      // Fetch from history endpoint which uses analysis_results table
-      const watchlistWithResults = await Promise.all(
-        validWatchlist.map(async (stock) => {
-          try {
-            // Get analysis history for this stock (use ticker field, not symbol)
-            const historyData = await getStockHistory(stock.ticker);
-            
-            if (historyData && historyData.history && historyData.history.length > 0) {
-              const latest = historyData.history[0];
-              return { 
-                ...stock, 
-                verdict: latest.verdict || '-', 
-                confidence: (latest.score / 100) || 0,  // Score is 0-100, convert to percentage
-                has_analysis: true
-              };
-            }
-            
-            return { ...stock, verdict: 'No analysis available', confidence: 0, has_analysis: false };
-          } catch (error) {
-            console.error(`Error fetching history for ${stock.ticker}:`, error);
-            return { ...stock, verdict: 'No analysis available', confidence: 0, has_analysis: false };
-          }
-        })
-      );
-      
-      setWatchlist(watchlistWithResults);
-    } catch (error) {
-      console.error('Failed to load watchlist:', error);
-    } finally {
-      setLoading(false);
-    }
+  const loadWatchlist = async (forceRefresh = false) => {
+    // Use context's fetch function - it handles caching automatically
+    await fetchWatchlistData(forceRefresh);
   };
 
   const handleAddStock = async (symbol, name) => {
     try {
-      await addToWatchlist(symbol, name);
+      const result = await addToWatchlist(symbol, name);
       setShowAddModal(false);
-      loadWatchlist();
+      // Update cache immediately with the new stock
+      addToWatchlistCache({
+        ticker: symbol,
+        name: name,
+        verdict: 'No analysis available',
+        confidence: 0,
+        has_analysis: false
+      });
     } catch (error) {
       console.error('Failed to add stock:', error);
       alert('Failed to add stock. Please try again.');
@@ -99,7 +74,8 @@ function Dashboard() {
       try {
         // symbol here is the ticker (full yahoo symbol)
         await removeFromWatchlist(symbol);
-        loadWatchlist();
+        // Update cache immediately
+        removeFromWatchlistCache(symbol);
       } catch (error) {
         console.error('Failed to remove stock:', error);
       }
@@ -127,7 +103,8 @@ function Dashboard() {
           sessionStorage.removeItem('activeJobId');
           
           if (status.status === 'completed') {
-            loadWatchlist();
+            // Force refresh watchlist to get new analysis results
+            await loadWatchlist(true);
             alert(`Analysis completed! ${status.successful || status.completed}/${status.total} stocks analyzed successfully.`);
           } else if (status.status === 'failed') {
             alert('Analysis failed. Please check the logs.');
@@ -230,12 +207,19 @@ function Dashboard() {
             {analyzing ? 'Analyzing...' : 'Analyze Selected Stocks'}
           </button>
           <button
-            onClick={loadWatchlist}
+            onClick={() => loadWatchlist(true)}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
           >
-            Refresh
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
+
+        {/* Last Synced Indicator */}
+        {lastWatchlistFetch && !loading && (
+          <div className="mb-2 text-xs text-gray-500 text-right">
+            Last synced: {getTimeSinceLastFetch(lastWatchlistFetch)}
+          </div>
+        )}
 
         {/* Analysis Progress */}
         {analyzing && (

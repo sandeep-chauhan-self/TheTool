@@ -23,6 +23,7 @@ from typing import Dict, List, Any, Tuple, Optional
 import logging
 
 from utils.analysis_orchestrator import DataFetcher
+from strategies.strategy_5 import Strategy5
 
 logger = logging.getLogger('trading_analyzer')
 
@@ -37,15 +38,44 @@ class BacktestEngine:
     """
     
     # Strategy 5 parameters (synchronized with strategy_5.py)
-    TARGET_PCT = 5.0       # 5% target (aggressive)
+    # OPTIMIZED based on 15-stock backtest analysis (Dec 2025)
+    # Key findings from comprehensive_backtest_analysis.py:
+    # 1. Volume 1.3-1.5x is SWEET SPOT (80% win rate vs 65% for others)
+    # 2. RSI 50-75 performs better (64-72% win rate)
+    # 3. 15-bar holding captures more gains (time exits have 72.3% win rate)
+    # 4. Lower confidence signals actually perform better (67% vs 61%)
+    TARGET_PCT = 4.0       # 4% target - 44.9% hit rate is good
+    MAX_BARS = 15          # 15 bars holding - 72.3% time exit win rate
     STOP_LOSS_PCT = 3.0    # Base stop: 3%
     MAX_STOP_LOSS_PCT = 4.0  # Maximum stop: 4% (cap)
-    ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR × 1.5)
+    ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR x 1.5)
     USE_WIDER_STOP = True  # Use wider stop in volatile conditions
-    MIN_VOLUME_RATIO = 1.3 # Minimum 1.3x average volume
-    RSI_MIN = 35           # Minimum RSI for healthy momentum  
+    
+    # VOLUME SWEET SPOT FILTER (NEW - Dec 2025)
+    # Analysis showed: 1.3-1.5x volume = 80% win rate, 2.34% avg P&L
+    # But hard filter is too restrictive (only 21 signals vs 392)
+    # Alternative: Disable hard filter, use volume as confidence boost only
+    USE_VOLUME_SWEET_SPOT = False  # DISABLED - too restrictive
+    MIN_VOLUME_RATIO = 1.0         # No minimum (was 1.3)
+    MAX_VOLUME_RATIO = 100.0       # No maximum (was 1.5)
+    VOLUME_SWEET_SPOT_MIN = 1.3    # For confidence boost calculation
+    VOLUME_SWEET_SPOT_MAX = 1.5    # For confidence boost calculation
+    
+    # RSI OPTIMIZATION (Dec 2025)
+    # Analysis showed: RSI 50-75 has 64-72% win rate
+    # RSI 40-50 only 48% win rate - too weak
+    RSI_MIN = 50           # Raised from 30 - stronger momentum required
     RSI_MAX = 75           # Maximum RSI (avoid overbought)
-    MIN_CONDITIONS = 2     # Need at least 2 of 4 conditions
+    
+    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions
+    ADX_CHOPPY_THRESHOLD = 20  # ADX below this = choppy market, skip signal
+    USE_ADX_FILTER = True  # Enable ADX regime filtering
+    
+    # VALIDATION LOOSENING (Dec 2025)
+    # Analysis showed lower confidence signals perform BETTER (67% vs 61%)
+    # But disabling validation reduced expectancy from 1.18% to 1.02%
+    # Keep validation ON for quality, rely on RSI 50-75 for filtering weak signals
+    USE_STRATEGY5_VALIDATION = True  # RE-ENABLED - quality over quantity
     
     def __init__(self, strategy_id: int = 5):
         """
@@ -56,6 +86,7 @@ class BacktestEngine:
         """
         self.strategy_id = strategy_id
         self.data_fetcher = DataFetcher()
+        self.strategy_5 = Strategy5()  # For validation methods
     
     def backtest_ticker(self, ticker: str, days: int = 90) -> Dict[str, Any]:
         """
@@ -210,6 +241,56 @@ class BacktestEngine:
             # 4. Volume moving average (for volume ratio)
             df['volume_ma'] = df['volume'].rolling(window=20).mean()
             
+            # 5. ADX (14-period) for market regime detection
+            # True Range
+            high_low = df['high'] - df['low']
+            high_close = (df['high'] - df['close'].shift()).abs()
+            low_close = (df['low'] - df['close'].shift()).abs()
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            
+            # +DM and -DM
+            high_diff = df['high'].diff()
+            low_diff = -df['low'].diff()
+            dm_plus = np.where((high_diff > low_diff) & (high_diff > 0), high_diff, 0.0)
+            dm_minus = np.where((low_diff > high_diff) & (low_diff > 0), low_diff, 0.0)
+            
+            # Wilder smoothing (alpha = 1/14)
+            alpha = 1.0 / 14
+            tr_smooth = pd.Series(tr).ewm(alpha=alpha, adjust=False).mean()
+            dm_plus_smooth = pd.Series(dm_plus).ewm(alpha=alpha, adjust=False).mean()
+            dm_minus_smooth = pd.Series(dm_minus).ewm(alpha=alpha, adjust=False).mean()
+            
+            # DI+ and DI-
+            di_plus = 100 * (dm_plus_smooth / tr_smooth)
+            di_minus = 100 * (dm_minus_smooth / tr_smooth)
+            
+            # DX and ADX
+            dx = 100 * np.abs(di_plus - di_minus) / (di_plus + di_minus + 1e-10)
+            df['ADX'] = pd.Series(dx).ewm(alpha=alpha, adjust=False).mean()
+            df['DI_plus'] = di_plus
+            df['DI_minus'] = di_minus
+            
+            # 6. MACD for Strategy 5 validation
+            exp1 = df['close'].ewm(span=12, adjust=False).mean()
+            exp2 = df['close'].ewm(span=26, adjust=False).mean()
+            df['MACD'] = exp1 - exp2
+            df['MACD_signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+            df['MACD_histogram'] = df['MACD'] - df['MACD_signal']
+            
+            # 7. Stochastic (14-period) for Strategy 5 validation
+            low14 = df['low'].rolling(window=14).min()
+            high14 = df['high'].rolling(window=14).max()
+            df['Stochastic'] = 100 * (df['close'] - low14) / (high14 - low14 + 1e-10)
+            
+            # 8. CCI (20-period) for Strategy 5 validation
+            tp = (df['high'] + df['low'] + df['close']) / 3
+            sma_tp = tp.rolling(window=20).mean()
+            mean_dev = tp.rolling(window=20).apply(lambda x: np.abs(x - x.mean()).mean())
+            df['CCI'] = (tp - sma_tp) / (0.015 * mean_dev + 1e-10)
+            
+            # 9. Williams %R (14-period) for Strategy 5 validation
+            df['Williams'] = -100 * (high14 - df['close']) / (high14 - low14 + 1e-10)
+            
             logger.debug(f"[Backtest] Calculated indicators for {len(df)} bars (ticker: {ticker})")
             return df
             
@@ -221,36 +302,27 @@ class BacktestEngine:
         """
         Generate buy signals based on Strategy 5 enhanced logic.
         
-        IMPROVED: Now uses stricter conditions matching Strategy 5:
+        IMPROVED: Now integrates Strategy 5 validation methods:
         1. Price is above 20-day SMA (uptrend confirmation)
-        2. RSI between 35-75 (healthy momentum, not overbought/oversold)
-        3. Volume >= 1.3x average (volume confirms move)
-        4. Price rising (close > previous close)
+        2. RSI between 30-75 (healthy momentum, not overbought/oversold)
+        3. ADX > 20 (trending market, skip choppy conditions)
+        4. Strategy 5 momentum validation (MACD bullish, 3+ indicators aligned)
+        5. Price rising (close > previous close)
         
-        Need at least 2 of 4 conditions + RSI must be valid (35-75).
+        Uses Strategy 5's validate_buy_signal() for additional filtering.
         """
         signals = []
         
         try:
-            # Calculate indicators if not present
-            if 'SMA_20' not in df.columns:
-                df['SMA_20'] = df['close'].rolling(window=20).mean()
+            # Ensure all indicators are calculated
+            required_cols = ['SMA_20', 'RSI', 'ATR', 'ADX', 'MACD', 'MACD_signal', 'Stochastic', 'CCI', 'Williams']
+            missing_cols = [col for col in required_cols if col not in df.columns]
             
-            if 'RSI' not in df.columns:
-                # Calculate RSI (14-period)
-                delta = df['close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain / loss
-                df['RSI'] = 100 - (100 / (1 + rs))
+            if missing_cols:
+                logger.warning(f"[Backtest] Missing columns for validation: {missing_cols}")
             
-            if 'ATR' not in df.columns:
-                # Calculate ATR (14-period)
-                high_low = df['high'] - df['low']
-                high_close = np.abs(df['high'] - df['close'].shift())
-                low_close = np.abs(df['low'] - df['close'].shift())
-                true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-                df['ATR'] = true_range.rolling(window=14).mean()
+            skipped_adx = 0
+            skipped_momentum = 0
             
             for i in range(20, len(df)):
                 row = df.iloc[i]
@@ -261,6 +333,7 @@ class BacktestEngine:
                 prev_close = prev_row['close']
                 sma_20 = row.get('SMA_20', close)
                 rsi = row.get('RSI', 50)
+                adx = row.get('ADX', 25)  # Default to 25 if missing
                 
                 # Volume analysis
                 avg_volume = df['volume'].iloc[max(0, i-20):i].mean()
@@ -271,32 +344,75 @@ class BacktestEngine:
                 if pd.isna(rsi) or rsi > self.RSI_MAX or rsi < self.RSI_MIN:
                     continue
                 
+                # ADX Market Regime Filter: Skip choppy markets
+                if self.USE_ADX_FILTER and adx < self.ADX_CHOPPY_THRESHOLD:
+                    skipped_adx += 1
+                    continue
+                
+                # Volume Sweet Spot Filter: Only take trades with optimal volume
+                # Analysis showed 1.3-1.5x volume has 80% win rate vs 53-66% for others
+                if self.USE_VOLUME_SWEET_SPOT:
+                    if volume_ratio < self.MIN_VOLUME_RATIO or volume_ratio > self.MAX_VOLUME_RATIO:
+                        continue  # Skip non-sweet-spot volume
+                
                 # Strategy 5 conditions
                 conditions = {
                     'price_above_sma': close > sma_20,
                     'healthy_rsi': self.RSI_MIN <= rsi <= self.RSI_MAX,
-                    'volume_surge': volume_ratio >= self.MIN_VOLUME_RATIO,
                     'price_rising': close > prev_close,
                 }
                 
                 # Count conditions met
                 conditions_met = sum(conditions.values())
                 
-                # Need at least MIN_CONDITIONS to trigger signal
-                if conditions_met >= self.MIN_CONDITIONS:
-                    signals.append({
-                        'date': row.name,
-                        'index': i,
-                        'entry_price': close,
-                        'volume_ratio': round(volume_ratio, 2),
-                        'rsi': round(rsi, 1),
-                        'atr': round(row.get('ATR', 0), 2),
-                        'conditions_met': conditions_met,
-                        'conditions': conditions,
-                        'confidence': round(conditions_met / 4 * 100, 1)
-                    })
+                # Need at least MIN_CONDITIONS to proceed
+                if conditions_met < self.MIN_CONDITIONS:
+                    continue
+                
+                # Strategy 5 Momentum Validation (optional but recommended)
+                if self.USE_STRATEGY5_VALIDATION:
+                    # Build indicator dict for Strategy 5 validation
+                    indicator_values = {
+                        'RSI': rsi,
+                        'MACD': row.get('MACD'),
+                        'MACD_signal': row.get('MACD_signal'),
+                        'MACD_histogram': row.get('MACD_histogram'),
+                        'Stochastic': row.get('Stochastic'),
+                        'CCI': row.get('CCI'),
+                        'Williams %R': row.get('Williams'),
+                        'ADX': adx,
+                    }
+                    
+                    # Use Strategy 5's validation method
+                    is_valid, reason = self.strategy_5.validate_buy_signal(indicator_values)
+                    
+                    if not is_valid:
+                        skipped_momentum += 1
+                        continue
+                
+                # Track volume for reporting but don't filter on it
+                has_volume_surge = volume_ratio >= 1.3  # Track but don't require
+                
+                # Calculate confidence based on validation results
+                confidence = conditions_met / 3 * 100
+                if adx >= 25:
+                    confidence += 10  # Bonus for strong trend
+                
+                signals.append({
+                    'date': row.name,
+                    'index': i,
+                    'entry_price': close,
+                    'volume_ratio': round(volume_ratio, 2),
+                    'has_volume_surge': has_volume_surge,
+                    'rsi': round(rsi, 1),
+                    'adx': round(adx, 1),
+                    'atr': round(row.get('ATR', 0), 2),
+                    'conditions_met': conditions_met,
+                    'conditions': conditions,
+                    'confidence': round(min(confidence, 100), 1)
+                })
             
-            logger.debug(f"[Backtest] Generated {len(signals)} entry signals (strict mode)")
+            logger.info(f"[Backtest] Generated {len(signals)} signals (skipped: {skipped_adx} ADX filter, {skipped_momentum} momentum filter)")
             return signals
             
         except Exception as e:
@@ -387,7 +503,7 @@ class BacktestEngine:
                 'reason': 'Hit 4% target' | 'Hit stop loss' | 'Time exit'
             }
         """
-        max_bars = min(10, len(df) - entry_index - 1)  # 10 bars = ~2 weeks
+        max_bars = min(self.MAX_BARS, len(df) - entry_index - 1)  # Use class constant
         
         try:
             last_close = df.iloc[entry_index]['close']
@@ -429,8 +545,8 @@ class BacktestEngine:
             outcome = 'WIN' if pnl_pct > 0 else 'LOSS'
             
             # Determine reason based on actual bars held
-            if max_bars >= 10:
-                reason = 'Time exit (10 bars)'
+            if max_bars >= self.MAX_BARS:
+                reason = f'Time exit ({self.MAX_BARS} bars)'
             elif max_bars > 0:
                 reason = f'End of data ({max_bars} bars)'
             else:

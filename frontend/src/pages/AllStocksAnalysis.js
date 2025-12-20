@@ -1,10 +1,11 @@
 import _ from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { analyzeAllStocks, getAllAnalysisResults, getAllNSEStocks, getAllStocksProgress } from '../api/api';
+import { analyzeAllStocks, getAllStocksProgress } from '../api/api';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
+import { useStocks } from '../context/StocksContext';
 import { TradingViewLink } from '../utils/tradingViewUtils';
 
 // Define verdict sort order (higher priority first) - outside component to avoid recreating on every render
@@ -18,9 +19,20 @@ const VERDICT_PRIORITY = {
 };
 
 function AllStocksAnalysis() {
-  const [stocks, setStocks] = useState([]);
+  // Use global stocks context for caching
+  const { 
+    stocks: cachedStocks, 
+    stocksLoading, 
+    fetchAllStocks, 
+    fetchAnalysisResults,
+    getStocksWithAnalysis,
+    getTimeSinceLastFetch,
+    lastStocksFetch,
+    updateBulkAnalysis
+  } = useStocks();
+
+  // Local UI state only
   const [selectedStocks, setSelectedStocks] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,7 +42,12 @@ function AllStocksAnalysis() {
   const [pendingAnalysisType, setPendingAnalysisType] = useState(null); // 'all' or 'selected'
   const navigate = useNavigate();
 
+  // Get merged stocks with analysis data from context
+  const stocks = getStocksWithAnalysis();
+  const loading = stocksLoading;
+
   useEffect(() => {
+    // Load stocks from cache or fetch if needed (respects TTL)
     loadAllStocks();
   }, []);
 
@@ -50,10 +67,11 @@ function AllStocksAnalysis() {
             // Add small delay to ensure database is fully updated
             completionCheckCount++;
             if (completionCheckCount >= 2) {
-              // Wait for DB to settle, then refresh
-              setTimeout(() => {
+              // Wait for DB to settle, then refresh analysis results only
+              setTimeout(async () => {
                 setAnalyzing(false);
-                loadAllStocks(); // Refresh the list with results
+                // Force refresh analysis results to get new data
+                await fetchAnalysisResults(true);
               }, 1000);
             }
           } else {
@@ -68,99 +86,14 @@ function AllStocksAnalysis() {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [analyzing]);
+  }, [analyzing, fetchAnalysisResults]);
 
-  const loadAllStocks = async () => {
-    try {
-      setLoading(true);
-      
-      // OPTIMIZED: Fetch first page to get total_pages, then fetch all pages in parallel
-      const firstStocksPage = await getAllNSEStocks(1, 500); // Larger page size
-      const totalStockPages = firstStocksPage?.total_pages || 1;
-      
-      // Fetch remaining stock pages in parallel
-      let allLoadedStocks = [...(firstStocksPage?.stocks || [])];
-      if (totalStockPages > 1) {
-        const stockPagePromises = [];
-        for (let page = 2; page <= totalStockPages; page++) {
-          stockPagePromises.push(getAllNSEStocks(page, 500));
-        }
-        const stockResults = await Promise.all(stockPagePromises);
-        stockResults.forEach(data => {
-          if (data?.stocks) {
-            allLoadedStocks = [...allLoadedStocks, ...data.stocks];
-          }
-        });
-      }
-      
-      // OPTIMIZED: Same parallel approach for analysis results
-      const firstResultsPage = await getAllAnalysisResults(1, 500);
-      const totalResultPages = firstResultsPage?.total_pages || 1;
-      
-      let allResults = [...(firstResultsPage?.results || [])];
-      if (totalResultPages > 1) {
-        const resultPagePromises = [];
-        for (let page = 2; page <= totalResultPages; page++) {
-          resultPagePromises.push(getAllAnalysisResults(page, 500));
-        }
-        const resultsData = await Promise.all(resultPagePromises);
-        resultsData.forEach(data => {
-          if (data?.results) {
-            allResults = [...allResults, ...data.results];
-          }
-        });
-      }
-      
-      // Create a map of symbol -> analysis result for quick lookup
-      // IMPORTANT: Only keep FIRST occurrence of each symbol (which is newest from backend DESC order)
-      const resultsMap = {};
-      allResults.forEach(result => {
-        const key = result.symbol || result.ticker;
-        if (key) {
-          const upperKey = key.toUpperCase();
-          // Only add if not already in map (first = newest from DESC ordering)
-          if (!resultsMap[upperKey]) {
-            resultsMap[upperKey] = result;
-          }
-        }
-      });
-      
-      // Map stocks to include status field for UI and enrich with analysis data
-      const stocksWithStatus = allLoadedStocks.map(stock => {
-        const result = resultsMap[stock.symbol.toUpperCase()];
-        if (result) {
-          return {
-            ...stock,
-            ticker: result.ticker,  // Add ticker from analysis result
-            status: 'completed',
-            score: result.score,
-            verdict: result.verdict,
-            entry: result.entry,
-            target: result.target,
-            has_analysis: true,
-            stop_loss: result.stop_loss,
-            created_at: result.created_at
-          };
-        }
-        return {
-          ...stock,
-          status: 'pending',
-          score: null,
-          verdict: '-',
-          entry: null,
-          target: null,
-          has_analysis: false
-        };
-      });
-      
-      setStocks(stocksWithStatus);
-      
-    } catch (error) {
-      console.error('Failed to load stocks:', error);
-      alert('Failed to load stocks. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const loadAllStocks = async (forceRefresh = false) => {
+    // Use context's fetch functions - they handle caching automatically
+    await Promise.all([
+      fetchAllStocks(forceRefresh),
+      fetchAnalysisResults(forceRefresh)
+    ]);
   };
 
   const handleSelectAll = () => {
@@ -387,13 +320,20 @@ function AllStocksAnalysis() {
           </button>
           
           <button
-            onClick={loadAllStocks}
+            onClick={() => loadAllStocks(true)}
             disabled={loading}
             className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm ml-0 sm:ml-auto whitespace-nowrap"
           >
-            Refresh
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
+
+        {/* Last Synced Indicator */}
+        {lastStocksFetch && !loading && (
+          <div className="mb-2 text-xs text-gray-500 text-right">
+            Last synced: {getTimeSinceLastFetch(lastStocksFetch)}
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="mb-4">

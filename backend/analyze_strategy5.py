@@ -9,7 +9,15 @@ def analyze_performance():
     result = engine.backtest_ticker('RELIANCE.NS', days=365)
     
     trades = result.get('trades', [])
-    metrics = result.get('metrics', {})
+    # Metrics are at top level, not nested
+    metrics = {
+        'win_rate': result.get('win_rate', 0),
+        'total_pnl': result.get('total_profit_pct', 0),
+        'avg_win': result.get('avg_win', 0),
+        'avg_loss': result.get('avg_loss', 0),
+        'profit_factor': result.get('profit_factor', 0),
+        'expectancy': result.get('expectancy', 0),
+    }
     
     print("=" * 70)
     print("STRATEGY 5 PERFORMANCE ANALYSIS")
@@ -19,6 +27,7 @@ def analyze_performance():
     print(f"Total Trades: {len(trades)}")
     print(f"Win Rate: {metrics.get('win_rate', 0):.1f}%")
     print(f"Total P&L: {metrics.get('total_pnl', 0):.2f}%")
+    print(f"Expectancy: {metrics.get('expectancy', 0):.2f}% per trade")
     print(f"Avg Win: {metrics.get('avg_win', 0):.2f}%")
     print(f"Avg Loss: {metrics.get('avg_loss', 0):.2f}%")
     print(f"Profit Factor: {metrics.get('profit_factor', 0):.2f}")
