@@ -39,6 +39,9 @@ from utils.trading.risk_manager import RiskManager
 from utils.trading.trade_validator import TradeValidator
 from utils.analysis.signal_validator import SignalValidator
 
+# Import Strategy 5 for validation methods
+from strategies.strategy_5 import Strategy5
+
 logger = logging.getLogger('trading_analyzer')
 
 # Category biases for weighted scoring
@@ -228,6 +231,56 @@ class IndicatorEngine:
             return "volume"
         else:
             return "unknown"
+    
+    @staticmethod
+    def extract_indicator_values(indicator_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Extract raw indicator values from results for Strategy 5 validation.
+        
+        Maps indicator results to the format expected by Strategy 5's
+        validate_momentum_context() and detect_signal_contradictions() methods.
+        
+        Args:
+            indicator_results: List of indicator results from calculate_indicators()
+            
+        Returns:
+            Dict with indicator values keyed by indicator name
+        """
+        values = {}
+        
+        for result in indicator_results:
+            name = result.get('name', '')
+            
+            # Extract values based on indicator type
+            if name == 'RSI':
+                values['RSI'] = result.get('value', result.get('rsi'))
+            elif name == 'MACD':
+                values['MACD'] = result.get('macd')
+                values['MACD_signal'] = result.get('macd_signal', result.get('signal'))
+                values['MACD_histogram'] = result.get('macd_histogram', result.get('histogram'))
+            elif name == 'Stochastic':
+                values['Stochastic'] = result.get('value', result.get('k'))
+            elif name == 'CCI':
+                values['CCI'] = result.get('value', result.get('cci'))
+            elif name == 'Williams %R':
+                values['Williams %R'] = result.get('value', result.get('williams'))
+            elif name == 'ADX':
+                values['ADX'] = result.get('adx', result.get('value'))
+                values['DI+'] = result.get('di_plus')
+                values['DI-'] = result.get('di_minus')
+            elif name == 'OBV':
+                values['OBV'] = result.get('obv', result.get('value'))
+                values['OBV_prev'] = result.get('obv_prev')
+            elif name == 'Chaikin Money Flow':
+                values['CMF'] = result.get('cmf', result.get('value'))
+            elif name == 'ATR':
+                values['ATR'] = result.get('atr', result.get('value'))
+            
+            # Also store raw result for any indicator
+            if 'value' in result:
+                values[name] = result['value']
+        
+        return values
 
 
 class SignalAggregator:
@@ -708,6 +761,61 @@ class AnalysisOrchestrator:
             
             logger.info(f"[ORCHESTRATOR] Signal analysis complete - ticker: {ticker}, score: {score}, verdict: {verdict}")
             
+            # Step 3.5: Strategy 5 Enhanced Validation (if applicable)
+            validation_result = None
+            confidence_score = 100
+            market_regime = 'UNKNOWN'
+            validation_warnings = []
+            
+            if strategy_id == 5 and verdict in ["Buy", "Strong Buy"]:
+                # Extract indicator values for validation
+                indicator_values = self.indicator_engine.extract_indicator_values(indicator_results)
+                
+                # Initialize Strategy 5 instance for validation
+                strategy_5 = Strategy5()
+                
+                # 1. ADX Market Regime Filter
+                adx_value = indicator_values.get('ADX')
+                if adx_value is not None:
+                    if adx_value < 20:
+                        market_regime = 'CHOPPY'
+                        validation_warnings.append(f"Weak trend (ADX {adx_value:.1f} < 20) - choppy market conditions")
+                        # Reduce confidence but don't reject
+                        confidence_score -= 15
+                    elif adx_value >= 25:
+                        market_regime = 'TRENDING'
+                    else:
+                        market_regime = 'WEAK_TREND'
+                
+                # 2. Momentum Context Validation
+                is_momentum_valid, momentum_reason = strategy_5.validate_buy_signal(indicator_values)
+                if not is_momentum_valid:
+                    validation_warnings.append(f"Momentum filter: {momentum_reason}")
+                    # Significant confidence reduction for failed momentum
+                    confidence_score -= 25
+                
+                # 3. Signal Contradiction Detection
+                contradiction_confidence, contradictions = strategy_5.detect_signal_contradictions(
+                    'BUY', indicator_values
+                )
+                if contradictions:
+                    validation_warnings.extend(contradictions)
+                    # Apply contradiction penalty (already computed in contradiction_confidence)
+                    confidence_score = min(confidence_score, contradiction_confidence)
+                
+                # Clamp confidence to valid range
+                confidence_score = max(0, min(100, confidence_score))
+                
+                logger.info(f"[ORCHESTRATOR] Strategy 5 validation - confidence: {confidence_score}, regime: {market_regime}, warnings: {len(validation_warnings)}")
+                
+                validation_result = {
+                    'confidence_score': confidence_score,
+                    'market_regime': market_regime,
+                    'validation_warnings': validation_warnings,
+                    'momentum_valid': is_momentum_valid,
+                    'momentum_reason': momentum_reason if not is_momentum_valid else 'All momentum filters passed'
+                }
+            
             # Step 4: Calculate trade parameters
             trade_params = self.trade_calculator.calculate_trade_parameters(
                 df, score, verdict, effective_capital, config
@@ -745,6 +853,14 @@ class AnalysisOrchestrator:
             # Add strategy info to result
             result['strategy_id'] = strategy_id
             result['strategy_name'] = strategy.name
+            
+            # Add Strategy 5 validation results if applicable
+            if validation_result:
+                result['validation'] = validation_result
+                result['confidence_score'] = confidence_score
+                result['market_regime'] = market_regime
+                if validation_warnings:
+                    result['validation_warnings'] = validation_warnings
 
             return result
             
