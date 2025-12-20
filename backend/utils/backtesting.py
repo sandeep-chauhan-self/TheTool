@@ -4,7 +4,7 @@ Backtesting Engine for Strategy Analysis
 Analyzes historical OHLCV data following TheTool architecture patterns:
 - Uses DataFetcher for OHLCV data (respects demo/live data modes)
 - Uses IndicatorEngine for calculations (respects modular indicators)
-- Integrates with Strategy 5 enhanced validation methods
+- Integrates with Strategy validation methods (1-5)
 - Thread-safe with get_db_session() for background job compatibility
 - Uses _convert_query_params() for PostgreSQL/SQLite database abstraction
 - Centralized logging via utils.logger.get_logger()
@@ -14,6 +14,7 @@ Architecture Pattern:
 - Modular: Uses existing DataFetcher and IndicatorEngine, doesn't duplicate
 - Database agnostic: No direct SQL, uses db layer abstractions
 - Thread-safe: Suitable for background job processing
+- Multi-Strategy: Supports all 5 strategies with strategy-specific parameters
 """
 
 import pandas as pd
@@ -23,85 +24,193 @@ from typing import Dict, List, Any, Tuple, Optional
 import logging
 
 from utils.analysis_orchestrator import DataFetcher
+from strategies.strategy_1 import Strategy1
+from strategies.strategy_2 import Strategy2
+from strategies.strategy_3 import Strategy3
+from strategies.strategy_4 import Strategy4
 from strategies.strategy_5 import Strategy5
 
 logger = logging.getLogger('trading_analyzer')
+
+
+# =============================================================================
+# STRATEGY CONFIGURATIONS
+# =============================================================================
+# Each strategy has its own parameters for backtesting
+# These are derived from the risk_profile() and characteristics of each strategy
+
+STRATEGY_CONFIGS = {
+    1: {
+        # Strategy 1: Balanced Analysis - Equal weight to all indicators
+        'name': 'Balanced Analysis',
+        'description': 'Equal weight to all 12 indicators - good for general market scanning',
+        'target_pct': 4.0,           # Standard 4% target
+        'stop_loss_pct': 2.0,        # Standard 2% stop (from risk_profile)
+        'max_stop_loss_pct': 3.0,    # Maximum 3% stop
+        'max_bars': 20,              # 20 bars (~4 weeks) - longer holding for balanced
+        'rsi_min': 30,               # Standard RSI oversold level
+        'rsi_max': 70,               # Standard RSI overbought level
+        'adx_threshold': 20,         # Standard ADX threshold
+        'atr_multiplier': 1.5,       # Standard ATR multiplier
+        'use_trend_filter': True,    # Use SMA 50 trend filter
+        'use_loss_cooldown': True,   # Wait after losses
+        'cooldown_bars': 2,          # 2 bar cooldown (shorter for balanced)
+        'min_conditions': 2,         # Need 2 of 3 conditions
+        'use_strategy_validation': False,  # No Strategy 5-specific validation
+    },
+    2: {
+        # Strategy 2: Trend Following - Heavy on MACD, ADX, EMA, PSAR
+        'name': 'Trend Following',
+        'description': 'Emphasizes trend indicators - best for trending markets',
+        'target_pct': 6.0,           # Higher target for trends (let winners run)
+        'stop_loss_pct': 2.5,        # Wider stop to avoid whipsaws
+        'max_stop_loss_pct': 4.0,    # Maximum 4% stop
+        'max_bars': 25,              # 25 bars (~5 weeks) - longer for trend capture
+        'rsi_min': 40,               # Higher minimum (need momentum in direction)
+        'rsi_max': 80,               # Higher max (trends can stay overbought)
+        'adx_threshold': 25,         # Higher ADX requirement for trend confirmation
+        'atr_multiplier': 2.0,       # Wider ATR multiplier for trends
+        'use_trend_filter': True,    # Essential for trend following
+        'use_loss_cooldown': True,   # Wait after losses
+        'cooldown_bars': 3,          # 3 bar cooldown
+        'min_conditions': 2,         # Need 2 of 3 conditions
+        'use_strategy_validation': False,  # Uses trend-specific validation
+    },
+    3: {
+        # Strategy 3: Mean Reversion - Heavy on RSI, Bollinger, Stochastic
+        'name': 'Mean Reversion',
+        'description': 'Emphasizes oscillators - best for range-bound markets',
+        'target_pct': 2.5,           # Smaller target (quick profits in ranges)
+        'stop_loss_pct': 1.5,        # Tighter stop for range trading
+        'max_stop_loss_pct': 2.5,    # Maximum 2.5% stop
+        'max_bars': 10,              # 10 bars (~2 weeks) - quick turnaround
+        'rsi_min': 20,               # Lower RSI threshold (oversold is entry signal)
+        'rsi_max': 40,               # Lower max (buy when oversold, not in middle)
+        'adx_threshold': 15,         # LOWER ADX (want range-bound, not trending)
+        'adx_max': 25,               # Maximum ADX (avoid trends)
+        'atr_multiplier': 1.0,       # Tighter ATR multiplier
+        'use_trend_filter': False,   # Don't use trend filter (counter-trend strategy)
+        'use_loss_cooldown': True,   # Wait after losses
+        'cooldown_bars': 2,          # 2 bar cooldown (faster re-entry)
+        'min_conditions': 1,         # Need only 1 condition (oversold signal)
+        'use_strategy_validation': False,
+    },
+    4: {
+        # Strategy 4: Momentum Breakout - Heavy on OBV, CMF, RSI, ATR
+        'name': 'Momentum Breakout',
+        'description': 'Volume-confirmed momentum - best for breakouts',
+        'target_pct': 5.0,           # Higher target for breakouts
+        'stop_loss_pct': 3.0,        # Wider stop for volatile breakouts
+        'max_stop_loss_pct': 4.0,    # Maximum 4% stop
+        'max_bars': 12,              # 12 bars (~2.5 weeks) - breakouts resolve fast
+        'rsi_min': 50,               # Higher RSI minimum (need strength)
+        'rsi_max': 85,               # High max (breakouts can be extended)
+        'adx_threshold': 20,         # Lower threshold to catch early breakouts
+        'atr_multiplier': 1.8,       # Higher ATR multiplier for volatility
+        'use_trend_filter': True,    # Need directional confirmation
+        'use_loss_cooldown': True,   # Wait after losses
+        'cooldown_bars': 2,          # 2 bar cooldown (re-enter fast on breakouts)
+        'min_conditions': 2,         # Need 2 of 3 conditions
+        'use_strategy_validation': False,
+        'require_volume_surge': True,  # CRITICAL: Require volume confirmation
+        'min_volume_ratio': 1.5,       # Need 1.5x average volume
+    },
+    5: {
+        # Strategy 5: Weekly 4% Target (Optimized Dec 2025)
+        'name': 'Weekly 4% Target',
+        'description': 'Optimized swing trading - 4% target, smart stop, 15-bar holding',
+        'target_pct': 4.0,           # 4% target (optimized from 5%)
+        'stop_loss_pct': 3.0,        # Base stop: 3%
+        'max_stop_loss_pct': 4.0,    # Maximum stop: 4% (cap)
+        'max_bars': 15,              # 15 bars (~3 weeks)
+        'rsi_min': 50,               # Raised from 30 - stronger momentum required
+        'rsi_max': 75,               # Avoid overbought
+        'adx_threshold': 20,         # ADX below this = choppy market
+        'atr_multiplier': 1.5,       # ATR × 1.5 for dynamic stop
+        'use_trend_filter': True,    # SMA 50 trend filter
+        'use_loss_cooldown': True,   # Wait after losses
+        'cooldown_bars': 3,          # 3 bar cooldown
+        'min_conditions': 2,         # Need 2 of 3 conditions
+        'use_strategy_validation': True,  # Use Strategy 5 momentum validation
+    }
+}
+
+
+def get_strategy_class(strategy_id: int):
+    """Get the strategy class instance for a given strategy ID."""
+    strategy_classes = {
+        1: Strategy1,
+        2: Strategy2,
+        3: Strategy3,
+        4: Strategy4,
+        5: Strategy5,
+    }
+    if strategy_id not in strategy_classes:
+        raise ValueError(f"Invalid strategy_id: {strategy_id}. Must be 1-5.")
+    return strategy_classes[strategy_id]()
 
 
 class BacktestEngine:
     """
     Backtesting engine following TheTool architecture patterns.
     
-    Simulates historical trades based on Strategy 5 enhanced signals.
+    Simulates historical trades based on strategy-specific signals.
     Uses existing DataFetcher and IndicatorEngine to avoid code duplication.
-    Integrates Strategy 5 validation methods for accurate backtesting.
+    Supports all 5 strategies with appropriate validation methods.
     """
-    
-    # Strategy 5 parameters (synchronized with strategy_5.py)
-    # OPTIMIZED based on 15-stock backtest analysis (Dec 2025)
-    # Key findings from comprehensive_backtest_analysis.py:
-    # 1. Volume 1.3-1.5x is SWEET SPOT (80% win rate vs 65% for others)
-    # 2. RSI 50-75 performs better (64-72% win rate)
-    # 3. 15-bar holding captures more gains (time exits have 72.3% win rate)
-    # 4. Lower confidence signals actually perform better (67% vs 61%)
-    TARGET_PCT = 4.0       # 4% target - 44.9% hit rate is good
-    MAX_BARS = 15          # 15 bars holding - 72.3% time exit win rate
-    STOP_LOSS_PCT = 3.0    # Base stop: 3%
-    MAX_STOP_LOSS_PCT = 4.0  # Maximum stop: 4% (cap)
-    ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR x 1.5)
-    USE_WIDER_STOP = True  # Use wider stop in volatile conditions
-    
-    # VOLUME SWEET SPOT FILTER (NEW - Dec 2025)
-    # Analysis showed: 1.3-1.5x volume = 80% win rate, 2.34% avg P&L
-    # But hard filter is too restrictive (only 21 signals vs 392)
-    # Alternative: Disable hard filter, use volume as confidence boost only
-    USE_VOLUME_SWEET_SPOT = False  # DISABLED - too restrictive
-    MIN_VOLUME_RATIO = 1.0         # No minimum (was 1.3)
-    MAX_VOLUME_RATIO = 100.0       # No maximum (was 1.5)
-    VOLUME_SWEET_SPOT_MIN = 1.3    # For confidence boost calculation
-    VOLUME_SWEET_SPOT_MAX = 1.5    # For confidence boost calculation
-    
-    # RSI OPTIMIZATION (Dec 2025)
-    # Analysis showed: RSI 50-75 has 64-72% win rate
-    # RSI 40-50 only 48% win rate - too weak
-    RSI_MIN = 50           # Raised from 30 - stronger momentum required
-    RSI_MAX = 75           # Maximum RSI (avoid overbought)
-    
-    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions
-    ADX_CHOPPY_THRESHOLD = 20  # ADX below this = choppy market, skip signal
-    USE_ADX_FILTER = True  # Enable ADX regime filtering
-    
-    # VALIDATION LOOSENING (Dec 2025)
-    # Analysis showed lower confidence signals perform BETTER (67% vs 61%)
-    # But disabling validation reduced expectancy from 1.18% to 1.02%
-    # Keep validation ON for quality, rely on RSI 50-75 for filtering weak signals
-    USE_STRATEGY5_VALIDATION = True  # RE-ENABLED - quality over quantity
-    
-    # TREND FILTER (Dec 2025) - Synced with Strategy 5
-    # Avoid buying in downtrends - major cause of losses
-    USE_TREND_FILTER = True          # Enable SMA 50 trend filter
-    SMA_TREND_PERIOD = 50            # 50-day SMA for trend direction
-    
-    # COOLDOWN AFTER LOSS (Dec 2025) - Synced with Strategy 5
-    # Avoid rapid re-entry after stop loss (Nov 3-5 clustering issue)
-    USE_LOSS_COOLDOWN = True         # Enable cooldown after loss
-    COOLDOWN_BARS = 3                # Wait 3 bars after a loss
-    
-    # INCOMPLETE TRADE HANDLING (Dec 2025)
-    # Don't count trades that didn't have enough bars to reach target/stop
-    MIN_BARS_FOR_VALID_TRADE = 5     # Need at least 5 bars for valid trade
-    SKIP_INCOMPLETE_TRADES = True    # Exclude trades with insufficient data
     
     def __init__(self, strategy_id: int = 5):
         """
-        Initialize backtesting engine.
+        Initialize backtesting engine with strategy-specific configuration.
         
         Args:
-            strategy_id: Strategy to backtest (default 5 = enhanced swing trading)
+            strategy_id: Strategy to backtest (1-5, default 5 = enhanced swing trading)
         """
+        if strategy_id not in STRATEGY_CONFIGS:
+            raise ValueError(f"Invalid strategy_id: {strategy_id}. Must be 1-5.")
+        
         self.strategy_id = strategy_id
+        self.config = STRATEGY_CONFIGS[strategy_id]
         self.data_fetcher = DataFetcher()
-        self.strategy_5 = Strategy5()  # For validation methods
+        self.strategy = get_strategy_class(strategy_id)
+        
+        # Load strategy-specific parameters from config
+        self.TARGET_PCT = self.config['target_pct']
+        self.MAX_BARS = self.config['max_bars']
+        self.STOP_LOSS_PCT = self.config['stop_loss_pct']
+        self.MAX_STOP_LOSS_PCT = self.config['max_stop_loss_pct']
+        self.ATR_MULTIPLIER = self.config['atr_multiplier']
+        self.USE_WIDER_STOP = True
+        
+        # RSI parameters
+        self.RSI_MIN = self.config['rsi_min']
+        self.RSI_MAX = self.config['rsi_max']
+        
+        # ADX parameters
+        self.ADX_CHOPPY_THRESHOLD = self.config['adx_threshold']
+        self.ADX_MAX = self.config.get('adx_max')  # Only for mean reversion
+        self.USE_ADX_FILTER = True
+        
+        # Filters
+        self.USE_TREND_FILTER = self.config['use_trend_filter']
+        self.USE_LOSS_COOLDOWN = self.config['use_loss_cooldown']
+        self.COOLDOWN_BARS = self.config['cooldown_bars']
+        self.MIN_CONDITIONS = self.config['min_conditions']
+        self.USE_STRATEGY5_VALIDATION = self.config['use_strategy_validation']
+        
+        # Volume requirements (for Strategy 4 breakout)
+        self.REQUIRE_VOLUME_SURGE = self.config.get('require_volume_surge', False)
+        self.MIN_VOLUME_RATIO = self.config.get('min_volume_ratio', 1.0)
+        
+        # Incomplete trade handling
+        self.MIN_BARS_FOR_VALID_TRADE = 5
+        self.SKIP_INCOMPLETE_TRADES = True
+        
+        # Volume sweet spot (disabled by default - use config to enable)
+        self.USE_VOLUME_SWEET_SPOT = False
+        self.MAX_VOLUME_RATIO = 100.0
+        
+        logger.info(f"[Backtest] Initialized with Strategy {strategy_id}: {self.config['name']}")
     
     def backtest_ticker(self, ticker: str, days: int = 90) -> Dict[str, Any]:
         """
@@ -110,6 +219,7 @@ class BacktestEngine:
         Uses TheTool patterns:
         - DataFetcher for data retrieval (respects demo/live modes)
         - IndicatorEngine for calculations (respects modular indicators)
+        - Strategy-specific parameters and validation
         
         Args:
             ticker: Stock ticker (e.g., 'RELIANCE.NS')
@@ -118,6 +228,8 @@ class BacktestEngine:
         Returns:
             {
                 'ticker': 'RELIANCE.NS',
+                'strategy_id': 5,
+                'strategy_name': 'Weekly 4% Target',
                 'backtest_period': '2025-11-01 to 2025-01-28',
                 'total_signals': 45,
                 'winning_trades': 32,
@@ -154,7 +266,9 @@ class BacktestEngine:
                 logger.warning(f"[Backtest] No valid data for {ticker}: {message}")
                 return {
                     'error': f'No valid data available: {message}',
-                    'ticker': ticker
+                    'ticker': ticker,
+                    'strategy_id': self.strategy_id,
+                    'strategy_name': self.config['name']
                 }
             
             logger.info(f"[Backtest] Fetched {len(df)} candles for {ticker} (source: {source})")
@@ -169,13 +283,16 @@ class BacktestEngine:
             # Calculate indicators for entire dataframe
             df = self._calculate_indicators(df, ticker)
             
-            # Generate buy signals based on Strategy 5 logic
+            # Generate buy signals based on strategy logic
             signals = self._generate_entry_signals(df)
             
             if not signals:
                 logger.info(f"[Backtest] No signals generated for {ticker}")
                 return {
                     'ticker': ticker,
+                    'strategy_id': self.strategy_id,
+                    'strategy_name': self.config['name'],
+                    'strategy_description': self.config['description'],
                     'backtest_period': f"{df.index[0].strftime('%Y-%m-%d')} to {df.index[-1].strftime('%Y-%m-%d')}",
                     'total_signals': 0,
                     'winning_trades': 0,
@@ -191,6 +308,18 @@ class BacktestEngine:
             # Calculate comprehensive metrics
             metrics = self._calculate_metrics(trades)
             metrics['ticker'] = ticker
+            metrics['strategy_id'] = self.strategy_id
+            metrics['strategy_name'] = self.config['name']
+            metrics['strategy_description'] = self.config['description']
+            metrics['strategy_params'] = {
+                'target_pct': self.TARGET_PCT,
+                'stop_loss_pct': self.STOP_LOSS_PCT,
+                'max_bars': self.MAX_BARS,
+                'rsi_range': f"{self.RSI_MIN}-{self.RSI_MAX}",
+                'adx_threshold': self.ADX_CHOPPY_THRESHOLD,
+                'use_trend_filter': self.USE_TREND_FILTER,
+                'cooldown_bars': self.COOLDOWN_BARS,
+            }
             metrics['backtest_period'] = f"{df.index[0].strftime('%Y-%m-%d')} to {df.index[-1].strftime('%Y-%m-%d')}"
             metrics['trades'] = trades
             metrics['days_analyzed'] = days
@@ -324,18 +453,21 @@ class BacktestEngine:
     
     def _generate_entry_signals(self, df: pd.DataFrame) -> List[Dict]:
         """
-        Generate buy signals based on Strategy 5 enhanced logic.
+        Generate buy signals based on strategy-specific logic.
         
-        IMPROVED: Now integrates Strategy 5 validation methods:
-        1. Price is above 20-day SMA (uptrend confirmation)
-        2. RSI between 50-75 (healthy momentum, not overbought/oversold)
-        3. ADX > 20 (trending market, skip choppy conditions)
-        4. Strategy 5 momentum validation (MACD bullish, 3+ indicators aligned)
-        5. Price rising (close > previous close)
-        6. TREND FILTER: Price > SMA(50) and SMA(20) > SMA(50) (Dec 2025)
-        7. COOLDOWN: Wait 3 bars after a loss before next signal (Dec 2025)
+        Each strategy has different entry criteria:
+        - Strategy 1: Balanced - standard conditions (2/3 met)
+        - Strategy 2: Trend Following - requires ADX > 25, focus on trend
+        - Strategy 3: Mean Reversion - low RSI (oversold), low ADX (range-bound)
+        - Strategy 4: Breakout - requires volume surge + momentum
+        - Strategy 5: Enhanced - uses Strategy 5 validation methods
         
-        Uses Strategy 5's validate_buy_signal() for additional filtering.
+        Common filters applied:
+        1. RSI within strategy-specific range
+        2. ADX filter (varies by strategy)
+        3. Trend filter (if enabled)
+        4. Cooldown after loss
+        5. Strategy-specific validation (if enabled)
         """
         signals = []
         
@@ -351,6 +483,7 @@ class BacktestEngine:
             skipped_momentum = 0
             skipped_trend = 0
             skipped_cooldown = 0
+            skipped_volume = 0
             last_loss_bar = None  # Track when last loss occurred for cooldown
             
             # Start at bar 50 to ensure SMA_50 is valid
@@ -373,42 +506,70 @@ class BacktestEngine:
                 current_volume = row['volume']
                 volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
                 
-                # Skip if RSI is invalid (overbought or too weak)
+                # Skip if RSI is invalid based on strategy
                 if pd.isna(rsi) or rsi > self.RSI_MAX or rsi < self.RSI_MIN:
                     continue
                 
-                # TREND FILTER (Dec 2025) - Synced with Strategy 5
-                # Skip if in downtrend: both price and SMA_20 must be above SMA_50
+                # ADX FILTER - Strategy-specific handling
+                if self.USE_ADX_FILTER:
+                    # Strategy 3 (Mean Reversion): Want LOW ADX (range-bound market)
+                    if self.ADX_MAX is not None:
+                        # Mean reversion: skip if ADX too HIGH (trending)
+                        if adx > self.ADX_MAX:
+                            skipped_adx += 1
+                            continue
+                    else:
+                        # Other strategies: skip if ADX too LOW (choppy)
+                        if adx < self.ADX_CHOPPY_THRESHOLD:
+                            skipped_adx += 1
+                            continue
+                
+                # TREND FILTER - Skip if in downtrend (unless mean reversion)
                 if self.USE_TREND_FILTER:
                     if pd.notna(sma_50) and (close < sma_50 or sma_20 < sma_50):
                         skipped_trend += 1
                         continue
                 
-                # COOLDOWN FILTER (Dec 2025) - Synced with Strategy 5
-                # Wait X bars after a loss before taking another signal
+                # COOLDOWN FILTER - Wait X bars after a loss
                 if self.USE_LOSS_COOLDOWN and last_loss_bar is not None:
                     bars_since_loss = i - last_loss_bar
                     if bars_since_loss < self.COOLDOWN_BARS:
                         skipped_cooldown += 1
                         continue
                 
-                # ADX Market Regime Filter: Skip choppy markets
-                if self.USE_ADX_FILTER and adx < self.ADX_CHOPPY_THRESHOLD:
-                    skipped_adx += 1
-                    continue
+                # VOLUME SURGE FILTER - Required for Strategy 4 (Breakout)
+                if self.REQUIRE_VOLUME_SURGE:
+                    if volume_ratio < self.MIN_VOLUME_RATIO:
+                        skipped_volume += 1
+                        continue
                 
-                # Volume Sweet Spot Filter: Only take trades with optimal volume
-                # Analysis showed 1.3-1.5x volume has 80% win rate vs 53-66% for others
+                # Volume Sweet Spot Filter (disabled by default)
                 if self.USE_VOLUME_SWEET_SPOT:
                     if volume_ratio < self.MIN_VOLUME_RATIO or volume_ratio > self.MAX_VOLUME_RATIO:
-                        continue  # Skip non-sweet-spot volume
+                        continue
                 
-                # Strategy 5 conditions
-                conditions = {
-                    'price_above_sma': close > sma_20,
-                    'healthy_rsi': self.RSI_MIN <= rsi <= self.RSI_MAX,
-                    'price_rising': close > prev_close,
-                }
+                # Build conditions based on strategy type
+                if self.strategy_id == 3:
+                    # Mean Reversion: Buy when oversold
+                    conditions = {
+                        'oversold_rsi': rsi < 40,  # RSI below 40 is oversold signal
+                        'price_below_sma': close < sma_20,  # Price stretched below mean
+                        'low_adx': adx < 25,  # Range-bound market
+                    }
+                elif self.strategy_id == 4:
+                    # Breakout: Need momentum + volume confirmation
+                    conditions = {
+                        'price_above_sma': close > sma_20,
+                        'strong_rsi': rsi > 50,  # Need momentum
+                        'volume_surge': volume_ratio >= 1.5,
+                    }
+                else:
+                    # Standard conditions for Strategy 1, 2, 5
+                    conditions = {
+                        'price_above_sma': close > sma_20,
+                        'healthy_rsi': self.RSI_MIN <= rsi <= self.RSI_MAX,
+                        'price_rising': close > prev_close,
+                    }
                 
                 # Count conditions met
                 conditions_met = sum(conditions.values())
@@ -417,8 +578,8 @@ class BacktestEngine:
                 if conditions_met < self.MIN_CONDITIONS:
                     continue
                 
-                # Strategy 5 Momentum Validation (optional but recommended)
-                if self.USE_STRATEGY5_VALIDATION:
+                # Strategy 5 Momentum Validation (only for strategy 5)
+                if self.USE_STRATEGY5_VALIDATION and self.strategy_id == 5:
                     # Build indicator dict for Strategy 5 validation
                     indicator_values = {
                         'RSI': rsi,
@@ -432,14 +593,14 @@ class BacktestEngine:
                     }
                     
                     # Use Strategy 5's validation method
-                    is_valid, reason = self.strategy_5.validate_buy_signal(indicator_values)
+                    is_valid, reason = self.strategy.validate_buy_signal(indicator_values)
                     
                     if not is_valid:
                         skipped_momentum += 1
                         continue
                 
-                # Track volume for reporting but don't filter on it
-                has_volume_surge = volume_ratio >= 1.3  # Track but don't require
+                # Track volume for reporting but don't filter on it (unless breakout)
+                has_volume_surge = volume_ratio >= 1.3
                 
                 # Check if in uptrend (for reporting)
                 in_uptrend = pd.notna(sma_50) and close > sma_50 and sma_20 > sma_50
@@ -450,6 +611,8 @@ class BacktestEngine:
                     confidence += 10  # Bonus for strong trend
                 if in_uptrend:
                     confidence += 5   # Bonus for uptrend
+                if has_volume_surge:
+                    confidence += 5   # Bonus for volume
                 
                 signals.append({
                     'date': row.name,
@@ -466,7 +629,10 @@ class BacktestEngine:
                     'confidence': round(min(confidence, 100), 1)
                 })
             
-            logger.info(f"[Backtest] Generated {len(signals)} signals (skipped: {skipped_adx} ADX, {skipped_momentum} momentum, {skipped_trend} trend, {skipped_cooldown} cooldown)")
+            skip_summary = f"skipped: {skipped_adx} ADX, {skipped_momentum} momentum, {skipped_trend} trend, {skipped_cooldown} cooldown"
+            if self.REQUIRE_VOLUME_SURGE:
+                skip_summary += f", {skipped_volume} volume"
+            logger.info(f"[Backtest] Strategy {self.strategy_id}: Generated {len(signals)} signals ({skip_summary})")
             return signals
             
         except Exception as e:

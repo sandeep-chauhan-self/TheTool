@@ -2,13 +2,24 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './BacktestResults.css';
 
+// Strategy definitions with descriptions
+const STRATEGIES = {
+  1: { name: 'Balanced Analysis', description: 'Equal weight to all 12 indicators' },
+  2: { name: 'Trend Following', description: 'Best for trending markets' },
+  3: { name: 'Mean Reversion', description: 'Best for range-bound markets' },
+  4: { name: 'Momentum Breakout', description: 'Volume-confirmed breakouts' },
+  5: { name: 'Weekly 4% Target', description: 'Optimized swing trading' }
+};
+
 export default function BacktestResults() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialTicker = searchParams.get('ticker') || '';
+  const initialStrategyId = parseInt(searchParams.get('strategy_id')) || 5;
   
   const [ticker, setTicker] = useState(initialTicker);
   const [days, setDays] = useState(90);
+  const [strategyId, setStrategyId] = useState(initialStrategyId);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,11 +33,11 @@ export default function BacktestResults() {
   // Auto-run backtest if ticker is provided via URL
   useEffect(() => {
     if (initialTicker) {
-      runBacktest(initialTicker);
+      runBacktest(initialTicker, initialStrategyId);
     }
-  }, [initialTicker]);
+  }, [initialTicker, initialStrategyId]);
 
-  const runBacktest = async (tickerToTest = ticker) => {
+  const runBacktest = async (tickerToTest = ticker, strategyToTest = strategyId) => {
     if (!tickerToTest.trim()) {
       setError('Please enter a ticker symbol');
       return;
@@ -38,7 +49,7 @@ export default function BacktestResults() {
     
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/backtest/ticker/${tickerToTest}?days=${days}`
+        `${API_BASE_URL}/api/backtest/ticker/${tickerToTest}?days=${days}&strategy_id=${strategyToTest}`
       );
 
       if (!response.ok) {
@@ -66,11 +77,17 @@ export default function BacktestResults() {
     }
   };
 
+  const handleStrategyChange = (e) => {
+    const newStrategyId = parseInt(e.target.value);
+    setStrategyId(newStrategyId);
+    // Don't auto-run on change - let user click Run button
+  };
+
   return (
     <div className="backtest-container">
       <div className="backtest-header">
-        <h1>📊 Strategy 5 Backtest Analysis</h1>
-        <p>Test Strategy 5 (Weekly 4% Target) on historical data</p>
+        <h1>📊 Strategy Backtest Analysis</h1>
+        <p>Test trading strategies on historical data</p>
         {initialTicker && (
           <button 
             onClick={() => navigate(`/results/${encodeURIComponent(initialTicker)}`)}
@@ -96,6 +113,23 @@ export default function BacktestResults() {
         </div>
 
         <div className="input-group">
+          <label htmlFor="strategy">Strategy</label>
+          <select 
+            id="strategy"
+            value={strategyId} 
+            onChange={handleStrategyChange}
+            disabled={loading}
+          >
+            {Object.entries(STRATEGIES).map(([id, strategy]) => (
+              <option key={id} value={id}>
+                Strategy {id}: {strategy.name}
+              </option>
+            ))}
+          </select>
+          <div className="strategy-hint">{STRATEGIES[strategyId]?.description}</div>
+        </div>
+
+        <div className="input-group">
           <label htmlFor="days">Period</label>
           <select 
             id="days"
@@ -112,7 +146,7 @@ export default function BacktestResults() {
         </div>
 
         <button 
-          onClick={() => runBacktest(ticker)} 
+          onClick={() => runBacktest(ticker, strategyId)} 
           disabled={loading}
           className="backtest-button"
         >
@@ -140,8 +174,19 @@ export default function BacktestResults() {
           <div className="results-summary">
             <h2>
               {results.ticker}
+              <span className="strategy-badge">Strategy {results.strategy_id}: {results.strategy_name}</span>
               <span className="period-badge">{results.backtest_period}</span>
             </h2>
+
+            {/* Strategy Parameters */}
+            {results.strategy_params && (
+              <div className="strategy-params">
+                <span className="param">Target: {results.strategy_params.target_pct}%</span>
+                <span className="param">Stop: {results.strategy_params.stop_loss_pct}%</span>
+                <span className="param">Max Bars: {results.strategy_params.max_bars}</span>
+                <span className="param">RSI: {results.strategy_params.rsi_range}</span>
+              </div>
+            )}
 
             {/* Key Metrics Grid */}
             <div className="metrics-grid">
@@ -386,7 +431,7 @@ export default function BacktestResults() {
         <div className="empty-state">
           <div className="empty-icon">📊</div>
           <h3>No backtest run yet</h3>
-          <p>Enter a ticker symbol and click "Run Backtest" to analyze Strategy 5 performance</p>
+          <p>Enter a ticker symbol, select a strategy, and click "Run Backtest" to analyze performance</p>
           <p className="hint">📌 Tip: Try RELIANCE.NS, TCS.NS, or INFY.NS</p>
         </div>
       )}

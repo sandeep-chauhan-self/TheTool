@@ -91,8 +91,26 @@ function Results() {
       position_size: selectedAnalysis.position_size || 0,
       risk_reward_ratio: selectedAnalysis.risk_reward_ratio || 0,
       indicators: selectedAnalysis.indicators || [],
-      created_at: selectedAnalysis.created_at
+      created_at: selectedAnalysis.created_at,
+      strategy_id: selectedAnalysis.strategy_id || 5  // Include strategy_id for backtest
     });
+  };
+
+  // Get strategy_id from current report (default to 5)
+  const getCurrentStrategyId = () => {
+    return report?.strategy_id || report?.analysis?.strategy_id || 5;
+  };
+
+  // Get strategy name for display
+  const getStrategyName = (strategyId) => {
+    const names = {
+      1: 'Balanced Analysis',
+      2: 'Trend Following',
+      3: 'Mean Reversion',
+      4: 'Momentum Breakout',
+      5: 'Weekly 4% Target'
+    };
+    return names[strategyId] || `Strategy ${strategyId}`;
   };
 
   const handleDownload = async () => {
@@ -425,10 +443,11 @@ function Results() {
             {reanalyzing ? 'Reanalyzing...' : 'Re-Analyze'}
           </button>
           <button
-            onClick={() => navigate(`/backtest?ticker=${encodeURIComponent(ticker)}`)}
+            onClick={() => navigate(`/backtest?ticker=${encodeURIComponent(ticker)}&strategy_id=${getCurrentStrategyId()}`)}
             className="px-6 py-3 bg-purple-600 text-white rounded hover:bg-purple-700"
+            title={`Backtest using ${getStrategyName(getCurrentStrategyId())}`}
           >
-            📊 Backtest Strategy
+            📊 Backtest Strategy {getCurrentStrategyId()}
           </button>
           <button
             onClick={() => navigate(-1)}

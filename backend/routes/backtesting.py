@@ -6,30 +6,68 @@ Following TheTool architecture:
 - Uses _convert_query_params() for database abstraction (PostgreSQL/SQLite)
 - Centralized logging via infrastructure.logger
 - Error handling via api_utils.register_error_handlers
+- Multi-strategy support (1-5)
 """
 
 from flask import Blueprint, request, jsonify
-from utils.backtesting import BacktestEngine
+from utils.backtesting import BacktestEngine, STRATEGY_CONFIGS
 import logging
 
 bp = Blueprint('backtesting', __name__, url_prefix='/api/backtest')
 logger = logging.getLogger('trading_analyzer')
 
 
+@bp.route('/strategies', methods=['GET'])
+def get_strategies():
+    """
+    Get list of available strategies for backtesting.
+    
+    Returns:
+        {
+            'strategies': [
+                {
+                    'id': 1,
+                    'name': 'Balanced Analysis',
+                    'description': '...',
+                    'params': { ... }
+                },
+                ...
+            ]
+        }
+    """
+    strategies = []
+    for strategy_id, config in STRATEGY_CONFIGS.items():
+        strategies.append({
+            'id': strategy_id,
+            'name': config['name'],
+            'description': config['description'],
+            'params': {
+                'target_pct': config['target_pct'],
+                'stop_loss_pct': config['stop_loss_pct'],
+                'max_bars': config['max_bars'],
+                'rsi_range': f"{config['rsi_min']}-{config['rsi_max']}",
+            }
+        })
+    return jsonify({'strategies': strategies}), 200
+
+
 @bp.route('/ticker/<ticker>', methods=['GET'])
 def backtest_ticker(ticker):
     """
-    Backtest Strategy 5 on a single ticker.
+    Backtest a strategy on a single ticker.
     
     Query params:
     - days: Historical days to analyze (30-365, default 90)
+    - strategy_id: Strategy to backtest (1-5, default 5)
     
     Example:
-        GET /api/backtest/ticker/RELIANCE.NS?days=90
+        GET /api/backtest/ticker/RELIANCE.NS?days=90&strategy_id=5
     
     Returns:
         {
             'ticker': 'RELIANCE.NS',
+            'strategy_id': 5,
+            'strategy_name': 'Weekly 4% Target',
             'backtest_period': '2025-11-01 to 2025-01-28',
             'total_signals': 45,
             'winning_trades': 32,
@@ -63,15 +101,19 @@ def backtest_ticker(ticker):
     try:
         # Get parameters
         days = request.args.get('days', 90, type=int)
+        strategy_id = request.args.get('strategy_id', 5, type=int)
         
         # Validate
         if days < 30 or days > 365:
             return jsonify({'error': 'days must be between 30 and 365'}), 400
         
-        logger.info(f"[API] Backtest request: {ticker} ({days} days)")
+        if strategy_id not in STRATEGY_CONFIGS:
+            return jsonify({'error': f'Invalid strategy_id: {strategy_id}. Must be 1-5.'}), 400
+        
+        logger.info(f"[API] Backtest request: {ticker} ({days} days, strategy_id={strategy_id})")
         
         # Run backtest
-        engine = BacktestEngine(strategy_id=5)
+        engine = BacktestEngine(strategy_id=strategy_id)
         result = engine.backtest_ticker(ticker, days=days)
         
         if 'error' in result:
@@ -96,12 +138,15 @@ def backtest_portfolio():
     Body:
         {
             'tickers': ['RELIANCE.NS', 'TCS.NS', 'INFY.NS'],
-            'days': 90
+            'days': 90,
+            'strategy_id': 5
         }
     
     Returns:
         {
             'tickers_analyzed': 3,
+            'strategy_id': 5,
+            'strategy_name': 'Weekly 4% Target',
             'results': {
                 'RELIANCE.NS': { backtest_result },
                 'TCS.NS': { backtest_result },
@@ -114,6 +159,7 @@ def backtest_portfolio():
         data = request.json or {}
         tickers = data.get('tickers', [])
         days = data.get('days', 90)
+        strategy_id = data.get('strategy_id', 5)
         
         # Validate
         if not tickers:
@@ -128,10 +174,13 @@ def backtest_portfolio():
         if days < 30 or days > 365:
             return jsonify({'error': 'days must be between 30 and 365'}), 400
         
-        logger.info(f"[API] Portfolio backtest: {len(tickers)} tickers ({days} days)")
+        if strategy_id not in STRATEGY_CONFIGS:
+            return jsonify({'error': f'Invalid strategy_id: {strategy_id}. Must be 1-5.'}), 400
+        
+        logger.info(f"[API] Portfolio backtest: {len(tickers)} tickers ({days} days, strategy_id={strategy_id})")
         
         # Run backtest for each ticker
-        engine = BacktestEngine(strategy_id=5)
+        engine = BacktestEngine(strategy_id=strategy_id)
         results = {}
         
         for ticker in tickers:
@@ -143,6 +192,8 @@ def backtest_portfolio():
         return jsonify({
             'tickers_analyzed': len(tickers),
             'days': days,
+            'strategy_id': strategy_id,
+            'strategy_name': STRATEGY_CONFIGS[strategy_id]['name'],
             'results': results
         }), 200
         

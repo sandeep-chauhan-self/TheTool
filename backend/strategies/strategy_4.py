@@ -5,7 +5,7 @@ Volume-confirmed momentum signals.
 Best for catching breakouts with strong volume confirmation.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from .base import BaseStrategy
 
 
@@ -74,4 +74,93 @@ class Strategy4(BaseStrategy):
             'default_stop_loss_pct': 3.0,  # Wider stops for breakout volatility
             'default_target_multiplier': 2.5,  # Good targets on confirmed breakouts
             'max_position_size_pct': 20
+        }
+    
+    def validate_buy_signal(self, indicators: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Breakout validation - requires volume confirmation.
+        
+        Key requirements:
+        - Volume surge (> 1.5x average)
+        - RSI showing strength (> 50)
+        - MACD bullish preferred
+        
+        Returns:
+            (is_valid: bool, reason: str)
+        """
+        rsi = indicators.get('RSI')
+        macd = indicators.get('MACD')
+        macd_signal = indicators.get('MACD_signal')
+        volume_ratio = indicators.get('volume_ratio', 1.0)
+        cmf = indicators.get('CMF')
+        obv = indicators.get('OBV')
+        obv_prev = indicators.get('OBV_prev')
+        
+        # Volume surge is CRITICAL for breakout
+        if volume_ratio < 1.3:
+            return False, f"Volume too low ({volume_ratio:.2f}x) - breakout needs 1.3x+ volume"
+        
+        # RSI must show strength (not exhausted)
+        if rsi is not None:
+            if rsi < 50:
+                return False, f"RSI too weak ({rsi:.1f}) - breakout needs momentum"
+            if rsi > 85:
+                return False, f"RSI extremely overbought ({rsi:.1f}) - breakout exhausted"
+        
+        # MACD bullish preferred
+        macd_bullish = macd is not None and macd_signal is not None and macd > macd_signal
+        
+        # CMF positive preferred (money flowing in)
+        cmf_positive = cmf is not None and cmf > 0
+        
+        # OBV rising preferred
+        obv_rising = obv is not None and obv_prev is not None and obv > obv_prev
+        
+        # Count volume confirmations
+        volume_confirms = sum([macd_bullish, cmf_positive, obv_rising])
+        
+        if volume_confirms < 1:
+            return False, f"No volume confirmation ({volume_confirms}/3) - need MACD/CMF/OBV support"
+        
+        return True, f"Breakout confirmed: {volume_ratio:.2f}x volume, {volume_confirms}/3 confirmations"
+    
+    def validate_trend_filter(self, indicators: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Breakout needs directional confirmation, but not as strict as trend following.
+        
+        Returns:
+            (is_valid: bool, reason: str)
+        """
+        close = indicators.get('close') or indicators.get('Close')
+        sma_20 = indicators.get('SMA_20') or indicators.get('sma_20')
+        sma_50 = indicators.get('SMA_50') or indicators.get('sma_50')
+        
+        if sma_50 is None:
+            return True, "SMA_50 not available - trend filter skipped"
+        
+        # Price should be above SMA 20 (immediate trend)
+        if close is not None and sma_20 is not None and close < sma_20:
+            return False, f"Price ({close:.2f}) below SMA(20) - no immediate breakout"
+        
+        # SMA 50 is less critical for breakouts - we're looking for new trends
+        
+        return True, "Breakout direction confirmed"
+    
+    def get_cooldown_config(self) -> Dict[str, Any]:
+        """Shorter cooldown - breakouts can happen in clusters."""
+        return {
+            'use_cooldown': True,
+            'cooldown_bars': 2,
+            'cooldown_on_stop_loss': True,
+            'cooldown_on_time_exit': False,
+        }
+    
+    def get_trade_validation_config(self) -> Dict[str, Any]:
+        """Breakout config - volume is key."""
+        return {
+            'min_bars_for_valid_trade': 5,
+            'skip_incomplete_trades': True,
+            'require_trend_filter': True,
+            'require_momentum_filter': False,
+            'require_volume_surge': True,  # Critical for breakout strategy
         }
