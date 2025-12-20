@@ -34,6 +34,7 @@ function AllStocksAnalysis() {
   // Local UI state only
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [refreshingResults, setRefreshingResults] = useState(false);
   const [progress, setProgress] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(null);
@@ -70,8 +71,10 @@ function AllStocksAnalysis() {
               // Wait for DB to settle, then refresh analysis results only
               setTimeout(async () => {
                 setAnalyzing(false);
+                setRefreshingResults(true);
                 // Force refresh analysis results to get new data
                 await fetchAnalysisResults(true);
+                setRefreshingResults(false);
               }, 1000);
             }
           } else {
@@ -258,6 +261,23 @@ function AllStocksAnalysis() {
             </div>
           </div>
         )}
+
+        {/* Analysis Starting - shows immediately when analysis begins before first progress poll */}
+        {analyzing && !progress && (
+          <div className="mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 flex-shrink-0"></div>
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-blue-800">
+                  Starting Analysis...
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Preparing to analyze {pendingAnalysisType === 'all' ? 'all stocks' : `${selectedStocks.length} selected stocks`}. Please wait...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Progress Bar */}
         {analyzing && progress && (
@@ -281,6 +301,23 @@ function AllStocksAnalysis() {
               <span>Analyzing: {progress.analyzing}</span>
               <span>Failed: {progress.failed}</span>
               <span>Pending: {progress.pending}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Refreshing Results - shows after analysis completes while fetching new data */}
+        {refreshingResults && (
+          <div className="mb-6 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600 flex-shrink-0"></div>
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-yellow-800">
+                  Refreshing Results...
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Loading updated analysis data. Almost there!
+                </p>
+              </div>
             </div>
           </div>
         )}
