@@ -655,3 +655,26 @@
     padding: 6px;
   }
 }
+
+/* Excluded Trades Styles */
+.excluded-card {
+  background: #fff8e1;
+  border-color: #ffc107;
+}
+
+.exclusion-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fff8e1;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #856404;
+  margin-bottom: 20px;
+}
+
+.exclusion-note .info-icon {
+  font-size: 16px;
+}

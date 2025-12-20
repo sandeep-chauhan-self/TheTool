@@ -766,10 +766,14 @@ class AnalysisOrchestrator:
             confidence_score = 100
             market_regime = 'UNKNOWN'
             validation_warnings = []
+            trend_valid = True
             
             if strategy_id == 5 and verdict in ["Buy", "Strong Buy"]:
                 # Extract indicator values for validation
                 indicator_values = self.indicator_engine.extract_indicator_values(indicator_results)
+                
+                # Add price data for trend filter
+                indicator_values['close'] = float(df['Close'].iloc[-1])
                 
                 # Initialize Strategy 5 instance for validation
                 strategy_5 = Strategy5()
@@ -787,14 +791,27 @@ class AnalysisOrchestrator:
                     else:
                         market_regime = 'WEAK_TREND'
                 
-                # 2. Momentum Context Validation
+                # 2. Trend Filter (Dec 2025) - SMA 50 crossover check
+                # Calculate SMA values if not already in indicators
+                if len(df) >= 50:
+                    sma_20 = df['Close'].tail(20).mean()
+                    sma_50 = df['Close'].tail(50).mean()
+                    indicator_values['SMA_20'] = sma_20
+                    indicator_values['SMA_50'] = sma_50
+                    
+                    trend_valid, trend_reason = strategy_5.validate_trend_filter(indicator_values)
+                    if not trend_valid:
+                        validation_warnings.append(f"Trend filter: {trend_reason}")
+                        confidence_score -= 20  # Significant penalty for downtrend
+                
+                # 3. Momentum Context Validation
                 is_momentum_valid, momentum_reason = strategy_5.validate_buy_signal(indicator_values)
                 if not is_momentum_valid:
                     validation_warnings.append(f"Momentum filter: {momentum_reason}")
                     # Significant confidence reduction for failed momentum
                     confidence_score -= 25
                 
-                # 3. Signal Contradiction Detection
+                # 4. Signal Contradiction Detection
                 contradiction_confidence, contradictions = strategy_5.detect_signal_contradictions(
                     'BUY', indicator_values
                 )
@@ -806,14 +823,16 @@ class AnalysisOrchestrator:
                 # Clamp confidence to valid range
                 confidence_score = max(0, min(100, confidence_score))
                 
-                logger.info(f"[ORCHESTRATOR] Strategy 5 validation - confidence: {confidence_score}, regime: {market_regime}, warnings: {len(validation_warnings)}")
+                logger.info(f"[ORCHESTRATOR] Strategy 5 validation - confidence: {confidence_score}, regime: {market_regime}, trend_valid: {trend_valid}, warnings: {len(validation_warnings)}")
                 
                 validation_result = {
                     'confidence_score': confidence_score,
                     'market_regime': market_regime,
                     'validation_warnings': validation_warnings,
                     'momentum_valid': is_momentum_valid,
-                    'momentum_reason': momentum_reason if not is_momentum_valid else 'All momentum filters passed'
+                    'momentum_reason': momentum_reason if not is_momentum_valid else 'All momentum filters passed',
+                    'trend_valid': trend_valid,
+                    'trend_reason': trend_reason if not trend_valid else 'Uptrend confirmed'
                 }
             
             # Step 4: Calculate trade parameters

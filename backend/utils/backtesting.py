@@ -77,6 +77,21 @@ class BacktestEngine:
     # Keep validation ON for quality, rely on RSI 50-75 for filtering weak signals
     USE_STRATEGY5_VALIDATION = True  # RE-ENABLED - quality over quantity
     
+    # TREND FILTER (Dec 2025) - Synced with Strategy 5
+    # Avoid buying in downtrends - major cause of losses
+    USE_TREND_FILTER = True          # Enable SMA 50 trend filter
+    SMA_TREND_PERIOD = 50            # 50-day SMA for trend direction
+    
+    # COOLDOWN AFTER LOSS (Dec 2025) - Synced with Strategy 5
+    # Avoid rapid re-entry after stop loss (Nov 3-5 clustering issue)
+    USE_LOSS_COOLDOWN = True         # Enable cooldown after loss
+    COOLDOWN_BARS = 3                # Wait 3 bars after a loss
+    
+    # INCOMPLETE TRADE HANDLING (Dec 2025)
+    # Don't count trades that didn't have enough bars to reach target/stop
+    MIN_BARS_FOR_VALID_TRADE = 5     # Need at least 5 bars for valid trade
+    SKIP_INCOMPLETE_TRADES = True    # Exclude trades with insufficient data
+    
     def __init__(self, strategy_id: int = 5):
         """
         Initialize backtesting engine.
@@ -171,7 +186,7 @@ class BacktestEngine:
             logger.info(f"[Backtest] Generated {len(signals)} entry signals for {ticker}")
             
             # Simulate trades from each signal
-            trades = self._simulate_trades(df, signals)
+            trades, incomplete_trades = self._simulate_trades(df, signals)
             
             # Calculate comprehensive metrics
             metrics = self._calculate_metrics(trades)
@@ -180,6 +195,12 @@ class BacktestEngine:
             metrics['trades'] = trades
             metrics['days_analyzed'] = days
             metrics['data_source'] = source
+            
+            # Add excluded trades info (Dec 2025)
+            metrics['excluded_trades'] = len(incomplete_trades)
+            metrics['excluded_trades_detail'] = incomplete_trades
+            if incomplete_trades:
+                metrics['exclusion_note'] = f"{len(incomplete_trades)} signal(s) excluded due to insufficient data at end of period"
             
             logger.info(f"[Backtest] Completed for {ticker}: {metrics['win_rate']}% win rate, {metrics['profit_factor']}x profit factor")
             
@@ -223,6 +244,9 @@ class BacktestEngine:
             
             # 1. SMA (20-period)
             df['SMA_20'] = df['close'].rolling(window=20).mean()
+            
+            # 1b. SMA (50-period) for trend filter - Synced with Strategy 5
+            df['SMA_50'] = df['close'].rolling(window=50).mean()
             
             # 2. RSI (14-period)
             delta = df['close'].diff()
@@ -304,10 +328,12 @@ class BacktestEngine:
         
         IMPROVED: Now integrates Strategy 5 validation methods:
         1. Price is above 20-day SMA (uptrend confirmation)
-        2. RSI between 30-75 (healthy momentum, not overbought/oversold)
+        2. RSI between 50-75 (healthy momentum, not overbought/oversold)
         3. ADX > 20 (trending market, skip choppy conditions)
         4. Strategy 5 momentum validation (MACD bullish, 3+ indicators aligned)
         5. Price rising (close > previous close)
+        6. TREND FILTER: Price > SMA(50) and SMA(20) > SMA(50) (Dec 2025)
+        7. COOLDOWN: Wait 3 bars after a loss before next signal (Dec 2025)
         
         Uses Strategy 5's validate_buy_signal() for additional filtering.
         """
@@ -315,7 +341,7 @@ class BacktestEngine:
         
         try:
             # Ensure all indicators are calculated
-            required_cols = ['SMA_20', 'RSI', 'ATR', 'ADX', 'MACD', 'MACD_signal', 'Stochastic', 'CCI', 'Williams']
+            required_cols = ['SMA_20', 'SMA_50', 'RSI', 'ATR', 'ADX', 'MACD', 'MACD_signal', 'Stochastic', 'CCI', 'Williams']
             missing_cols = [col for col in required_cols if col not in df.columns]
             
             if missing_cols:
@@ -323,8 +349,14 @@ class BacktestEngine:
             
             skipped_adx = 0
             skipped_momentum = 0
+            skipped_trend = 0
+            skipped_cooldown = 0
+            last_loss_bar = None  # Track when last loss occurred for cooldown
             
-            for i in range(20, len(df)):
+            # Start at bar 50 to ensure SMA_50 is valid
+            start_bar = max(50, 20)
+            
+            for i in range(start_bar, len(df)):
                 row = df.iloc[i]
                 prev_row = df.iloc[i-1]
                 
@@ -332,6 +364,7 @@ class BacktestEngine:
                 close = row['close']
                 prev_close = prev_row['close']
                 sma_20 = row.get('SMA_20', close)
+                sma_50 = row.get('SMA_50', close)
                 rsi = row.get('RSI', 50)
                 adx = row.get('ADX', 25)  # Default to 25 if missing
                 
@@ -343,6 +376,21 @@ class BacktestEngine:
                 # Skip if RSI is invalid (overbought or too weak)
                 if pd.isna(rsi) or rsi > self.RSI_MAX or rsi < self.RSI_MIN:
                     continue
+                
+                # TREND FILTER (Dec 2025) - Synced with Strategy 5
+                # Skip if in downtrend: both price and SMA_20 must be above SMA_50
+                if self.USE_TREND_FILTER:
+                    if pd.notna(sma_50) and (close < sma_50 or sma_20 < sma_50):
+                        skipped_trend += 1
+                        continue
+                
+                # COOLDOWN FILTER (Dec 2025) - Synced with Strategy 5
+                # Wait X bars after a loss before taking another signal
+                if self.USE_LOSS_COOLDOWN and last_loss_bar is not None:
+                    bars_since_loss = i - last_loss_bar
+                    if bars_since_loss < self.COOLDOWN_BARS:
+                        skipped_cooldown += 1
+                        continue
                 
                 # ADX Market Regime Filter: Skip choppy markets
                 if self.USE_ADX_FILTER and adx < self.ADX_CHOPPY_THRESHOLD:
@@ -393,10 +441,15 @@ class BacktestEngine:
                 # Track volume for reporting but don't filter on it
                 has_volume_surge = volume_ratio >= 1.3  # Track but don't require
                 
+                # Check if in uptrend (for reporting)
+                in_uptrend = pd.notna(sma_50) and close > sma_50 and sma_20 > sma_50
+                
                 # Calculate confidence based on validation results
                 confidence = conditions_met / 3 * 100
                 if adx >= 25:
                     confidence += 10  # Bonus for strong trend
+                if in_uptrend:
+                    confidence += 5   # Bonus for uptrend
                 
                 signals.append({
                     'date': row.name,
@@ -404,6 +457,7 @@ class BacktestEngine:
                     'entry_price': close,
                     'volume_ratio': round(volume_ratio, 2),
                     'has_volume_surge': has_volume_surge,
+                    'in_uptrend': in_uptrend,
                     'rsi': round(rsi, 1),
                     'adx': round(adx, 1),
                     'atr': round(row.get('ATR', 0), 2),
@@ -412,7 +466,7 @@ class BacktestEngine:
                     'confidence': round(min(confidence, 100), 1)
                 })
             
-            logger.info(f"[Backtest] Generated {len(signals)} signals (skipped: {skipped_adx} ADX filter, {skipped_momentum} momentum filter)")
+            logger.info(f"[Backtest] Generated {len(signals)} signals (skipped: {skipped_adx} ADX, {skipped_momentum} momentum, {skipped_trend} trend, {skipped_cooldown} cooldown)")
             return signals
             
         except Exception as e:
@@ -430,13 +484,19 @@ class BacktestEngine:
         4. Use WIDER stop when ATR indicates high volatility
            (reduces stop-and-reverse scenarios)
         
+        IMPROVEMENTS (Dec 2025) - Synced with Strategy 5:
+        - Skip incomplete trades (not enough bars to reach target/stop)
+        - Track cooldown after losses
+        
         For each signal:
         - Entry at signal close price
-        - Target: 5% above entry
+        - Target: 4% above entry (optimized from 5%)
         - Stop: Smart dynamic (3-4% based on volatility)
-        - Lookback: 10 bars (~2 weeks) to find exit
+        - Holding: Up to 15 bars (~3 weeks)
         """
         trades = []
+        incomplete_trades = []  # Track trades with insufficient data
+        last_loss_bar = None    # For cooldown tracking in signals
         
         try:
             for signal in signals:
@@ -445,7 +505,13 @@ class BacktestEngine:
                 entry_date = signal['date']
                 atr = signal.get('atr', 0)
                 
-                # Calculate target (5%)
+                # COOLDOWN CHECK - Skip if within cooldown period after loss
+                if self.USE_LOSS_COOLDOWN and last_loss_bar is not None:
+                    bars_since_loss = entry_index - last_loss_bar
+                    if bars_since_loss < self.COOLDOWN_BARS:
+                        continue  # Skip this signal, still in cooldown
+                
+                # Calculate target (4%)
                 target = entry_price * (1 + self.TARGET_PCT / 100)
                 
                 # SMART STOP LOSS CALCULATION
@@ -465,7 +531,21 @@ class BacktestEngine:
                 else:
                     stop_loss = base_stop
                 
-                # Find exit point (look forward up to 10 bars)
+                # Calculate available bars for this trade
+                available_bars = len(df) - entry_index - 1
+                
+                # INCOMPLETE TRADE CHECK (Dec 2025) - Synced with Strategy 5
+                # Skip trades that don't have minimum bars to be valid
+                if self.SKIP_INCOMPLETE_TRADES and available_bars < self.MIN_BARS_FOR_VALID_TRADE:
+                    incomplete_trades.append({
+                        'entry_date': entry_date.strftime('%Y-%m-%d') if hasattr(entry_date, 'strftime') else str(entry_date),
+                        'entry_price': round(entry_price, 2),
+                        'available_bars': available_bars,
+                        'reason': f'Only {available_bars} bars available (need {self.MIN_BARS_FOR_VALID_TRADE})'
+                    })
+                    continue
+                
+                # Find exit point (look forward up to MAX_BARS)
                 outcome = self._find_exit(df, entry_index, entry_price, target, stop_loss)
                 
                 if outcome:
@@ -476,15 +556,22 @@ class BacktestEngine:
                     outcome['confidence'] = signal['confidence']
                     outcome['rsi'] = signal.get('rsi', 'N/A')
                     outcome['volume_ratio'] = signal.get('volume_ratio', 'N/A')
+                    outcome['in_uptrend'] = signal.get('in_uptrend', True)
+                    
+                    # Update last_loss_bar for cooldown tracking
+                    if outcome['outcome'] == 'LOSS':
+                        last_loss_bar = entry_index + outcome.get('bars_held', 0)
                     
                     trades.append(outcome)
             
-            logger.info(f"[Backtest] Simulated {len(trades)} trades")
-            return trades
+            if incomplete_trades:
+                logger.info(f"[Backtest] Excluded {len(incomplete_trades)} incomplete trades (insufficient bars)")
+            logger.info(f"[Backtest] Simulated {len(trades)} valid trades")
+            return trades, incomplete_trades
             
         except Exception as e:
             logger.error(f"[Backtest] Error simulating trades: {str(e)}")
-            return []
+            return [], []
     
     def _find_exit(self, df: pd.DataFrame, entry_index: int,
                    entry_price: float, target: float, stop_loss: float) -> Optional[Dict]:
