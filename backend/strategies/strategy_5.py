@@ -173,14 +173,15 @@ class Strategy5(BaseStrategy):
         cci = indicators.get('CCI')
         williams = indicators.get('Williams %R')
         
-        # Filter 1: RSI Health Check (40-75 is healthy)
+        # Filter 1: RSI Health Check (50-75 is optimal - Dec 2025 optimization)
+        # Analysis showed: RSI 50-75 has 64-72% win rate, RSI 40-50 only 48%
         if rsi is not None:
             if rsi > 75:
                 return False, f"RSI overbought ({rsi:.1f}) - reversal risk"
             if rsi < 25:
                 return False, f"RSI oversold ({rsi:.1f}) - weak momentum"
-            if rsi < 40:
-                return False, f"RSI weak ({rsi:.1f}) - below 40 threshold"
+            if rsi < 50:
+                return False, f"RSI weak ({rsi:.1f}) - below 50 threshold"
         
         # Filter 2: MACD Bullish Check
         if macd is not None and macd_signal is not None:
@@ -190,7 +191,7 @@ class Strategy5(BaseStrategy):
         # Filter 3: Momentum Convergence (3+ indicators must align)
         momentum_count = 0
         
-        if rsi is not None and 40 <= rsi <= 75:
+        if rsi is not None and 50 <= rsi <= 75:
             momentum_count += 1
         if stochastic is not None and stochastic > 50:
             momentum_count += 1

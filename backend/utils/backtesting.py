@@ -39,24 +39,43 @@ class BacktestEngine:
     
     # Strategy 5 parameters (synchronized with strategy_5.py)
     # OPTIMIZED based on 15-stock backtest analysis (Dec 2025)
-    # Key findings:
-    # 1. Volume filter HURTS performance (reduces expectancy by 46%) - DISABLED
-    # 2. 4% target more achievable than 5% (19% vs expected 25% hit rate)
-    # 3. 15-bar holding captures more gains (time exits have 71% win rate)
-    TARGET_PCT = 4.0       # 4% target (was 5% - optimization finding)
-    MAX_BARS = 15          # 15 bars holding (was 10 - optimization finding)
+    # Key findings from comprehensive_backtest_analysis.py:
+    # 1. Volume 1.3-1.5x is SWEET SPOT (80% win rate vs 65% for others)
+    # 2. RSI 50-75 performs better (64-72% win rate)
+    # 3. 15-bar holding captures more gains (time exits have 72.3% win rate)
+    # 4. Lower confidence signals actually perform better (67% vs 61%)
+    TARGET_PCT = 4.0       # 4% target - 44.9% hit rate is good
+    MAX_BARS = 15          # 15 bars holding - 72.3% time exit win rate
     STOP_LOSS_PCT = 3.0    # Base stop: 3%
     MAX_STOP_LOSS_PCT = 4.0  # Maximum stop: 4% (cap)
     ATR_MULTIPLIER = 1.5   # Dynamic stop = Entry - (ATR x 1.5)
     USE_WIDER_STOP = True  # Use wider stop in volatile conditions
-    REQUIRE_VOLUME_FILTER = False  # DISABLED - optimization showed this hurts performance
-    MIN_VOLUME_RATIO = 1.0 # Set to 1.0 (effectively disabled) - was 1.3
-    RSI_MIN = 30           # Minimum RSI for healthy momentum (was 35, widened for more trades)
+    
+    # VOLUME SWEET SPOT FILTER (NEW - Dec 2025)
+    # Analysis showed: 1.3-1.5x volume = 80% win rate, 2.34% avg P&L
+    # But hard filter is too restrictive (only 21 signals vs 392)
+    # Alternative: Disable hard filter, use volume as confidence boost only
+    USE_VOLUME_SWEET_SPOT = False  # DISABLED - too restrictive
+    MIN_VOLUME_RATIO = 1.0         # No minimum (was 1.3)
+    MAX_VOLUME_RATIO = 100.0       # No maximum (was 1.5)
+    VOLUME_SWEET_SPOT_MIN = 1.3    # For confidence boost calculation
+    VOLUME_SWEET_SPOT_MAX = 1.5    # For confidence boost calculation
+    
+    # RSI OPTIMIZATION (Dec 2025)
+    # Analysis showed: RSI 50-75 has 64-72% win rate
+    # RSI 40-50 only 48% win rate - too weak
+    RSI_MIN = 50           # Raised from 30 - stronger momentum required
     RSI_MAX = 75           # Maximum RSI (avoid overbought)
-    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions (volume excluded)
+    
+    MIN_CONDITIONS = 2     # Need at least 2 of 3 conditions
     ADX_CHOPPY_THRESHOLD = 20  # ADX below this = choppy market, skip signal
     USE_ADX_FILTER = True  # Enable ADX regime filtering
-    USE_STRATEGY5_VALIDATION = True  # Enable Strategy 5 momentum validation
+    
+    # VALIDATION LOOSENING (Dec 2025)
+    # Analysis showed lower confidence signals perform BETTER (67% vs 61%)
+    # But disabling validation reduced expectancy from 1.18% to 1.02%
+    # Keep validation ON for quality, rely on RSI 50-75 for filtering weak signals
+    USE_STRATEGY5_VALIDATION = True  # RE-ENABLED - quality over quantity
     
     def __init__(self, strategy_id: int = 5):
         """
@@ -329,6 +348,12 @@ class BacktestEngine:
                 if self.USE_ADX_FILTER and adx < self.ADX_CHOPPY_THRESHOLD:
                     skipped_adx += 1
                     continue
+                
+                # Volume Sweet Spot Filter: Only take trades with optimal volume
+                # Analysis showed 1.3-1.5x volume has 80% win rate vs 53-66% for others
+                if self.USE_VOLUME_SWEET_SPOT:
+                    if volume_ratio < self.MIN_VOLUME_RATIO or volume_ratio > self.MAX_VOLUME_RATIO:
+                        continue  # Skip non-sweet-spot volume
                 
                 # Strategy 5 conditions
                 conditions = {
