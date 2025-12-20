@@ -113,7 +113,7 @@ STRATEGY_CONFIGS = {
         'min_conditions': 2,         # Need 2 of 3 conditions
         'use_strategy_validation': False,
         'require_volume_surge': True,  # CRITICAL: Require volume confirmation
-        'min_volume_ratio': 1.5,       # Need 1.5x average volume
+        'min_volume_ratio': 1.2,       # Need 1.2x average volume (lowered from 1.5 for more signals)
     },
     5: {
         # Strategy 5: Weekly 4% Target (Optimized Dec 2025)
@@ -524,11 +524,19 @@ class BacktestEngine:
                             skipped_adx += 1
                             continue
                 
-                # TREND FILTER - Skip if in downtrend (unless mean reversion)
+                # TREND FILTER - Skip if in downtrend (unless mean reversion or breakout)
                 if self.USE_TREND_FILTER:
-                    if pd.notna(sma_50) and (close < sma_50 or sma_20 < sma_50):
-                        skipped_trend += 1
-                        continue
+                    # Strategy 4 (Breakout): Only require price above SMA 20, not SMA 50
+                    # Breakouts can happen at the start of new trends before SMA 50 turns
+                    if self.strategy_id == 4:
+                        if pd.notna(sma_20) and close < sma_20:
+                            skipped_trend += 1
+                            continue
+                    else:
+                        # Other strategies: require both price > SMA 50 and SMA 20 > SMA 50
+                        if pd.notna(sma_50) and (close < sma_50 or sma_20 < sma_50):
+                            skipped_trend += 1
+                            continue
                 
                 # COOLDOWN FILTER - Wait X bars after a loss
                 if self.USE_LOSS_COOLDOWN and last_loss_bar is not None:
@@ -561,7 +569,7 @@ class BacktestEngine:
                     conditions = {
                         'price_above_sma': close > sma_20,
                         'strong_rsi': rsi > 50,  # Need momentum
-                        'volume_surge': volume_ratio >= 1.5,
+                        'volume_surge': volume_ratio >= 1.2,  # Lowered from 1.5 for more signals
                     }
                 else:
                     # Standard conditions for Strategy 1, 2, 5
