@@ -178,8 +178,26 @@ export default function BacktestResults() {
               <span className="period-badge">{results.backtest_period}</span>
             </h2>
 
-            {/* Strategy Parameters */}
-            {results.strategy_params && (
+            {/* No Signals Message */}
+            {results.total_signals === 0 && (
+              <div className="no-signals-message">
+                <div className="no-signals-icon">📭</div>
+                <h3>No Buy Signals Generated</h3>
+                <p>{results.message || 'No trading opportunities were identified during this period based on the strategy criteria.'}</p>
+                <div className="no-signals-tips">
+                  <p><strong>This could mean:</strong></p>
+                  <ul>
+                    <li>The stock is in a downtrend (not meeting trend filter criteria)</li>
+                    <li>RSI or momentum indicators are outside the buy zone</li>
+                    <li>Volatility conditions don't match the strategy</li>
+                  </ul>
+                  <p><strong>Try:</strong> Testing with a different strategy or extending the time period</p>
+                </div>
+              </div>
+            )}
+
+            {/* Strategy Parameters - only show if we have signals */}
+            {results.strategy_params && results.total_signals > 0 && (
               <div className="strategy-params">
                 <span className="param">Target: {results.strategy_params.target_pct}%</span>
                 <span className="param">Stop: {results.strategy_params.stop_loss_pct}%</span>
@@ -188,7 +206,8 @@ export default function BacktestResults() {
               </div>
             )}
 
-            {/* Key Metrics Grid */}
+            {/* Key Metrics Grid - only show if we have signals */}
+            {results.total_signals > 0 && (
             <div className="metrics-grid">
               <div className="metric-card">
                 <div className="metric-label">Win Rate</div>
@@ -267,16 +286,18 @@ export default function BacktestResults() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Exclusion Note */}
-            {results.exclusion_note && (
+            {results.exclusion_note && results.total_signals > 0 && (
               <div className="exclusion-note">
                 <span className="info-icon">ℹ️</span>
                 {results.exclusion_note}
               </div>
             )}
 
-            {/* Analysis Summary */}
+            {/* Analysis Summary - only show if we have signals */}
+            {results.total_signals > 0 && (
             <div className="analysis-summary">
               <h3>📈 Analysis Summary</h3>
               <div className="summary-text">
@@ -305,6 +326,7 @@ export default function BacktestResults() {
                 )}
               </div>
             </div>
+            )}
           </div>
 
           {/* Trades Section */}
