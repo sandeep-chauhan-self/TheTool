@@ -60,7 +60,7 @@ class Strategy5(BaseStrategy):
     
     id = 5
     name = "Strategy 5"
-    description = "Weekly 4% Target (OPTIMIZED) - High-conviction swing trading. 4% target, 3% smart stop, 15-bar holding. Backtested 38% target hit rate."
+    description = "Weekly 4% Target (OPTIMIZED Dec 2025) - High-conviction swing trading. 4% target, 3% smart stop, 15-bar holding. Includes trend filter (SMA 50), cooldown after loss, and momentum validation."
     
     def get_indicator_weights(self) -> Dict[str, float]:
         """
@@ -332,3 +332,69 @@ class Strategy5(BaseStrategy):
         
         confidence = max(0, confidence)
         return confidence, contradictions
+    
+    def validate_trend_filter(self, indicators: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        ENHANCEMENT 6 (Dec 2025): Trend Filter - Synced with Backtesting
+        
+        Validates that the stock is in an uptrend using SMA crossover.
+        Prevents buying in downtrends which are the major cause of losses.
+        
+        Logic:
+        - Price must be above SMA(50)
+        - SMA(20) must be above SMA(50) (bullish crossover)
+        
+        Returns:
+            (is_valid: bool, reason: str)
+        """
+        close = indicators.get('close') or indicators.get('Close')
+        sma_20 = indicators.get('SMA_20') or indicators.get('sma_20')
+        sma_50 = indicators.get('SMA_50') or indicators.get('sma_50')
+        
+        # If SMA_50 not available, pass the filter (don't block)
+        if sma_50 is None:
+            return True, "SMA_50 not available - trend filter skipped"
+        
+        # Check 1: Price must be above SMA(50)
+        if close is not None and close < sma_50:
+            return False, f"Price ({close:.2f}) below SMA(50) ({sma_50:.2f}) - downtrend"
+        
+        # Check 2: SMA(20) must be above SMA(50) - bullish alignment
+        if sma_20 is not None and sma_20 < sma_50:
+            return False, f"SMA(20) ({sma_20:.2f}) below SMA(50) ({sma_50:.2f}) - bearish alignment"
+        
+        return True, "Trend filter passed - uptrend confirmed"
+    
+    def get_cooldown_config(self) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 7 (Dec 2025): Cooldown Configuration - Synced with Backtesting
+        
+        Returns cooldown parameters to avoid rapid re-entry after losses.
+        This prevents the clustering issue (e.g., Nov 3-5 3 consecutive losses).
+        
+        Returns:
+            Dict with cooldown settings
+        """
+        return {
+            'use_cooldown': True,           # Enable cooldown after loss
+            'cooldown_bars': 3,             # Wait 3 bars (days) after a loss
+            'cooldown_on_stop_loss': True,  # Apply cooldown when stop loss hit
+            'cooldown_on_time_exit': False, # Don't apply on time exits (they might be small gains)
+        }
+    
+    def get_trade_validation_config(self) -> Dict[str, Any]:
+        """
+        ENHANCEMENT 8 (Dec 2025): Trade Validation Config - Synced with Backtesting
+        
+        Returns parameters for validating trade completeness.
+        Used to skip trades that don't have enough data to be meaningful.
+        
+        Returns:
+            Dict with validation settings
+        """
+        return {
+            'min_bars_for_valid_trade': 5,  # Need at least 5 bars to evaluate
+            'skip_incomplete_trades': True,  # Exclude trades at end of data
+            'require_trend_filter': True,    # Must pass trend filter
+            'require_momentum_filter': True, # Must pass momentum validation
+        }

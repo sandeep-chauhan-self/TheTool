@@ -210,7 +210,26 @@ export default function BacktestResults() {
                 </div>
                 <div className="metric-detail">Trades analyzed</div>
               </div>
+
+              {/* Excluded Trades Info */}
+              {results.excluded_trades > 0 && (
+                <div className="metric-card excluded-card">
+                  <div className="metric-label">Excluded</div>
+                  <div className="metric-value neutral">
+                    {results.excluded_trades}
+                  </div>
+                  <div className="metric-detail">Insufficient data</div>
+                </div>
+              )}
             </div>
+
+            {/* Exclusion Note */}
+            {results.exclusion_note && (
+              <div className="exclusion-note">
+                <span className="info-icon">ℹ️</span>
+                {results.exclusion_note}
+              </div>
+            )}
 
             {/* Analysis Summary */}
             <div className="analysis-summary">
