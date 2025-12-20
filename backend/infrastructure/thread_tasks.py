@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from database import get_db_connection, get_db_session, close_thread_connection, _convert_query_params
 from utils.compute_score import analyze_ticker
-from utils.timezone_util import get_ist_timestamp
+from utils.timezone_util import get_ist_timestamp, get_ist_now
 from models.job_state import get_job_state_manager
 
 logger = logging.getLogger('thread_tasks')
@@ -233,13 +233,15 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                     # Likely unique constraint violation - do UPDATE instead
                                     if 'unique' in str(conflict_err).lower() or 'duplicate' in str(conflict_err).lower():
                                         logger.info(f"Updating existing analysis for {ticker} (conflict detected)")
+                                        # Use IST date for comparison (servers run in UTC but we store IST)
+                                        ist_date = get_ist_now().date().isoformat()
                                         update_query = '''
                                             UPDATE analysis_results SET
                                                 score = ?, verdict = ?, entry = ?, stop_loss = ?, target = ?,
                                                 position_size = ?, risk_reward_ratio = ?, analysis_config = ?,
                                                 raw_data = ?, updated_at = ?, status = ?
                                             WHERE ticker = ? AND strategy_id = ?
-                                              AND CAST(created_at AS DATE) = CURRENT_DATE
+                                              AND CAST(created_at AS DATE) = CAST(? AS DATE)
                                         '''
                                         update_query, update_params = _convert_query_params(update_query, (
                                             float(convert_numpy_types(result.get('score', 0)) or 0),
@@ -254,7 +256,8 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                             get_ist_timestamp(),
                                             'completed',
                                             ticker,
-                                            strategy_id
+                                            strategy_id,
+                                            ist_date
                                         ))
                                         cursor.execute(update_query, update_params)
                                     else:
@@ -525,13 +528,15 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                     # Likely unique constraint violation - do UPDATE instead
                     if 'unique' in str(conflict_err).lower() or 'duplicate' in str(conflict_err).lower():
                         logger.info(f"Updating existing analysis for {symbol} (conflict detected)")
+                        # Use IST date for comparison (servers run in UTC but we store IST)
+                        ist_date = get_ist_now().date().isoformat()
                         update_query = '''
                             UPDATE analysis_results SET
                                 score = ?, verdict = ?, entry = ?, stop_loss = ?, target = ?,
                                 position_size = ?, risk_reward_ratio = ?,
                                 raw_data = ?, updated_at = ?, status = ?
                             WHERE ticker = ? AND strategy_id = 1
-                              AND CAST(created_at AS DATE) = CURRENT_DATE
+                              AND CAST(created_at AS DATE) = CAST(? AS DATE)
                         '''
                         update_query, update_params = _convert_query_params(update_query, (
                             float(convert_numpy_types(result.get('score', 0)) or 0),
@@ -544,7 +549,8 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
                             raw_data,
                             datetime.now().isoformat(),
                             'completed',
-                            yahoo_symbol
+                            yahoo_symbol,
+                            ist_date
                         ))
                         cursor.execute(update_query, update_params)
                     else:
