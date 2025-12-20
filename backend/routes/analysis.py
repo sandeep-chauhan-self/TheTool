@@ -326,7 +326,7 @@ def get_history(ticker):
         results = query_db(
             """
             SELECT id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data,
-                   position_size, risk_reward_ratio
+                   position_size, risk_reward_ratio, strategy_id, analysis_config
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -345,7 +345,7 @@ def get_history(ticker):
         history = []
         for r in results:
             if isinstance(r, (tuple, list)):
-                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data, position_size, risk_reward_ratio)
+                # PostgreSQL returns tuples: (id, ticker, symbol, verdict, score, entry, stop_loss, target, created_at, raw_data, position_size, risk_reward_ratio, strategy_id, analysis_config)
                 raw_data = r[9]
                 indicators = []
                 if raw_data:
@@ -353,6 +353,14 @@ def get_history(ticker):
                         indicators = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
                     except json.JSONDecodeError:
                         indicators = []
+                
+                # Parse analysis_config
+                config_data = None
+                if r[13]:
+                    try:
+                        config_data = json.loads(r[13]) if isinstance(r[13], str) else r[13]
+                    except json.JSONDecodeError:
+                        config_data = None
                 
                 history.append({
                     "id": r[0],
@@ -366,7 +374,9 @@ def get_history(ticker):
                     "created_at": str(r[8]) if r[8] else None,
                     "indicators": indicators,
                     "position_size": r[10] or 0,
-                    "risk_reward_ratio": r[11] or 0
+                    "risk_reward_ratio": r[11] or 0,
+                    "strategy_id": r[12] or 5,
+                    "analysis_config": config_data
                 })
             else:
                 # SQLite returns Row objects
@@ -381,6 +391,14 @@ def get_history(ticker):
                 item_dict['indicators'] = indicators
                 item_dict['position_size'] = item_dict.get('position_size', 0) or 0
                 item_dict['risk_reward_ratio'] = item_dict.get('risk_reward_ratio', 0) or 0
+                item_dict['strategy_id'] = item_dict.get('strategy_id', 5) or 5
+                # Parse analysis_config
+                config_str = item_dict.get('analysis_config')
+                if config_str:
+                    try:
+                        item_dict['analysis_config'] = json.loads(config_str) if isinstance(config_str, str) else config_str
+                    except json.JSONDecodeError:
+                        item_dict['analysis_config'] = None
                 history.append(item_dict)
         
         return jsonify({
@@ -411,11 +429,11 @@ def get_report(ticker):
         
         logger.info(f"[REPORT] Querying for ticker: {ticker}")
         
-        # Get latest analysis (including position_size, risk_reward_ratio, and analysis_config)
+        # Get latest analysis (including position_size, risk_reward_ratio, strategy_id, and analysis_config)
         result = query_db(
             """
             SELECT verdict, score, entry, stop_loss, target, created_at, raw_data,
-                   position_size, risk_reward_ratio, analysis_config
+                   position_size, risk_reward_ratio, analysis_config, strategy_id
             FROM analysis_results
             WHERE LOWER(ticker) = LOWER(?)
             ORDER BY created_at DESC
@@ -448,7 +466,8 @@ def get_report(ticker):
                 "stop_loss": result[3],
                 "target": result[4],
                 "position_size": result[7] or 0,
-                "risk_reward_ratio": result[8] or 0
+                "risk_reward_ratio": result[8] or 0,
+                "strategy_id": result[10] or 5
             }
             created_at = result[5]
             raw_data = result[6]
@@ -461,7 +480,8 @@ def get_report(ticker):
                 "stop_loss": result['stop_loss'],
                 "target": result['target'],
                 "position_size": result.get('position_size', 0) or 0,
-                "risk_reward_ratio": result.get('risk_reward_ratio', 0) or 0
+                "risk_reward_ratio": result.get('risk_reward_ratio', 0) or 0,
+                "strategy_id": result.get('strategy_id', 5) or 5
             }
             created_at = result['created_at']
             raw_data = result['raw_data']

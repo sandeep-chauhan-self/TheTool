@@ -52,7 +52,9 @@ function Results() {
           target: data.analysis.target,
           position_size: data.analysis.position_size || 0,
           risk_reward_ratio: data.analysis.risk_reward_ratio || 0,
-          risk_message: data.analysis.risk_message || ''
+          risk_message: data.analysis.risk_message || '',
+          strategy_id: data.analysis.strategy_id || 5,
+          analysis_config: data.analysis_config || null
         });
       } else {
         setReport(data);
@@ -92,7 +94,8 @@ function Results() {
       risk_reward_ratio: selectedAnalysis.risk_reward_ratio || 0,
       indicators: selectedAnalysis.indicators || [],
       created_at: selectedAnalysis.created_at,
-      strategy_id: selectedAnalysis.strategy_id || 5  // Include strategy_id for backtest
+      strategy_id: selectedAnalysis.strategy_id || 5,
+      analysis_config: selectedAnalysis.analysis_config || null
     });
   };
 
@@ -308,6 +311,46 @@ function Results() {
             </span>
           </div>
         )}
+
+        {/* Analysis Configuration Info */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 text-sm">Strategy:</span>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                {(() => {
+                  const strategyId = report.strategy_id || report.analysis?.strategy_id || 5;
+                  const icons = { 1: '⚖️', 2: '📈', 3: '🔄', 4: '🚀', 5: '🎯' };
+                  return `${icons[strategyId] || '📊'} ${getStrategyName(strategyId)}`;
+                })()}
+              </span>
+            </div>
+            
+            {report.analysis_config?.capital && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-sm">Capital:</span>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                  ₹{Number(report.analysis_config.capital).toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
+            
+            {report.created_at && (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-sm">Analyzed:</span>
+                <span className="text-sm text-gray-700">
+                  {new Date(report.created_at).toLocaleString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Verdict Summary */}
         <div className="bg-white rounded shadow p-6 mb-6">

@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeAllStocks, getAllStocksProgress } from '../api/api';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
@@ -17,6 +17,72 @@ const VERDICT_PRIORITY = {
   'STRONG SELL': 1,
   '-': 0 // No analysis
 };
+
+// Memoized table row component to prevent unnecessary re-renders
+const StockRow = React.memo(function StockRow({ 
+  stock, 
+  isSelected, 
+  onToggleSelection, 
+  onViewDetails,
+  getStatusBadge 
+}) {
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelection(stock.yahoo_symbol)}
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        />
+      </td>
+      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        <TradingViewLink 
+          ticker={stock.yahoo_symbol} 
+          displayText={stock.symbol}
+          className="text-xs sm:text-sm font-medium text-gray-900"
+        />
+        <div className="text-xs text-gray-500">{stock.yahoo_symbol}</div>
+      </td>
+      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3">
+        <div className="text-xs sm:text-sm text-gray-900 truncate max-w-xs">{stock.name}</div>
+      </td>
+      <td className="hidden lg:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        {getStatusBadge(stock.status)}
+      </td>
+      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        <div className="text-xs sm:text-sm text-gray-900">
+          {stock.score !== null ? stock.score.toFixed(1) : '-'}
+        </div>
+      </td>
+      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        <div className="text-xs sm:text-sm text-gray-900 font-medium">
+          {stock.verdict || '-'}
+        </div>
+      </td>
+      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        <div className="text-xs sm:text-sm text-gray-900">
+          {stock.entry ? `Rs. ${stock.entry.toFixed(2)}` : '-'}
+        </div>
+      </td>
+      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        <div className="text-xs sm:text-sm text-gray-900">
+          {stock.target ? `Rs. ${stock.target.toFixed(2)}` : '-'}
+        </div>
+      </td>
+      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+        {stock.has_analysis && (
+          <button
+            onClick={() => onViewDetails(stock.ticker)}
+            className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
+          >
+            View
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+});
 
 function AllStocksAnalysis() {
   // Use global stocks context for caching
@@ -109,13 +175,13 @@ function AllStocksAnalysis() {
     setSelectedStocks([]);
   };
 
-  const toggleStockSelection = (yahooSymbol) => {
-    if (selectedStocks.includes(yahooSymbol)) {
-      setSelectedStocks(selectedStocks.filter(s => s !== yahooSymbol));
-    } else {
-      setSelectedStocks([...selectedStocks, yahooSymbol]);
-    }
-  };
+  const toggleStockSelection = useCallback((yahooSymbol) => {
+    setSelectedStocks(prev => 
+      prev.includes(yahooSymbol)
+        ? prev.filter(s => s !== yahooSymbol)
+        : [...prev, yahooSymbol]
+    );
+  }, []);
 
   const handleAnalyzeAll = async () => {
     if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
@@ -159,11 +225,11 @@ function AllStocksAnalysis() {
     }
   };
 
-  const handleViewDetails = (ticker) => {
+  const handleViewDetails = useCallback((ticker) => {
     navigate(`/results/${ticker}`);
-  };
+  }, [navigate]);
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = useCallback((status) => {
     const badges = {
       pending: { text: 'Pending', color: 'bg-gray-200 text-gray-700' },
       analyzing: { text: 'Analyzing...', color: 'bg-blue-100 text-blue-700' },
@@ -178,7 +244,7 @@ function AllStocksAnalysis() {
         {badge.text}
       </span>
     );
-  };
+  }, []);
 
   const handleSort = (column) => {
     // If clicking the same column, toggle direction; otherwise, set new column and reset to asc
@@ -444,60 +510,14 @@ function AllStocksAnalysis() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredStocks.map((stock) => (
-                    <tr key={stock.yahoo_symbol} className="hover:bg-gray-50">
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={selectedStocks.includes(stock.yahoo_symbol)}
-                          onChange={() => toggleStockSelection(stock.yahoo_symbol)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                      </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <TradingViewLink 
-                          ticker={stock.yahoo_symbol} 
-                          displayText={stock.symbol}
-                          className="text-xs sm:text-sm font-medium text-gray-900"
-                        />
-                        <div className="text-xs text-gray-500">{stock.yahoo_symbol}</div>
-                      </td>
-                      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3">
-                        <div className="text-xs sm:text-sm text-gray-900 truncate max-w-xs">{stock.name}</div>
-                      </td>
-                      <td className="hidden lg:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        {getStatusBadge(stock.status)}
-                      </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <div className="text-xs sm:text-sm text-gray-900">
-                          {stock.score !== null ? stock.score.toFixed(1) : '-'}
-                        </div>
-                      </td>
-                      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <div className="text-xs sm:text-sm text-gray-900 font-medium">
-                          {stock.verdict || '-'}
-                        </div>
-                      </td>
-                      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <div className="text-xs sm:text-sm text-gray-900">
-                          {stock.entry ? `Rs. ${stock.entry.toFixed(2)}` : '-'}
-                        </div>
-                      </td>
-                      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        <div className="text-xs sm:text-sm text-gray-900">
-                          {stock.target ? `Rs. ${stock.target.toFixed(2)}` : '-'}
-                        </div>
-                      </td>
-                      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-                        {stock.has_analysis && (
-                          <button
-                            onClick={() => handleViewDetails(stock.ticker)}
-                            className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
-                          >
-                            View
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                    <StockRow
+                      key={stock.yahoo_symbol}
+                      stock={stock}
+                      isSelected={selectedStocks.includes(stock.yahoo_symbol)}
+                      onToggleSelection={toggleStockSelection}
+                      onViewDetails={handleViewDetails}
+                      getStatusBadge={getStatusBadge}
+                    />
                   ))}
                 </tbody>
               </table>
