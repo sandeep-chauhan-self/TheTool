@@ -165,98 +165,8 @@ function AllStocksAnalysis() {
     ]);
   };
 
-  const handleSelectAll = () => {
-    // Use memoized filtered stocks (already sorted) to respect current sort order
-    // Note: filteredStocks is computed in useMemo and available here
-    setSelectedStocks(filteredStocks.map(s => s.yahoo_symbol));
-  };
-
-  const handleDeselectAll = () => {
-    setSelectedStocks([]);
-  };
-
-  const toggleStockSelection = useCallback((yahooSymbol) => {
-    setSelectedStocks(prev => 
-      prev.includes(yahooSymbol)
-        ? prev.filter(s => s !== yahooSymbol)
-        : [...prev, yahooSymbol]
-    );
-  }, []);
-
-  const handleAnalyzeAll = async () => {
-    if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
-      setPendingAnalysisType('all');
-      setShowConfigModal(true);
-    }
-  };
-
-  const handleAnalyzeSelected = async () => {
-    if (selectedStocks.length === 0) {
-      alert('Please select at least one stock');
-      return;
-    }
-    
-    if (window.confirm(`Analyze ${selectedStocks.length} selected stocks?`)) {
-      setPendingAnalysisType('selected');
-      setShowConfigModal(true);
-    }
-  };
-
-  const handleAnalyzeWithConfig = async (config) => {
-    setShowConfigModal(false);
-    
-    const symbolsToAnalyze = pendingAnalysisType === 'all' ? [] : selectedStocks;
-    
-    try {
-      setAnalyzing(true);
-      const response = await analyzeAllStocks(symbolsToAnalyze, config);
-      
-      // Handle both new job and duplicate job responses
-      if (response.is_duplicate) {
-        alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
-              `Progress: ${response.completed}/${response.total}`);
-      } else {
-        alert(`Analysis started. Job ID: ${response.job_id}`);
-      }
-    } catch (error) {
-      console.error('Failed to start analysis:', error);
-      alert('Failed to start analysis. Please try again.');
-      setAnalyzing(false);
-    }
-  };
-
-  const handleViewDetails = useCallback((ticker) => {
-    navigate(`/results/${ticker}`);
-  }, [navigate]);
-
-  const getStatusBadge = useCallback((status) => {
-    const badges = {
-      pending: { text: 'Pending', color: 'bg-gray-200 text-gray-700' },
-      analyzing: { text: 'Analyzing...', color: 'bg-blue-100 text-blue-700' },
-      completed: { text: 'Completed', color: 'bg-green-100 text-green-700' },
-      failed: { text: 'Failed', color: 'bg-red-100 text-red-700' }
-    };
-    
-    const badge = badges[status] || badges.pending;
-    
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${badge.color}`}>
-        {badge.text}
-      </span>
-    );
-  }, []);
-
-  const handleSort = (column) => {
-    // If clicking the same column, toggle direction; otherwise, set new column and reset to asc
-    if (sortBy === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortDirection('asc');
-    }
-  };
-
   // Memoized sorted + filtered stocks with stable Lodash ordering
+  // NOTE: Defined before handleSelectAll which depends on it
   const filteredStocks = useMemo(() => {
     const query = searchQuery.toLowerCase();
 
@@ -298,10 +208,104 @@ function AllStocksAnalysis() {
 
   }, [stocks, searchQuery, sortBy, sortDirection]);
 
-  const getSortIndicator = (column) => {
+  const handleSelectAll = useCallback(() => {
+    // Use memoized filtered stocks (already sorted) to respect current sort order
+    // Note: filteredStocks is computed in useMemo and available here
+    setSelectedStocks(filteredStocks.map(s => s.yahoo_symbol));
+  }, [filteredStocks]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedStocks([]);
+  }, []);
+
+  const toggleStockSelection = useCallback((yahooSymbol) => {
+    setSelectedStocks(prev => 
+      prev.includes(yahooSymbol)
+        ? prev.filter(s => s !== yahooSymbol)
+        : [...prev, yahooSymbol]
+    );
+  }, []);
+
+  const handleAnalyzeAll = useCallback(() => {
+    if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
+      setPendingAnalysisType('all');
+      setShowConfigModal(true);
+    }
+  }, [stocks.length]);
+
+  const handleAnalyzeSelected = useCallback(() => {
+    if (selectedStocks.length === 0) {
+      alert('Please select at least one stock');
+      return;
+    }
+    
+    if (window.confirm(`Analyze ${selectedStocks.length} selected stocks?`)) {
+      setPendingAnalysisType('selected');
+      setShowConfigModal(true);
+    }
+  }, [selectedStocks.length]);
+
+  const handleAnalyzeWithConfig = useCallback(async (config) => {
+    setShowConfigModal(false);
+    
+    const symbolsToAnalyze = pendingAnalysisType === 'all' ? [] : selectedStocks;
+    
+    try {
+      setAnalyzing(true);
+      const response = await analyzeAllStocks(symbolsToAnalyze, config);
+      
+      // Handle both new job and duplicate job responses
+      if (response.is_duplicate) {
+        alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
+              `Progress: ${response.completed}/${response.total}`);
+      } else {
+        alert(`Analysis started. Job ID: ${response.job_id}`);
+      }
+    } catch (error) {
+      console.error('Failed to start analysis:', error);
+      alert('Failed to start analysis. Please try again.');
+      setAnalyzing(false);
+    }
+  }, [pendingAnalysisType, selectedStocks]);
+
+  const handleViewDetails = useCallback((ticker) => {
+    navigate(`/results/${ticker}`);
+  }, [navigate]);
+
+  const getStatusBadge = useCallback((status) => {
+    const badges = {
+      pending: { text: 'Pending', color: 'bg-gray-200 text-gray-700' },
+      analyzing: { text: 'Analyzing...', color: 'bg-blue-100 text-blue-700' },
+      completed: { text: 'Completed', color: 'bg-green-100 text-green-700' },
+      failed: { text: 'Failed', color: 'bg-red-100 text-red-700' }
+    };
+    
+    const badge = badges[status] || badges.pending;
+    
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${badge.color}`}>
+        {badge.text}
+      </span>
+    );
+  }, []);
+
+  const handleSort = useCallback((column) => {
+    // If clicking the same column, toggle direction; otherwise, set new column and reset to asc
+    setSortBy(prevSortBy => {
+      if (prevSortBy === column) {
+        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        return prevSortBy;
+      } else {
+        setSortDirection('asc');
+        return column;
+      }
+    });
+  }, []);
+
+  const getSortIndicator = useCallback((column) => {
     if (sortBy !== column) return '';
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
-  };
+  }, [sortBy, sortDirection]);
 
   return (
     <div className="min-h-screen bg-gray-100">
