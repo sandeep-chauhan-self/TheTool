@@ -15,6 +15,8 @@ Architecture Pattern:
 - Database agnostic: No direct SQL, uses db layer abstractions
 - Thread-safe: Suitable for background job processing
 - Multi-Strategy: Supports all 5 strategies with strategy-specific parameters
+
+BUGFIX (2025-12-21): Fixed ADX calculation index mismatch causing NaN values
 """
 
 import pandas as pd
