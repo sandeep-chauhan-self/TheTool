@@ -254,13 +254,11 @@ function AllStocksAnalysis() {
       setAnalyzing(true);
       const response = await analyzeAllStocks(symbolsToAnalyze, config);
       
-      // Handle both new job and duplicate job responses
+      // Only alert if duplicate job (useful feedback)
       if (response.is_duplicate) {
-        alert(`Analysis already running for these stocks. Job ID: ${response.job_id}\n` +
-              `Progress: ${response.completed}/${response.total}`);
-      } else {
-        alert(`Analysis started. Job ID: ${response.job_id}`);
+        alert(`Analysis already running for these stocks.\nProgress: ${response.completed}/${response.total}`);
       }
+      // Success case: no popup needed, progress bar shows status
     } catch (error) {
       console.error('Failed to start analysis:', error);
       alert('Failed to start analysis. Please try again.');
