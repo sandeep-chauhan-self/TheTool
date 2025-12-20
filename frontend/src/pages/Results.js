@@ -486,7 +486,9 @@ function Results() {
             {reanalyzing ? 'Reanalyzing...' : 'Re-Analyze'}
           </button>
           <button
-            onClick={() => navigate(`/backtest?ticker=${encodeURIComponent(ticker)}&strategy_id=${getCurrentStrategyId()}`)}
+            onClick={() => navigate(`/backtest?ticker=${encodeURIComponent(ticker)}&strategy_id=${getCurrentStrategyId()}`, {
+              state: { from: '/results', ticker: ticker }
+            })}
             className="px-6 py-3 bg-purple-600 text-white rounded hover:bg-purple-700"
             title={`Backtest using ${getStrategyName(getCurrentStrategyId())}`}
           >

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import './BacktestResults.css';
 
 // Strategy definitions with descriptions
@@ -14,6 +14,7 @@ const STRATEGIES = {
 export default function BacktestResults() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const initialTicker = searchParams.get('ticker') || '';
   const initialStrategyId = parseInt(searchParams.get('strategy_id')) || 5;
   
@@ -24,6 +25,10 @@ export default function BacktestResults() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showDetailedTrades, setShowDetailedTrades] = useState(false);
+  
+  // Get the page we came from (if any)
+  const previousPage = location.state?.from || null;
+  const previousTicker = location.state?.ticker || null;
 
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 
                        (window.location.hostname === 'localhost' 
@@ -83,19 +88,30 @@ export default function BacktestResults() {
     // Don't auto-run on change - let user click Run button
   };
 
+  const handleBackClick = () => {
+    // If we came from an analysis page, go back there
+    if (previousPage === '/results' && previousTicker) {
+      navigate(`/results/${encodeURIComponent(previousTicker)}`);
+    } else if (previousPage) {
+      // Otherwise go back to wherever we came from
+      navigate(-1);
+    } else {
+      // If we don't know where we came from, go to dashboard
+      navigate('/');
+    }
+  };
+
   return (
     <div className="backtest-container">
       <div className="backtest-header">
         <h1>📊 Strategy Backtest Analysis</h1>
         <p>Test trading strategies on historical data</p>
-        {initialTicker && (
-          <button 
-            onClick={() => navigate(`/results/${encodeURIComponent(initialTicker)}`)}
-            className="back-to-analysis-btn"
-          >
-            ← Back to {initialTicker} Analysis
-          </button>
-        )}
+        <button 
+          onClick={handleBackClick}
+          className="back-to-analysis-btn"
+        >
+          ← Back
+        </button>
       </div>
 
       <div className="backtest-inputs">
