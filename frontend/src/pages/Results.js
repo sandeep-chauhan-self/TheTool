@@ -199,15 +199,17 @@ function Results() {
       <div className="min-h-screen bg-gray-100">
         <Header title="Analysis Results" />
         <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Breadcrumbs */}
+          <nav className="flex items-center text-sm text-gray-500 mb-4">
+            <button onClick={() => navigate('/')} className="hover:text-blue-600">Dashboard</button>
+            <span className="mx-2">/</span>
+            <button onClick={() => navigate('/all-stocks')} className="hover:text-blue-600">All Stocks</button>
+            <span className="mx-2">/</span>
+            <span className="text-gray-900 font-medium">{ticker}</span>
+          </nav>
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
             {error}
           </div>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            &lt; Back
-          </button>
         </div>
       </div>
     );
@@ -218,6 +220,15 @@ function Results() {
       <Header title={`Analysis Results: ${ticker}`} />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <nav className="flex items-center text-sm text-gray-500 mb-4">
+          <button onClick={() => navigate('/')} className="hover:text-blue-600">Dashboard</button>
+          <span className="mx-2">/</span>
+          <button onClick={() => navigate('/all-stocks')} className="hover:text-blue-600">All Stocks</button>
+          <span className="mx-2">/</span>
+          <span className="text-gray-900 font-medium">{extractBaseSymbol(ticker)}</span>
+        </nav>
+
         {/* TradingView Link */}
         <div className="mb-4">
           <a
@@ -493,12 +504,6 @@ function Results() {
             title={`Backtest using ${getStrategyName(getCurrentStrategyId())}`}
           >
             📊 Backtest Strategy {getCurrentStrategyId()}
-          </button>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700"
-          >
-            &lt; Back
           </button>
         </div>
 
