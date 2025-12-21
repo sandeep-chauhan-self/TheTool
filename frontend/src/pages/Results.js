@@ -235,7 +235,7 @@ function Results() {
         </div>
 
         {/* Historical Analysis Dropdown */}
-        {history.length > 1 && (
+        {history.length > 0 && (
           <div className="mb-6 bg-white rounded-lg shadow-md p-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Analysis History ({history.length} available)
