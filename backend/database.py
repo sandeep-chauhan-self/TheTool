@@ -346,9 +346,11 @@ def _init_postgres_db():
             cursor.execute("ALTER TABLE analysis_jobs ADD COLUMN IF NOT EXISTS strategy_id INTEGER DEFAULT 1")
             # Add collection_id to watchlist for multiple watchlists support
             cursor.execute("ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS collection_id INTEGER REFERENCES watchlist_collections(id) ON DELETE SET NULL")
-            # Drop the old unique constraint on ticker only, add new one for (ticker, collection_id)
+            # Drop ALL old unique constraints on ticker only, add new one for (ticker, collection_id)
             cursor.execute("ALTER TABLE watchlist DROP CONSTRAINT IF EXISTS watchlist_ticker_key")
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS watchlist_ticker_collection_idx ON watchlist(ticker, COALESCE(collection_id, -1))")
+            cursor.execute("ALTER TABLE watchlist DROP CONSTRAINT IF EXISTS watchlist_symbol_key")
+            cursor.execute("DROP INDEX IF EXISTS watchlist_ticker_collection_idx")
+            cursor.execute("CREATE UNIQUE INDEX watchlist_ticker_collection_idx ON watchlist(LOWER(ticker), COALESCE(collection_id, -1))")
             conn.commit()
         except Exception as col_error:
             logger.debug(f"Columns may already exist: {col_error}")
