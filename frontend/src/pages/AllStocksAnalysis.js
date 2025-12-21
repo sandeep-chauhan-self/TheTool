@@ -540,7 +540,7 @@ function AllStocksAnalysis() {
             <div className="flex-1 relative">
               <input
                 type="text"
-                placeholder="Search by symbol, name, or verdict..."
+                placeholder="      Search by symbol, name, or verdict..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-3 sm:px-4 py-2 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"

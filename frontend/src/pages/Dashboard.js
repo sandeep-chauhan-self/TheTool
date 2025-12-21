@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  addToWatchlist, 
-  analyzeStocks, 
-  cancelJob, 
-  getJobStatus, 
+import {
+  addToWatchlist,
+  analyzeStocks,
+  cancelJob,
+  getJobStatus,
   getWatchlistCollections,
   getWatchlist,
   getStockHistory,
@@ -554,7 +554,7 @@ function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-12">
             {collections.map((collection) => {
               const collectionKey = collection.id === null ? 'default' : collection.id;
               return (
