@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addToWatchlist, analyzeStocks, cancelJob, getJobStatus, removeFromWatchlist } from '../api/api';
+import { addToWatchlist, analyzeStocks, cancelJob, getJobStatus, getWatchlistCollections, removeFromWatchlist } from '../api/api';
 import AddStockModal from '../components/AddStockModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
@@ -27,6 +27,8 @@ function Dashboard() {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState({});
+  const [collections, setCollections] = useState([]);
+  const [selectedCollection, setSelectedCollection] = useState('default'); // 'default', null (all), or collection id
   const navigate = useNavigate();
 
   // Use cached watchlist
@@ -34,6 +36,8 @@ function Dashboard() {
   const loading = watchlistLoading;
 
   useEffect(() => {
+    // Load collections on mount
+    loadCollections();
     // Load watchlist from cache or fetch if needed (respects TTL)
     loadWatchlist();
     
@@ -46,9 +50,23 @@ function Dashboard() {
     }
   }, []);
 
+  // Reload watchlist when collection changes
+  useEffect(() => {
+    loadWatchlist(true); // Force refresh when collection changes
+  }, [selectedCollection]);
+
+  const loadCollections = async () => {
+    try {
+      const data = await getWatchlistCollections();
+      setCollections(data);
+    } catch (error) {
+      console.error('Failed to load collections:', error);
+    }
+  };
+
   const loadWatchlist = async (forceRefresh = false) => {
-    // Use context's fetch function - it handles caching automatically
-    await fetchWatchlistData(forceRefresh);
+    // Use context's fetch function - pass collection filter
+    await fetchWatchlistData(forceRefresh, selectedCollection);
   };
 
   const handleAddStock = async (symbol, name) => {
@@ -191,6 +209,27 @@ function Dashboard() {
       <Header title="Trading Analysis Dashboard" />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Watchlist Collection Selector */}
+        <div className="flex items-center gap-4 mb-4">
+          <label className="text-sm font-medium text-gray-700">Watchlist:</label>
+          <select
+            value={selectedCollection === null ? 'all' : selectedCollection}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedCollection(val === 'all' ? null : val === 'default' ? 'default' : parseInt(val));
+              setSelectedStocks([]); // Clear selection when switching collections
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Watchlists</option>
+            {collections.map((col) => (
+              <option key={col.id ?? 'default'} value={col.id ?? 'default'}>
+                {col.name} ({col.stock_count} stocks)
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Action Buttons */}
         <div className="flex gap-4 mb-6">
           <button

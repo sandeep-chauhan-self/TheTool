@@ -42,13 +42,34 @@ def watchlist():
 
 
 def _get_watchlist():
-    """GET: Retrieve watchlist items"""
+    """GET: Retrieve watchlist items, optionally filtered by collection"""
     try:
-        items = query_db("""
-            SELECT id, ticker, name, created_at
-            FROM watchlist
-            ORDER BY created_at DESC
-        """)
+        # Get optional collection_id filter from query params
+        collection_id = request.args.get('collection_id')
+        
+        if collection_id == 'null' or collection_id == 'default':
+            # Filter for Default collection (NULL collection_id)
+            items = query_db("""
+                SELECT id, ticker, name, created_at, collection_id
+                FROM watchlist
+                WHERE collection_id IS NULL
+                ORDER BY created_at DESC
+            """)
+        elif collection_id is not None:
+            # Filter by specific collection
+            items = query_db("""
+                SELECT id, ticker, name, created_at, collection_id
+                FROM watchlist
+                WHERE collection_id = ?
+                ORDER BY created_at DESC
+            """, (int(collection_id),))
+        else:
+            # No filter - return all (backward compatible)
+            items = query_db("""
+                SELECT id, ticker, name, created_at, collection_id
+                FROM watchlist
+                ORDER BY created_at DESC
+            """)
         
         logger.info(f"[WATCHLIST_GET] Query returned type: {type(items)}, len: {len(items)}")
         
@@ -61,7 +82,8 @@ def _get_watchlist():
                         "id": item[0],
                         "ticker": item[1],
                         "name": item[2],
-                        "created_at": str(item[3]) if item[3] else None
+                        "created_at": str(item[3]) if item[3] else None,
+                        "collection_id": item[4]
                     })
                 else:
                     # Convert Row object to dict

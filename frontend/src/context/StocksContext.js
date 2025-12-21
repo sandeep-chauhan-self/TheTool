@@ -143,19 +143,23 @@ export function StocksProvider({ children }) {
 
   /**
    * Fetch watchlist (with caching)
+   * @param {boolean} forceRefresh - Force refresh from server
+   * @param {number|null|'default'} collectionId - Filter by collection (null/'default' = Default collection, number = specific, undefined = all)
    */
-  const fetchWatchlistData = useCallback(async (forceRefresh = false) => {
-    // Return cached data if valid
-    if (!forceRefresh && isCacheValid(watchlistLastFetch) && watchlist.length > 0) {
+  const fetchWatchlistData = useCallback(async (forceRefresh = false, collectionId = 'default') => {
+    // For now, don't cache when filtering by collection - always fetch fresh
+    const shouldUseCache = collectionId === undefined && !forceRefresh && isCacheValid(watchlistLastFetch) && watchlist.length > 0;
+    
+    if (shouldUseCache) {
       console.log('[StocksContext] Using cached watchlist');
       return watchlist;
     }
 
-    console.log('[StocksContext] Fetching watchlist from server...');
+    console.log(`[StocksContext] Fetching watchlist from server (collection: ${collectionId})...`);
     setWatchlistLoading(true);
 
     try {
-      const data = await fetchWatchlist();
+      const data = await fetchWatchlist(collectionId);
 
       // Filter out invalid items
       const validWatchlist = data.filter(stock => {

@@ -138,8 +138,12 @@ export const getConfig = async () => {
   return response.data;
 };
 
-export const getWatchlist = async () => {
-  const response = await api.get('/api/watchlist');
+export const getWatchlist = async (collectionId = null) => {
+  let url = '/api/watchlist';
+  if (collectionId !== null) {
+    url += `?collection_id=${collectionId === null ? 'null' : collectionId}`;
+  }
+  const response = await api.get(url);
   // The backend returns { count, watchlist }, but we only need the watchlist array
   return response.data.watchlist || [];
 };
