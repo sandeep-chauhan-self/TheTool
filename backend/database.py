@@ -280,18 +280,31 @@ def _init_postgres_db():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Watchlist collections table (named watchlists)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS watchlist_collections (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                description TEXT,
+                user_id INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Watchlist table (with user_id for future multi-user support)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS watchlist (
                 id SERIAL PRIMARY KEY,
-                ticker TEXT UNIQUE NOT NULL,
+                ticker TEXT NOT NULL,
                 name TEXT,
                 user_id INTEGER DEFAULT 1,
+                collection_id INTEGER REFERENCES watchlist_collections(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_job_id TEXT,
                 last_analyzed_at TIMESTAMP,
                 last_status TEXT,
-                notes TEXT
+                notes TEXT,
+                UNIQUE(ticker, collection_id)
             )
         ''')
         
@@ -331,6 +344,11 @@ def _init_postgres_db():
             cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS analysis_config TEXT")
             cursor.execute("ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS strategy_id INTEGER DEFAULT 1")
             cursor.execute("ALTER TABLE analysis_jobs ADD COLUMN IF NOT EXISTS strategy_id INTEGER DEFAULT 1")
+            # Add collection_id to watchlist for multiple watchlists support
+            cursor.execute("ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS collection_id INTEGER REFERENCES watchlist_collections(id) ON DELETE SET NULL")
+            # Drop the old unique constraint on ticker only, add new one for (ticker, collection_id)
+            cursor.execute("ALTER TABLE watchlist DROP CONSTRAINT IF EXISTS watchlist_ticker_key")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS watchlist_ticker_collection_idx ON watchlist(ticker, COALESCE(collection_id, -1))")
             conn.commit()
         except Exception as col_error:
             logger.debug(f"Columns may already exist: {col_error}")

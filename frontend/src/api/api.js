@@ -230,4 +230,37 @@ export const getStrategyWeights = async (strategyId) => {
   return response.data;
 };
 
+// Watchlist Collections API functions
+export const getWatchlistCollections = async () => {
+  const response = await api.get('/api/watchlist-collections');
+  return response.data.collections || [];
+};
+
+export const createWatchlistCollection = async (name, description = '') => {
+  const response = await api.post('/api/watchlist-collections', { name, description });
+  return response.data;
+};
+
+export const deleteWatchlistCollection = async (collectionId) => {
+  const response = await api.delete(`/api/watchlist-collections/${collectionId}`);
+  return response.data;
+};
+
+export const addStocksToCollection = async (stocks, collectionId = null) => {
+  // stocks: array of { symbol, name } or just symbol strings
+  const response = await api.post('/api/watchlist-collections/add-stocks', {
+    collection_id: collectionId,
+    stocks: stocks
+  });
+  return response.data;
+};
+
+export const moveStocksToCollection = async (stockIds, targetCollectionId) => {
+  const response = await api.post('/api/watchlist-collections/move-stocks', {
+    target_collection_id: targetCollectionId,
+    stock_ids: stockIds
+  });
+  return response.data;
+};
+
 export default api;

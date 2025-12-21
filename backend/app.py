@@ -25,6 +25,7 @@ from utils.api_utils import register_error_handlers
 # Import blueprints
 from routes.analysis import bp as analysis_bp
 from routes.watchlist import bp as watchlist_bp
+from routes.watchlist_collections import bp as watchlist_collections_bp
 from routes.stocks import bp as stocks_bp
 from routes.admin import bp as admin_bp
 from routes.strategies import strategies_bp
@@ -208,6 +209,7 @@ def create_app(config_object=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(analysis_bp)
     app.register_blueprint(watchlist_bp)
+    app.register_blueprint(watchlist_collections_bp)
     app.register_blueprint(stocks_bp)
     app.register_blueprint(strategies_bp)
     app.register_blueprint(backtesting_bp)

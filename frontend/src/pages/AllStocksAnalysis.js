@@ -1,7 +1,8 @@
 import _ from 'lodash';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { analyzeAllStocks, getAllStocksProgress } from '../api/api';
+import { addStocksToCollection, analyzeAllStocks, getAllStocksProgress } from '../api/api';
+import AddToWatchlistModal from '../components/AddToWatchlistModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
@@ -106,6 +107,7 @@ function AllStocksAnalysis() {
   const [sortBy, setSortBy] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showWatchlistModal, setShowWatchlistModal] = useState(false);
   const [pendingAnalysisType, setPendingAnalysisType] = useState(null); // 'all' or 'selected'
   const navigate = useNavigate();
 
@@ -266,6 +268,29 @@ function AllStocksAnalysis() {
     }
   }, [pendingAnalysisType, selectedStocks]);
 
+  const handleAddToWatchlist = useCallback(() => {
+    if (selectedStocks.length === 0) {
+      alert('Please select at least one stock');
+      return;
+    }
+    setShowWatchlistModal(true);
+  }, [selectedStocks.length]);
+
+  const handleAddStocksToCollection = useCallback(async (stockSymbols, collectionId) => {
+    // Map selected yahoo_symbols to stock objects with name
+    const stocksToAdd = stockSymbols.map(symbol => {
+      const stock = stocks.find(s => s.yahoo_symbol === symbol);
+      return {
+        symbol: symbol,
+        name: stock?.name || ''
+      };
+    });
+    
+    await addStocksToCollection(stocksToAdd, collectionId);
+    // Clear selection after successful add
+    setSelectedStocks([]);
+  }, [stocks]);
+
   const handleViewDetails = useCallback((ticker) => {
     navigate(`/results/${ticker}`);
   }, [navigate]);
@@ -407,6 +432,14 @@ function AllStocksAnalysis() {
           >
             Analyze ({selectedStocks.length})
           </button>
+
+          <button
+            onClick={handleAddToWatchlist}
+            disabled={selectedStocks.length === 0 || loading}
+            className="flex-1 sm:flex-none px-3 sm:px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 font-medium text-xs sm:text-sm whitespace-nowrap"
+          >
+            + Watchlist ({selectedStocks.length})
+          </button>
           
           <button
             onClick={handleSelectAll}
@@ -542,6 +575,18 @@ function AllStocksAnalysis() {
           stockCount={pendingAnalysisType === 'all' ? stocks.length : selectedStocks.length}
           stockNames={pendingAnalysisType === 'all' ? [] : selectedStocks}
           title={pendingAnalysisType === 'all' ? 'Configure Bulk Analysis' : 'Configure Analysis'}
+        />
+      )}
+
+      {/* Add to Watchlist Modal */}
+      {showWatchlistModal && (
+        <AddToWatchlistModal
+          stocks={selectedStocks.map(symbol => {
+            const stock = stocks.find(s => s.yahoo_symbol === symbol);
+            return { symbol, name: stock?.name || '' };
+          })}
+          onClose={() => setShowWatchlistModal(false)}
+          onAdd={handleAddStocksToCollection}
         />
       )}
     </div>
