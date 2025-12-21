@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addStocksToCollection, analyzeAllStocks, getAllStocksProgress } from '../api/api';
+import { analyzeAllStocks, getAllStocksProgress } from '../api/api';
 import AddToWatchlistModal from '../components/AddToWatchlistModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Header from '../components/Header';
@@ -276,20 +276,10 @@ function AllStocksAnalysis() {
     setShowWatchlistModal(true);
   }, [selectedStocks.length]);
 
-  const handleAddStocksToCollection = useCallback(async (stockSymbols, collectionId) => {
-    // Map selected yahoo_symbols to stock objects with name
-    const stocksToAdd = stockSymbols.map(symbol => {
-      const stock = stocks.find(s => s.yahoo_symbol === symbol);
-      return {
-        symbol: symbol,
-        name: stock?.name || ''
-      };
-    });
-    
-    await addStocksToCollection(stocksToAdd, collectionId);
+  const handleWatchlistSuccess = useCallback(() => {
     // Clear selection after successful add
     setSelectedStocks([]);
-  }, [stocks]);
+  }, []);
 
   const handleViewDetails = useCallback((ticker) => {
     navigate(`/results/${ticker}`);
@@ -586,7 +576,7 @@ function AllStocksAnalysis() {
             return { symbol, name: stock?.name || '' };
           })}
           onClose={() => setShowWatchlistModal(false)}
-          onAdd={handleAddStocksToCollection}
+          onSuccess={handleWatchlistSuccess}
         />
       )}
     </div>

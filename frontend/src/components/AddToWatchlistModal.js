@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { createWatchlistCollection, getWatchlistCollections } from '../api/api';
+import { addStocksToCollection, createWatchlistCollection, getWatchlistCollections } from '../api/api';
 
-function AddToWatchlistModal({ stocks, onClose, onAdd }) {
+function AddToWatchlistModal({ stocks, onClose, onSuccess }) {
   const [collections, setCollections] = useState([]);
   const [selectedCollection, setSelectedCollection] = useState(null); // null = Default
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -65,14 +65,16 @@ function AddToWatchlistModal({ stocks, onClose, onAdd }) {
   const handleSubmit = useCallback(async () => {
     try {
       setSubmitting(true);
-      await onAdd(stocks, selectedCollection);
+      // Call API directly with stock objects {symbol, name}
+      await addStocksToCollection(stocks, selectedCollection);
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
       console.error('Failed to add stocks:', err);
       setError('Failed to add stocks to watchlist');
       setSubmitting(false);
     }
-  }, [stocks, selectedCollection, onAdd, onClose]);
+  }, [stocks, selectedCollection, onSuccess, onClose]);
 
   // Handle escape key
   useEffect(() => {
