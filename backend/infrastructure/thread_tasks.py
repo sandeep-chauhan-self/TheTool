@@ -185,8 +185,7 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                     else:
                         symbol = ticker
                     
-                    # ✅ FIX #12: Add dedicated try/except for INSERT with retry logic
-                    # ✅ FIX: Use UPSERT to allow re-running analysis with same strategy on same day
+                    # ✅ Always INSERT new record to keep full history
                     insert_success = False
                     for insert_attempt in range(3):
                         try:
@@ -194,74 +193,38 @@ def analyze_stocks_batch(job_id: str, tickers: List[str], capital: float, indica
                                 # Serialize config for storage
                                 config_json = json.dumps(config) if config else None
                                 
-                                # First try simple INSERT
-                                # If conflict (same ticker+date+strategy), catch and UPDATE
-                                try:
-                                    query = '''
-                                        INSERT INTO analysis_results 
-                                        (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
-                                         position_size, risk_reward_ratio, analysis_config, strategy_id,
-                                         entry_method, data_source, is_demo_data, raw_data, status, 
-                                         created_at, updated_at, analysis_source)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                    '''
-                                    query, params = _convert_query_params(query, (
-                                        ticker,
-                                        symbol,
-                                        None,  # name not available from watchlist analysis
-                                        ticker,  # yahoo_symbol same as ticker
-                                        float(convert_numpy_types(result.get('score', 0)) or 0),
-                                        result.get('verdict', 'Neutral'),
-                                        float(convert_numpy_types(result.get('entry')) or 0),
-                                        float(convert_numpy_types(result.get('stop')) or 0),
-                                        float(convert_numpy_types(result.get('target')) or 0),
-                                        int(convert_numpy_types(result.get('position_size', 0)) or 0),
-                                        float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),
-                                        config_json,
-                                        strategy_id,
-                                        result.get('entry_method', 'Market Order'),
-                                        result.get('data_source', 'real'),
-                                        bool(result.get('is_demo_data', False)),
-                                        raw_data,
-                                        'completed',
-                                        get_ist_timestamp(),
-                                        get_ist_timestamp(),
-                                        'watchlist'
-                                    ))
-                                    cursor.execute(query, params)
-                                except Exception as conflict_err:
-                                    # Likely unique constraint violation - do UPDATE instead
-                                    if 'unique' in str(conflict_err).lower() or 'duplicate' in str(conflict_err).lower():
-                                        logger.info(f"Updating existing analysis for {ticker} (conflict detected)")
-                                        # Use IST date for comparison (servers run in UTC but we store IST)
-                                        ist_date = get_ist_now().date().isoformat()
-                                        update_query = '''
-                                            UPDATE analysis_results SET
-                                                score = ?, verdict = ?, entry = ?, stop_loss = ?, target = ?,
-                                                position_size = ?, risk_reward_ratio = ?, analysis_config = ?,
-                                                raw_data = ?, updated_at = ?, status = ?
-                                            WHERE ticker = ? AND strategy_id = ?
-                                              AND CAST(created_at AS DATE) = CAST(? AS DATE)
-                                        '''
-                                        update_query, update_params = _convert_query_params(update_query, (
-                                            float(convert_numpy_types(result.get('score', 0)) or 0),
-                                            result.get('verdict', 'Neutral'),
-                                            float(convert_numpy_types(result.get('entry')) or 0),
-                                            float(convert_numpy_types(result.get('stop')) or 0),
-                                            float(convert_numpy_types(result.get('target')) or 0),
-                                            int(convert_numpy_types(result.get('position_size', 0)) or 0),
-                                            float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),
-                                            config_json,
-                                            raw_data,
-                                            get_ist_timestamp(),
-                                            'completed',
-                                            ticker,
-                                            strategy_id,
-                                            ist_date
-                                        ))
-                                        cursor.execute(update_query, update_params)
-                                    else:
-                                        raise  # Re-raise if not a conflict error
+                                query = '''
+                                    INSERT INTO analysis_results 
+                                    (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                                     position_size, risk_reward_ratio, analysis_config, strategy_id,
+                                     entry_method, data_source, is_demo_data, raw_data, status, 
+                                     created_at, updated_at, analysis_source)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                '''
+                                query, params = _convert_query_params(query, (
+                                    ticker,
+                                    symbol,
+                                    None,  # name not available from watchlist analysis
+                                    ticker,  # yahoo_symbol same as ticker
+                                    float(convert_numpy_types(result.get('score', 0)) or 0),
+                                    result.get('verdict', 'Neutral'),
+                                    float(convert_numpy_types(result.get('entry')) or 0),
+                                    float(convert_numpy_types(result.get('stop')) or 0),
+                                    float(convert_numpy_types(result.get('target')) or 0),
+                                    int(convert_numpy_types(result.get('position_size', 0)) or 0),
+                                    float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),
+                                    config_json,
+                                    strategy_id,
+                                    result.get('entry_method', 'Market Order'),
+                                    result.get('data_source', 'real'),
+                                    bool(result.get('is_demo_data', False)),
+                                    raw_data,
+                                    'completed',
+                                    get_ist_timestamp(),
+                                    get_ist_timestamp(),
+                                    'watchlist'
+                                ))
+                                cursor.execute(query, params)
                             insert_success = True
                             break
                         except Exception as insert_error:
@@ -477,8 +440,6 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
     Returns:
         bool: True if analysis succeeded
     """
-    from database import cleanup_old_analyses
-    
     try:
         logger.info(f"Analyzing {symbol} for bulk analysis")
         
@@ -490,74 +451,39 @@ def analyze_single_stock_bulk(symbol: str, yahoo_symbol: str, name: str, use_dem
             raw_data = json.dumps(result.get('indicators', []), cls=NumpyEncoder)
             
             with get_db_session() as (conn, cursor):
-                # First try simple INSERT, catch conflict and do UPDATE
-                try:
-                    query = '''
-                        INSERT INTO analysis_results 
-                        (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
-                         position_size, risk_reward_ratio, analysis_config, strategy_id,
-                         entry_method, data_source, is_demo_data, raw_data, status, 
-                         created_at, updated_at, analysis_source)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    '''
-                    query, params = _convert_query_params(query, (
-                        yahoo_symbol,
-                        symbol,
-                        name,
-                        yahoo_symbol,
-                        float(convert_numpy_types(result.get('score', 0)) or 0),
-                        result.get('verdict', 'Neutral'),
-                        float(convert_numpy_types(result.get('entry')) or 0),
-                        float(convert_numpy_types(result.get('stop')) or 0),
-                        float(convert_numpy_types(result.get('target')) or 0),
-                        int(convert_numpy_types(result.get('position_size', 0)) or 0),
-                        float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),
-                        None,
-                        1,
-                        result.get('entry_method', 'Market Order'),
-                        result.get('data_source', 'real'),
-                        bool(use_demo),
-                        raw_data,
-                        'completed',
-                        datetime.now().isoformat(),
-                        datetime.now().isoformat(),
-                        'bulk'
-                    ))
-                    cursor.execute(query, params)
-                except Exception as conflict_err:
-                    # Likely unique constraint violation - do UPDATE instead
-                    if 'unique' in str(conflict_err).lower() or 'duplicate' in str(conflict_err).lower():
-                        logger.info(f"Updating existing analysis for {symbol} (conflict detected)")
-                        # Use IST date for comparison (servers run in UTC but we store IST)
-                        ist_date = get_ist_now().date().isoformat()
-                        update_query = '''
-                            UPDATE analysis_results SET
-                                score = ?, verdict = ?, entry = ?, stop_loss = ?, target = ?,
-                                position_size = ?, risk_reward_ratio = ?,
-                                raw_data = ?, updated_at = ?, status = ?
-                            WHERE ticker = ? AND strategy_id = 1
-                              AND CAST(created_at AS DATE) = CAST(? AS DATE)
-                        '''
-                        update_query, update_params = _convert_query_params(update_query, (
-                            float(convert_numpy_types(result.get('score', 0)) or 0),
-                            result.get('verdict', 'Neutral'),
-                            float(convert_numpy_types(result.get('entry')) or 0),
-                            float(convert_numpy_types(result.get('stop')) or 0),
-                            float(convert_numpy_types(result.get('target')) or 0),
-                            int(convert_numpy_types(result.get('position_size', 0)) or 0),
-                            float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),
-                            raw_data,
-                            datetime.now().isoformat(),
-                            'completed',
-                            yahoo_symbol,
-                            ist_date
-                        ))
-                        cursor.execute(update_query, update_params)
-                    else:
-                        raise  # Re-raise if not a conflict error
-            
-            # Auto-cleanup old analyses (keep last 10) - using symbol parameter
-            cleanup_old_analyses(symbol=symbol, keep_last=10)
+                # Always INSERT new record to keep full history
+                query = '''
+                    INSERT INTO analysis_results 
+                    (ticker, symbol, name, yahoo_symbol, score, verdict, entry, stop_loss, target, 
+                     position_size, risk_reward_ratio, analysis_config, strategy_id,
+                     entry_method, data_source, is_demo_data, raw_data, status, 
+                     created_at, updated_at, analysis_source)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                '''
+                query, params = _convert_query_params(query, (
+                    yahoo_symbol,
+                    symbol,
+                    name,
+                    yahoo_symbol,
+                    float(convert_numpy_types(result.get('score', 0)) or 0),
+                    result.get('verdict', 'Neutral'),
+                    float(convert_numpy_types(result.get('entry')) or 0),
+                    float(convert_numpy_types(result.get('stop')) or 0),
+                    float(convert_numpy_types(result.get('target')) or 0),
+                    int(convert_numpy_types(result.get('position_size', 0)) or 0),
+                    float(convert_numpy_types(result.get('risk_reward_ratio', 0)) or 0),
+                    None,
+                    1,
+                    result.get('entry_method', 'Market Order'),
+                    result.get('data_source', 'real'),
+                    bool(use_demo),
+                    raw_data,
+                    'completed',
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                    'bulk'
+                ))
+                cursor.execute(query, params)
             
             # Log with full context
             if result.get('success'):
