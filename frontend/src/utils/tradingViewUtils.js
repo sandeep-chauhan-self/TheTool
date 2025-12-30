@@ -24,7 +24,7 @@ export const extractBaseSymbol = (ticker) => {
  */
 export const getTradingViewUrl = (ticker) => {
   const baseSymbol = extractBaseSymbol(ticker);
-  return `https://in.tradingview.com/symbols/NSE-${baseSymbol}/`;
+  return `https://www.screener.in/company/${baseSymbol}/consolidated/`;
 };
 
 /**
