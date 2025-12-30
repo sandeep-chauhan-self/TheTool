@@ -1,18 +1,19 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   addToWatchlist,
   analyzeStocks,
   cancelJob,
+  deleteWatchlistCollection,
   getJobStatus,
-  getWatchlistCollections,
-  getWatchlist,
   getStockHistory,
-  removeFromWatchlist,
-  deleteWatchlistCollection
+  getWatchlist,
+  getWatchlistCollections,
+  removeFromWatchlist
 } from '../api/api';
 import AddStockModal from '../components/AddStockModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 import { TradingViewLink } from '../utils/tradingViewUtils';
@@ -468,6 +469,13 @@ function Dashboard() {
       <Header title="Trading Analysis Dashboard" />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: null }
+          ]} 
+        />
+
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4 mb-6">
           <button

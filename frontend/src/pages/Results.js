@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
 import { extractBaseSymbol, getTradingViewUrl } from '../utils/tradingViewUtils';
 
@@ -200,13 +201,13 @@ function Results() {
         <Header title="Analysis Results" />
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Breadcrumbs */}
-          <nav className="flex items-center text-sm text-gray-500 mb-4">
-            <button onClick={() => navigate('/')} className="hover:text-blue-600">Dashboard</button>
-            <span className="mx-2">/</span>
-            <button onClick={() => navigate('/all-stocks')} className="hover:text-blue-600">All Stocks</button>
-            <span className="mx-2">/</span>
-            <span className="text-gray-900 font-medium">{ticker}</span>
-          </nav>
+          <Breadcrumbs 
+            items={[
+              { label: 'Dashboard', path: '/' },
+              { label: 'All Stocks', path: '/all-stocks' },
+              { label: ticker, path: null }
+            ]} 
+          />
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
             {error}
           </div>
@@ -221,13 +222,13 @@ function Results() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Breadcrumbs */}
-        <nav className="flex items-center text-sm text-gray-500 mb-4">
-          <button onClick={() => navigate('/')} className="hover:text-blue-600">Dashboard</button>
-          <span className="mx-2">/</span>
-          <button onClick={() => navigate('/all-stocks')} className="hover:text-blue-600">All Stocks</button>
-          <span className="mx-2">/</span>
-          <span className="text-gray-900 font-medium">{extractBaseSymbol(ticker)}</span>
-        </nav>
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: '/' },
+            { label: 'All Stocks', path: '/all-stocks' },
+            { label: extractBaseSymbol(ticker), path: null }
+          ]} 
+        />
 
         {/* TradingView Link */}
         <div className="mb-4">

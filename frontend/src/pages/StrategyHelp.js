@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router-dom';
 import { getStrategy, getStrategyHelp } from '../api/api';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
 
 /**
@@ -115,6 +116,17 @@ function StrategyHelp() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
+      {/* Breadcrumbs */}
+      <div className="max-w-4xl mx-auto px-6 pt-6">
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: '/' },
+            { label: 'Strategies', path: '/strategies' },
+            { label: meta.name || `Strategy ${strategyId}`, path: null }
+          ]} 
+        />
+      </div>
+
       {/* Hero Header */}
       <div className={`bg-gradient-to-r ${
         meta.color === 'blue' ? 'from-blue-600 to-blue-700' :
@@ -122,14 +134,8 @@ function StrategyHelp() {
         meta.color === 'purple' ? 'from-purple-600 to-purple-700' :
         meta.color === 'orange' ? 'from-orange-500 to-orange-600' :
         'from-red-600 to-red-700'
-      } text-white py-8`}>
+      } text-white py-8 mt-4`}>
         <div className="max-w-4xl mx-auto px-6">
-          <Link 
-            to="/strategies" 
-            className="text-sm text-white/80 hover:text-white flex items-center gap-1 mb-4"
-          >
-            ← All Strategies
-          </Link>
           <div className="flex items-center gap-4">
             <span className="text-5xl">{meta.icon}</span>
             <div>

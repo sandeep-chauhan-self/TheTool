@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import './BacktestResults.css';
+import Breadcrumbs from './Breadcrumbs';
 
 // Strategy definitions with descriptions
 const STRATEGIES = {
@@ -103,15 +104,20 @@ export default function BacktestResults() {
 
   return (
     <div className="backtest-container">
+      {/* Breadcrumbs */}
+      <div className="max-w-6xl mx-auto px-4 pt-4">
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: '/' },
+            { label: 'Strategies', path: '/strategies' },
+            { label: 'Backtest', path: null }
+          ]} 
+        />
+      </div>
+
       <div className="backtest-header">
         <h1>📊 Strategy Backtest Analysis</h1>
         <p>Test trading strategies on historical data</p>
-        <button 
-          onClick={handleBackClick}
-          className="back-to-analysis-btn"
-        >
-          ← Back
-        </button>
       </div>
 
       <div className="backtest-inputs">

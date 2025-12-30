@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { analyzeAllStocks, getAllStocksProgress } from '../api/api';
 import AddToWatchlistModal from '../components/AddToWatchlistModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 import { useStocks } from '../context/StocksContext';
@@ -396,6 +397,13 @@ function AllStocksAnalysis() {
       <Header title="All Stocks Analysis" subtitle={`${stocks.length} NSE Stocks`} />
 
       <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: '/' },
+            { label: 'All Stocks', path: null }
+          ]} 
+        />
         
         {/* Completion Message */}
         {progress && !analyzing && progress.percentage === 100 && (

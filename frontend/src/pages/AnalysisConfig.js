@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getWatchlist, analyzeStocks, getJobStatus, getConfig } from '../api/api';
+import { analyzeStocks, getConfig, getJobStatus, getWatchlist } from '../api/api';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
 
 function AnalysisConfig() {
@@ -131,6 +132,14 @@ function AnalysisConfig() {
       <Header title="Analysis Configuration" />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: '/' },
+            { label: 'Analysis Config', path: null }
+          ]} 
+        />
+
         <div className="bg-white rounded shadow p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Select Stock</h2>
           
@@ -147,13 +156,6 @@ function AnalysisConfig() {
               </option>
             ))}
           </select>
-
-          <button
-            onClick={() => navigate('/')}
-            className="text-blue-600 hover:underline"
-          >
-            &lt; Back to Dashboard
-          </button>
         </div>
 
         <div className="bg-white rounded shadow p-6 mb-6">

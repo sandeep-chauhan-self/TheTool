@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
 
 /**
@@ -99,6 +100,16 @@ function StrategiesIndex() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
+      {/* Breadcrumbs */}
+      <div className="max-w-6xl mx-auto px-6 pt-6">
+        <Breadcrumbs 
+          items={[
+            { label: 'Dashboard', path: '/' },
+            { label: 'Strategies', path: null }
+          ]} 
+        />
+      </div>
+
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-12">
         <div className="max-w-6xl mx-auto px-6">
