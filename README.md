@@ -38,7 +38,7 @@ A comprehensive stock analysis system featuring async job processing, real-time 
 cd backend
 .\venv\Scripts\python.exe app.py
 
-# 3. Start frontend (new window)  
+# 3. Start frontend (new window)
 cd frontend
 .\start-frontend.bat
 
@@ -50,14 +50,15 @@ cd frontend
 
 ## ?? Documentation
 
-| Document                                                      | Description                                            |
-| ------------------------------------------------------------- | ------------------------------------------------------ |
-| **[START_HERE.md](START_HERE.md)**                         | ??**Start here!** Complete getting started guide |
-| [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md)           | 5-minute quick start guide                             |
-| [docs/guides/START_NOW.md](docs/guides/START_NOW.md)             | Quick test examples                                    |
-| [docs/setup/NO_REDIS_SETUP.md](docs/setup/NO_REDIS_SETUP.md)     | Threading architecture explained                       |
-| [docs/guides/TROUBLESHOOTING.md](docs/guides/TROUBLESHOOTING.md) | Common issues and solutions                            |
-| [docs/reference/API_TESTING.md](docs/reference/API_TESTING.md)   | API endpoints reference                                |
+| Document                                                         | Description                                                                                |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **[START_HERE.md](START_HERE.md)**                               | ??**Start here!** Complete getting started guide                                           |
+| [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md)           | 5-minute quick start guide                                                                 |
+| [docs/guides/START_NOW.md](docs/guides/START_NOW.md)             | Quick test examples                                                                        |
+| [docs/setup/NO_REDIS_SETUP.md](docs/setup/NO_REDIS_SETUP.md)     | Threading architecture explained                                                           |
+| [docs/guides/TROUBLESHOOTING.md](docs/guides/TROUBLESHOOTING.md) | Common issues and solutions                                                                |
+| [docs/reference/API_TESTING.md](docs/reference/API_TESTING.md)   | API endpoints reference                                                                    |
+| **[docs/learning/](docs/learning/README.md)**                    | 📖**Learning & Interview Prep** - Architecture, technologies, and 120+ interview questions |
 
 **Full Documentation Index:** [docs/INDEX.md](docs/INDEX.md)
 
@@ -75,7 +76,7 @@ POST /watchlist
 
 ```javascript
 // Start async analysis with progress tracking
-POST /analyze  
+POST /analyze
 { "tickers": ["AAPL", "MSFT", "GOOGL"], "capital": 100000 }
 
 // Returns job_id immediately
@@ -89,7 +90,7 @@ POST /analyze
 GET /status/abc-123
 
 // Returns live status
-{ 
+{
   "progress": 67,
   "status": "processing",
   "completed": 2,
@@ -178,7 +179,7 @@ GET /report/AAPL
 TheTool/
 ??? backend/                  # Python Flask API
 ?   ??? app.py               # Main application
-?   ??? thread_tasks.py      # Background job processor  
+?   ??? thread_tasks.py      # Background job processor
 ?   ??? database.py          # SQLite operations
 ?   ??? indicators/          # 12 technical indicators
 ?   ??? utils/               # Validators & utilities
