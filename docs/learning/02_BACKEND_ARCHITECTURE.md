@@ -101,6 +101,53 @@ backend/
 
 ---
 
+## High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "Flask Backend"
+        App["app.py\nApplication Factory"]
+
+        subgraph "Routes (Blueprints)"
+            Analysis["analysis.py"]
+            Stocks["stocks.py"]
+            Watchlist["watchlist.py"]
+            Strategies["strategies.py"]
+            Backtest["backtesting.py"]
+        end
+
+        subgraph "Business Logic"
+            Orchestrator["AnalysisOrchestrator"]
+            Indicators["12 Indicators"]
+            StrategyEngine["Strategy Engine"]
+        end
+
+        subgraph "Infrastructure"
+            ThreadTasks["thread_tasks.py\nBackground Jobs"]
+            Database["database.py\nPostgreSQL"]
+        end
+    end
+
+    Frontend["React Frontend"] -->|"HTTP/REST"| App
+    App --> Analysis
+    App --> Stocks
+    App --> Watchlist
+    Analysis --> Orchestrator
+    Orchestrator --> Indicators
+    Orchestrator --> StrategyEngine
+    Orchestrator --> ThreadTasks
+    ThreadTasks --> Database
+    Analysis --> Database
+
+    Database --> PostgreSQL[("PostgreSQL")]
+
+    style App fill:#e8f5e9
+    style Orchestrator fill:#e3f2fd
+    style PostgreSQL fill:#fff3e0
+```
+
+---
+
 ## Application Architecture
 
 ### Flask Application Factory Pattern
@@ -168,26 +215,27 @@ API Routes:
 
 The heart of the analysis pipeline, implementing modular SRP-compliant design:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    AnalysisOrchestrator                         │
-│                                                                 │
-│  ┌──────────────┐  ┌────────────────┐  ┌────────────────┐      │
-│  │ DataFetcher  │→ │ IndicatorEngine│→ │SignalAggregator│      │
-│  └──────────────┘  └────────────────┘  └────────────────┘      │
-│         │                  │                    │               │
-│         ▼                  ▼                    ▼               │
-│    Fetch OHLCV        Calculate 12          Aggregate          │
-│    from Yahoo         indicators            votes + score       │
-│                                                                 │
-│  ┌──────────────┐  ┌────────────────┐                          │
-│  │TradeCalculator│→│ResultFormatter │                          │
-│  └──────────────┘  └────────────────┘                          │
-│         │                  │                                    │
-│         ▼                  ▼                                    │
-│    Calculate            Format JSON                             │
-│    Entry/Stop/Target    response                                │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Orchestrator["AnalysisOrchestrator"]
+        A["DataFetcher"] --> B["IndicatorEngine"]
+        B --> C["SignalAggregator"]
+        C --> D["TradeCalculator"]
+        D --> E["ResultFormatter"]
+    end
+
+    Yahoo[("Yahoo Finance")] --> A
+    A -->|"OHLCV Data"| B
+    B -->|"12 Indicators"| C
+    C -->|"Score + Verdict"| D
+    D -->|"Entry/Stop/Target"| E
+    E -->|"JSON Response"| Output["API Response"]
+
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#e8f5e9
+    style D fill:#fce4ec
+    style E fill:#f3e5f5
 ```
 
 **Key Classes:**
@@ -322,30 +370,60 @@ def query_db(query, args=(), one=False):
 
 ### Database Schema
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     DATABASE SCHEMA                             │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    analysis_jobs ||--o{ analysis_results : "has"
+    watchlist_collections ||--o{ watchlist : "contains"
+    strategies ||--o{ analysis_results : "uses"
 
-analysis_jobs            analysis_results          watchlist
-├── job_id (PK)          ├── id (PK)               ├── id (PK)
-├── status               ├── ticker                ├── ticker
-├── progress             ├── symbol                ├── name
-├── total                ├── score                 ├── collection_id (FK)
-├── completed            ├── verdict               ├── last_job_id
-├── tickers_json         ├── entry                 ├── last_analyzed_at
-├── strategy_id          ├── stop_loss             └── created_at
-└── created_at           ├── target
-                         ├── position_size
-                         ├── raw_data (JSON)
-                         ├── strategy_id
-                         └── created_at
+    analysis_jobs {
+        string job_id PK
+        string status
+        int progress
+        int total
+        int completed
+        json tickers_json
+        int strategy_id
+        timestamp created_at
+    }
 
-watchlist_collections    strategies
-├── id (PK)              ├── id (PK)
-├── name                 ├── name
-├── description          ├── description
-└── created_at           └── is_active
+    analysis_results {
+        int id PK
+        string ticker
+        string symbol
+        float score
+        string verdict
+        float entry
+        float stop_loss
+        float target
+        int position_size
+        json raw_data
+        int strategy_id FK
+        timestamp created_at
+    }
+
+    watchlist {
+        int id PK
+        string ticker
+        string name
+        int collection_id FK
+        string last_job_id
+        timestamp last_analyzed_at
+    }
+
+    watchlist_collections {
+        int id PK
+        string name
+        string description
+        timestamp created_at
+    }
+
+    strategies {
+        int id PK
+        string name
+        string description
+        boolean is_active
+    }
 ```
 
 ### Connection Management
@@ -378,44 +456,31 @@ watchlist_collections    strategies
 
 ## Request/Response Flow
 
-```
-              HTTP Request
-                   │
-                   ▼
-           ┌──────────────┐
-           │   Flask App   │
-           │   (app.py)    │
-           └──────┬───────┘
-                  │
-                  ▼
-           ┌──────────────┐
-           │  Blueprint    │
-           │   Router      │
-           └──────┬───────┘
-                  │
-      ┌───────────┴───────────┐
-      │                       │
-      ▼                       ▼
-┌──────────────┐      ┌──────────────┐
-│  Validation   │      │   Database   │
-│  (Pydantic)   │      │   (query_db) │
-└──────┬───────┘      └──────────────┘
-       │
-       ▼
-┌──────────────┐
-│ Business     │
-│   Logic      │
-│ (Orchestrator)│
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│   Response   │
-│  Formatter   │
-└──────┬───────┘
-       │
-       ▼
-   JSON Response
+```mermaid
+sequenceDiagram
+    participant Client as React Frontend
+    participant Flask as Flask App
+    participant BP as Blueprint Router
+    participant Valid as Pydantic Validation
+    participant Logic as Business Logic
+    participant DB as PostgreSQL
+
+    Client->>Flask: HTTP Request
+    Flask->>BP: Route to Blueprint
+    BP->>Valid: Validate Request
+
+    alt Validation Passes
+        Valid->>Logic: Process Request
+        Logic->>DB: Query/Update Data
+        DB-->>Logic: Data Response
+        Logic-->>BP: Formatted Result
+        BP-->>Flask: JSON Response
+        Flask-->>Client: 200 OK + Data
+    else Validation Fails
+        Valid-->>BP: Error Details
+        BP-->>Flask: Error Response
+        Flask-->>Client: 400 Bad Request
+    end
 ```
 
 ---

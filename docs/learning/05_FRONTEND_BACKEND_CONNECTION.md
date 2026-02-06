@@ -8,34 +8,29 @@ This document explains how the React frontend communicates with the Flask backen
 
 ## Connection Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        FRONTEND-BACKEND CONNECTION                          │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Frontend["Frontend (React)\nPort: 3000"]
+        UserAction["User Action\n(Click/Input)"]
+        APILayer["API Layer\n(api.js)"]
+        StateUpdate["State Update\n(Context/Hook)"]
+        UIRender["UI Re-render"]
+    end
 
-   FRONTEND (React)                           BACKEND (Flask)
-   Port: 3000 (dev)                           Port: 5000
-   ┌─────────────────┐                        ┌─────────────────┐
-   │   User Action   │                        │    Flask App    │
-   │   (Click/Input) │                        │    (app.py)     │
-   └────────┬────────┘                        └────────┲────────┘
-            │                                          │
-            ▼                                          │
-   ┌─────────────────┐      HTTP/REST           ┌──────┴────────┐
-   │   API Layer     │ ─────────────────────→   │   Blueprint   │
-   │   (api.js)      │ ←─────────────────────   │    Router     │
-   └────────┬────────┘      JSON                └───────────────┘
-            │
-            ▼
-   ┌─────────────────┐
-   │ State Update    │
-   │ (Context/Hook)  │
-   └────────┬────────┘
-            │
-            ▼
-   ┌─────────────────┐
-   │  UI Re-render   │
-   └─────────────────┘
+    subgraph Backend["Backend (Flask)\nPort: 5000"]
+        FlaskApp["Flask App\n(app.py)"]
+        Blueprint["Blueprint\nRouter"]
+    end
+
+    UserAction --> APILayer
+    APILayer -->|"HTTP/REST"| FlaskApp
+    FlaskApp --> Blueprint
+    Blueprint -->|"JSON"| APILayer
+    APILayer --> StateUpdate
+    StateUpdate --> UIRender
+
+    style Frontend fill:#e3f2fd
+    style Backend fill:#e8f5e9
 ```
 
 ---
@@ -517,72 +512,47 @@ def download_report(ticker):
 
 ### Analyzing Stocks (Full Flow)
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         COMPLETE ANALYSIS FLOW                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard as Dashboard.js
+    participant API as api.js
+    participant Flask as Flask Backend
+    participant Thread as Background Thread
+    participant DB as PostgreSQL
 
-1. USER CLICKS "ANALYZE"
-   Dashboard.js
-   │
-   └──→ handleAnalyze(['AAPL', 'MSFT'])
+    User->>Dashboard: Click "Analyze"
+    Dashboard->>API: analyzeStocks(["AAPL", "MSFT"])
+    API->>Flask: POST /api/analysis/analyze
 
-2. FRONTEND API CALL
-   api.js
-   │
-   └──→ analyzeStocks(['AAPL', 'MSFT'], { capital: 100000 })
-        │
-        └──→ POST http://localhost:5000/api/analysis/analyze
-             Body: { "tickers": ["AAPL", "MSFT"], "capital": 100000 }
+    Flask->>Flask: Validate request
+    Flask->>Flask: Generate job_id
+    Flask->>DB: INSERT analysis_jobs
+    Flask->>Thread: Start background thread
+    Flask-->>API: {job_id, status: "queued"}
+    API-->>Dashboard: Store job_id
 
-3. BACKEND RECEIVES REQUEST
-   routes/analysis.py
-   │
-   ├──→ Validate request (Pydantic)
-   ├──→ Create job_id = "abc-123"
-   ├──→ Insert into analysis_jobs table
-   └──→ Start background thread
-        │
-        └──→ Response: { "job_id": "abc-123", "status": "queued" }
+    loop Every 2 seconds
+        Dashboard->>API: getJobStatus(job_id)
+        API->>Flask: GET /status/{job_id}
+        Flask->>DB: SELECT progress
+        Flask-->>API: {status, progress}
+        API-->>Dashboard: Update progress bar
+    end
 
-4. FRONTEND STARTS POLLING
-   Dashboard.js
-   │
-   └──→ pollJobStatus("abc-123")
-        │
-        └──→ setInterval every 2000ms
-             │
-             └──→ GET /api/analysis/status/abc-123
+    Note over Thread: Background Processing
+    Thread->>Thread: Fetch OHLCV (Yahoo)
+    Thread->>Thread: Calculate 12 indicators
+    Thread->>Thread: Aggregate score
+    Thread->>DB: INSERT analysis_results
+    Thread->>DB: UPDATE analysis_jobs (completed)
 
-5. BACKGROUND PROCESSING (Backend Thread)
-   thread_tasks.py
-   │
-   ├──→ analyze_stocks_batch(job_id, tickers)
-   │    │
-   │    ├──→ For each ticker:
-   │    │    ├──→ Fetch OHLCV from Yahoo Finance
-   │    │    ├──→ Calculate 12 indicators
-   │    │    ├──→ Aggregate score
-   │    │    ├──→ Calculate entry/stop/target
-   │    │    └──→ Save to analysis_results table
-   │    │
-   │    └──→ Update analysis_jobs (progress += 1)
-   │
-   └──→ Mark job as "completed"
-
-6. POLLING DETECTS COMPLETION
-   Dashboard.js
-   │
-   └──→ Status response: { "status": "completed", "results": [...] }
-        │
-        ├──→ clearInterval(polling)
-        ├──→ setResults(results)
-        └──→ setLoading(false)
-
-7. UI RE-RENDERS WITH RESULTS
-   Dashboard.js → StockRow components
-   │
-   └──→ Display score, verdict, entry, stop, target for each stock
+    Dashboard->>API: getJobStatus(job_id)
+    API->>Flask: GET /status/{job_id}
+    Flask->>DB: SELECT results
+    Flask-->>API: {status: "completed", results}
+    API-->>Dashboard: Display results
+    Dashboard->>User: Show analysis cards
 ```
 
 ---

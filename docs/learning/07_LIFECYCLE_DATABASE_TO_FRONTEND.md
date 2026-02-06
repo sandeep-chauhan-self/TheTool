@@ -652,62 +652,37 @@ function getVerdictColor(verdict) {
 
 ## Complete Data Flow Diagram
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                         DATA READ LIFECYCLE                                    │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant User
+    participant Router as React Router
+    participant Results as Results.js
+    participant API as api.js
+    participant Flask as Flask Route
+    participant DB as PostgreSQL
 
-FRONTEND                    BACKEND                         DATABASE
-────────                    ───────                         ────────
+    User->>Router: Navigate to /results/RELIANCE.NS
+    Router->>Results: Mount component
+    Results->>Results: useParams() = ticker
 
-1. User navigates to
-   /results/RELIANCE.NS
-      │
-      ▼
-2. useEffect triggers
-   getReport(ticker)
-   ─────────────────────────→
-                            3. get_report() route
-                               │
-                               └─→ query_db() ──────────────→ SELECT FROM
-                                                              analysis_results
-                                                              ┌──────────────┐
-                                                              │ Return row:  │
-                                                              │ - verdict    │
-                    4. Parse result  ←──────────────────────  │ - score      │
-                       │                                      │ - entry      │
-                       ├─→ Convert tuple to dict              │ - raw_data   │
-                       ├─→ Parse raw_data JSON                └──────────────┘
-                       ├─→ Parse analysis_config JSON
-                       │
-                       └─→ jsonify(response)
-                           │
-   5. Response ←───────────┘
-   { ticker, analysis, indicators, created_at }
+    Note over Results: useEffect triggers
 
-6. setReport(data)
-   │
-   └─→ Re-render triggered
+    Results->>API: getReport(ticker)
+    API->>Flask: GET /api/analysis/report/{ticker}
+    Flask->>DB: SELECT FROM analysis_results
+    DB-->>Flask: Row (tuple)
+    Flask->>Flask: Parse tuple to dict
+    Flask->>Flask: Parse raw_data JSON
+    Flask-->>API: {ticker, analysis, indicators}
+    API-->>Results: setReport(data)
 
-7. Render components
-   │
-   ├─→ Header (ticker, date)
-   ├─→ Summary Card (verdict, score, entry, target)
-   ├─→ Risk/Reward Row (stop_loss, position, R:R)
-   └─→ Indicators Grid
-       │
-       ├─→ Group by category
-       └─→ Map to IndicatorCard components
+    Note over Results: Re-render triggered
 
-8. UI Displayed to User
-   ┌─────────────────────────┐
-   │ RELIANCE.NS             │
-   │ Strong Buy - 72.5%      │
-   │ Entry: ₹2,450.50        │
-   │ Target: ₹2,550.75       │
-   │                         │
-   │ [Indicator Grid...]     │
-   └─────────────────────────┘
+    Results->>Results: Render Header
+    Results->>Results: Render Summary Card
+    Results->>Results: Render Risk/Reward Row
+    Results->>Results: Render IndicatorsGrid
+    Results->>User: Display UI
 ```
 
 ---

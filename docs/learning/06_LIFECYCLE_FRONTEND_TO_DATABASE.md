@@ -596,80 +596,44 @@ def get_analysis_job_status(job_id):
 
 ## Complete Data Flow Diagram
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                         DATA WRITE LIFECYCLE                                   │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard as Dashboard.js
+    participant API as api.js
+    participant Flask as Flask Route
+    participant Thread as Background Thread
+    participant Orch as Orchestrator
+    participant DB as PostgreSQL
 
-FRONTEND                    BACKEND                         DATABASE
-────────                    ───────                         ────────
+    User->>Dashboard: Click "Analyze"
+    Dashboard->>API: analyzeStocks(tickers)
+    API->>Flask: POST /api/analysis/analyze
+    Flask->>DB: INSERT analysis_jobs (queued)
+    Flask->>Thread: Start thread
+    Flask-->>API: {job_id, status: queued}
 
-1. User clicks
-   "Analyze"
-      │
-      ▼
-2. analyzeStocks()
-   POST /api/analysis/analyze
-   ─────────────────────────→
-                            3. analyze() route
-                               │
-                               ├─→ Validate request
-                               ├─→ Generate job_id
-                               │
-                               └─→ INSERT analysis_jobs ────→ analysis_jobs
-                                   (status: "queued")          ┌──────────────┐
-                                   │                           │ job_id       │
-                                   │                           │ status: queued│
-                                   │                           │ progress: 0  │
-                                   │                           └──────────────┘
-                               │
-                               ├─→ Start thread
-                               │   (analyze_stocks_batch)
-                               │
-   4. Response ←───────────────┘
-   { job_id, status: "queued" }
+    Note over Dashboard: Start polling
 
-5. Start polling ────────────────→
-   GET /status/{job_id}
-                            6. Background thread running
-                               │
-                               ├─→ UPDATE status: "processing"
-                               │
-                               ├─→ fetch_and_validate(ticker)
-                               │   (Yahoo Finance API)
-                               │
-                               ├─→ calculate_indicators()
-                               │   (12 technical indicators)
-                               │
-                               ├─→ aggregate_votes()
-                               │   (score: 72.5, verdict: "Strong Buy")
-                               │
-                               ├─→ calculate_trade_parameters()
-                               │   (entry, stop, target, position)
-                               │
-                               └─→ INSERT analysis_results ──→ analysis_results
-                                                               ┌──────────────┐
-                                                               │ ticker       │
-                                                               │ score: 72.5  │
-                                                               │ verdict      │
-                                                               │ entry: 2450  │
-                                                               │ raw_data:JSON│
-                                                               └──────────────┘
-                               │
-                               └─→ UPDATE analysis_jobs ─────→ analysis_jobs
-                                   (status: "completed",       ┌──────────────┐
-                                    progress: 100)             │ status:      │
-                                                               │  completed   │
-                                                               │ progress:100 │
-                                                               └──────────────┘
+    Thread->>DB: UPDATE status: processing
+    Thread->>Orch: analyze_ticker()
 
-7. Poll response ←───────────────
-   { status: "completed",
-     results: [...] }
+    Note over Orch: Analysis Pipeline
+    Orch->>Orch: DataFetcher (Yahoo Finance)
+    Orch->>Orch: IndicatorEngine (12 indicators)
+    Orch->>Orch: SignalAggregator (score/verdict)
+    Orch->>Orch: TradeCalculator (entry/stop/target)
+    Orch-->>Thread: Result object
 
-8. UI updates
-   - Show results
-   - Clear loading
+    Thread->>DB: INSERT analysis_results
+    Thread->>DB: UPDATE analysis_jobs (completed)
+
+    Dashboard->>API: getJobStatus(job_id)
+    API->>Flask: GET /status/{job_id}
+    Flask->>DB: SELECT results
+    Flask-->>API: {status: completed, results}
+    API-->>Dashboard: Update UI
+    Dashboard->>User: Show results
 ```
 
 ---
