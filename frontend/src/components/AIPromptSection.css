@@ -265,11 +265,64 @@
 
 /* Reusing AI Agent Dropdown styles but scoped to new class names if needed */
 .ai-agent-dropdown {
-  /* existing styles should work if structure matches */
-  right: 0;
-  left: auto;
+  position: absolute;
   bottom: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  z-index: 100;
   margin-bottom: 0.5rem;
+  overflow: hidden;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-agent-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  text-align: left;
+}
+
+.ai-agent-option:hover {
+  background: var(--primary-bg);
+}
+
+.ai-agent-option:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ai-agent-icon {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-agent-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-agent-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--text-main);
 }
 
 /* --- Toast --- */
