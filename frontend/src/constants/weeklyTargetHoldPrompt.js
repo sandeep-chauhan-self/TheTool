@@ -268,4 +268,4 @@ This is a BORDERLINE signal. Higher probability of time exit with small gain tha
 - **Time Exit:** Bar 15 ([Date]) - **MANDATORY EXIT**
 
 **Top Risk:** [Time Decay / Earnings / Market Chop]
-\`;
+`;
