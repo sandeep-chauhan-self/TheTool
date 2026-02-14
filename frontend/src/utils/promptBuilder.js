@@ -6,6 +6,79 @@
  */
 
 import { STRATEGY_PROMPTS, STRATEGY_PROMPT_META } from '../constants/aiPrompts';
+import { MEAN_REVERSION_BUY_PROMPT_TEMPLATE } from '../constants/meanReversionBuyPrompt';
+import { MOMENTUM_BREAKOUT_HOLD_PROMPT_TEMPLATE } from '../constants/momentumBreakoutHoldPrompt';
+import { TREND_SELL_PROMPT_TEMPLATE } from '../constants/trendSellPrompt';
+import { UNIVERSAL_PROMPT_TEMPLATE } from '../constants/universalPrompt';
+import { WEEKLY_TARGET_HOLD_PROMPT_TEMPLATE } from '../constants/weeklyTargetHoldPrompt';
+
+/**
+ * Build the Universal Analysis Prompt with dynamic parameters.
+ * 
+ * @param {Object} params - Dynamic parameters
+ * @returns {string} Formatted universal prompt
+ */
+export function buildUniversalPrompt(params) {
+  const safeParams = {
+    stockName: params.stockName || 'Unknown Stock',
+    ticker: params.ticker || 'N/A',
+    verdict: params.verdict || 'N/A',
+    score: params.score != null ? params.score : 'N/A',
+    entry: params.entry != null ? Number(params.entry).toFixed(2) : 'N/A',
+    stopLoss: params.stopLoss != null ? Number(params.stopLoss).toFixed(2) : 'N/A',
+    target: params.target != null ? Number(params.target).toFixed(2) : 'N/A',
+    strategyName: params.strategyName || 'Unknown Strategy',
+    strategyId: params.strategyId, // Added strategyId to params in AIPromptSection call needed, or infer from strategyName
+    date: new Date().toLocaleDateString('en-IN', { 
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+  };
+
+  // Determine which template to use
+  let selectedTemplate = UNIVERSAL_PROMPT_TEMPLATE;
+
+  // Check for Trend Following (Strategy 2) + SELL Signal
+  // We check strategyName for "Trend" or if we can pass strategyId.
+  // Assuming safeParams.strategyName contains "Trend"
+  const strategyNameLower = safeParams.strategyName.toLowerCase();
+  const verdictLower = safeParams.verdict.toLowerCase();
+
+  const isTrendFollowing = strategyNameLower.includes('trend');
+  const isSell = verdictLower.includes('sell');
+
+  // Check for Mean Reversion (Strategy 3) + BUY Signal
+  const isMeanReversion = strategyNameLower.includes('mean') || strategyNameLower.includes('reversion');
+  const isBuy = verdictLower.includes('buy');
+
+  // Check for Momentum Breakout (Strategy 1) + HOLD Signal
+  const isMomentum = strategyNameLower.includes('momentum');
+  const isHold = verdictLower.includes('hold');
+
+  // Check for Weekly 4% Target (Strategy 4) + HOLD Signal
+  const isWeeklyTarget = strategyNameLower.includes('weekly') && strategyNameLower.includes('target');
+
+  if (isTrendFollowing && isSell) {
+    selectedTemplate = TREND_SELL_PROMPT_TEMPLATE;
+  } else if (isMeanReversion && isBuy) {
+    selectedTemplate = MEAN_REVERSION_BUY_PROMPT_TEMPLATE;
+  } else if (isMomentum && isHold) {
+    selectedTemplate = MOMENTUM_BREAKOUT_HOLD_PROMPT_TEMPLATE;
+  } else if (isWeeklyTarget && isHold) {
+    selectedTemplate = WEEKLY_TARGET_HOLD_PROMPT_TEMPLATE;
+  }
+
+  return selectedTemplate
+    .replace(/{stockName}/g, safeParams.stockName)
+    .replace(/{ticker}/g, safeParams.ticker)
+    .replace(/{verdict}/g, safeParams.verdict)
+    .replace(/{score}/g, safeParams.score)
+    .replace(/{entry}/g, safeParams.entry)
+    .replace(/{stopLoss}/g, safeParams.stopLoss)
+    .replace(/{target}/g, safeParams.target)
+    .replace(/{strategyName}/g, safeParams.strategyName)
+    .replace(/{date}/g, safeParams.date);
+}
 
 /**
  * Build a single prompt for a given strategy and prompt index.
