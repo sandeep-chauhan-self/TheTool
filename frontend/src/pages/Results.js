@@ -18,6 +18,7 @@ function Results() {
   const [history, setHistory] = useState([]);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
 
   // Determine the back URL - use referrer from state or fallback to checking URL pattern
   const getBackUrl = () => {
@@ -437,19 +438,6 @@ function Results() {
           )}
         </div>
 
-        {/* AI Deep Dive Prompt */}
-        <AIPromptSection
-          stockName={extractBaseSymbol(ticker)}
-          ticker={ticker}
-          strategyId={report.strategy_id || report.analysis?.strategy_id || 5}
-          strategyName={getStrategyName(report.strategy_id || report.analysis?.strategy_id || 5)}
-          verdict={report.verdict || 'N/A'}
-          score={report.score}
-          entry={report.entry}
-          stopLoss={report.stop}
-          target={report.target}
-        />
-
         {/* Indicator Summary */}
         <div className="bg-white rounded shadow overflow-hidden mb-6">
           <div className="px-6 py-4 bg-gray-200">
@@ -520,7 +508,35 @@ function Results() {
           >
             📊 Backtest Strategy {getCurrentStrategyId()}
           </button>
+          <button
+            onClick={() => setShowAIPrompt(!showAIPrompt)}
+            className={`px-6 py-3 text-white rounded transition-colors ${
+              showAIPrompt
+                ? 'bg-indigo-700 hover:bg-indigo-800'
+                : 'bg-indigo-500 hover:bg-indigo-600'
+            }`}
+            title="Get AI-powered deep dive prompts for this analysis"
+          >
+            🤖 Test with AI
+          </button>
         </div>
+
+        {/* AI Deep Dive Prompt Section (toggled by Test with AI button) */}
+        {showAIPrompt && (
+          <div className="mt-6">
+            <AIPromptSection
+              stockName={extractBaseSymbol(ticker)}
+              ticker={ticker}
+              strategyId={report.strategy_id || report.analysis?.strategy_id || 5}
+              strategyName={getStrategyName(report.strategy_id || report.analysis?.strategy_id || 5)}
+              verdict={report.verdict || 'N/A'}
+              score={report.score}
+              entry={report.entry}
+              stopLoss={report.stop}
+              target={report.target}
+            />
+          </div>
+        )}
 
         {(report.analyzed_at || report.created_at) && (
           <div className="mt-6 text-sm text-gray-500">
