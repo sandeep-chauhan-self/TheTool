@@ -45,7 +45,7 @@ export const MEAN_REVERSION_BUY_PROMPT_TEMPLATE = `
   ├─ Bollinger Bands: 2.5x (price extremes, band bounces)
   ├─ Stochastic: 2.0x (momentum oversold)
   ├─ CCI: 1.5x (cyclical extremes)
-  └─ Williams %R: 1.5x (overbought/oversold)
+  ├─ Williams %R: 1.5x (overbought/oversold)
   
   DAMPENED TREND INDICATORS:
   ├─ MACD: 0.5x (ignore trend to buy dips)
