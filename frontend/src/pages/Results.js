@@ -20,6 +20,21 @@ function Results() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showAIPrompt, setShowAIPrompt] = useState(false);
 
+  // Determine the back URL - use referrer from state or fallback to checking URL pattern
+  // eslint-disable-next-line no-unused-vars
+  const getBackUrl = () => {
+    // If we came from a specific page, use that
+    if (location.state?.from) {
+      return location.state.from;
+    }
+    // Check if referrer suggests all-stocks page
+    if (document.referrer.includes('/all-stocks')) {
+      return '/all-stocks';
+    }
+    // Default to dashboard
+    return '/';
+  };
+
   useEffect(() => {
     loadReport();
     loadHistory();

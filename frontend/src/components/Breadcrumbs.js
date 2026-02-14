@@ -57,6 +57,7 @@ const Breadcrumbs = ({ items = [], className = '' }) => {
 
           {breadcrumbItems.map((item, index) => {
             const isLast = index === breadcrumbItems.length - 1;
+            const isFirst = index === 0; // eslint-disable-line no-unused-vars
 
             return (
               <li key={index} className="flex items-center">

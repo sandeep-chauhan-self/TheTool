@@ -11,6 +11,16 @@ import { useStocks } from '../context/StocksContext';
 import { TradingViewLink } from '../utils/tradingViewUtils';
 
 
+// Define verdict sort order (higher priority first) - outside component to avoid recreating on every render
+const VERDICT_PRIORITY = { // eslint-disable-line no-unused-vars
+  'STRONG BUY': 5,
+  'BUY': 4,
+  'HOLD': 3,
+  'SELL': 2,
+  'STRONG SELL': 1,
+  '-': 0 // No analysis
+};
+
 // Memoized table row component to prevent unnecessary re-renders
 const StockRow = React.memo(function StockRow({ 
   stock, 
@@ -80,12 +90,14 @@ const StockRow = React.memo(function StockRow({
 function AllStocksAnalysis() {
   // Use global stocks context for caching
   const { 
+    stocks: cachedStocks, // eslint-disable-line no-unused-vars
     stocksLoading, 
     fetchAllStocks, 
     fetchAnalysisResults,
     getStocksWithAnalysis,
     getTimeSinceLastFetch,
-    lastStocksFetch
+    lastStocksFetch,
+    updateBulkAnalysis // eslint-disable-line no-unused-vars
   } = useStocks();
 
   // Local UI state only

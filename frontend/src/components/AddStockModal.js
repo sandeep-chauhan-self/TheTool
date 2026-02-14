@@ -8,6 +8,8 @@ function AddStockModal({ onClose, onAdd, existingSymbols = [] }) {
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1); // eslint-disable-line no-unused-vars
+  const [totalPages, setTotalPages] = useState(1); // eslint-disable-line no-unused-vars
   const dropdownRef = useRef(null);
 
   // Load stocks on mount - load all pages to have complete list
