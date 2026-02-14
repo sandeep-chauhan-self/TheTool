@@ -5,7 +5,7 @@
  * This template uses the FULL "Deep Dive" structure with 5 sections, search queries, and rigorous probability assessment.
  */
 
-export const WEEKLY_TARGET_HOLD_PROMPT_TEMPLATE = \`
+export const WEEKLY_TARGET_HOLD_PROMPT_TEMPLATE = `
 # Swing Trade Validation: {stockName} ({ticker})
 ## HOLD SIGNAL - 4% Target in 3 Weeks (Low Conviction)
 
