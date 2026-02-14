@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { analyzeStocks, downloadReport, getReport, getStockHistory } from '../api/api';
+import AIPromptSection from '../components/AIPromptSection';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
@@ -435,6 +436,19 @@ function Results() {
             </div>
           )}
         </div>
+
+        {/* AI Deep Dive Prompt */}
+        <AIPromptSection
+          stockName={extractBaseSymbol(ticker)}
+          ticker={ticker}
+          strategyId={report.strategy_id || report.analysis?.strategy_id || 5}
+          strategyName={getStrategyName(report.strategy_id || report.analysis?.strategy_id || 5)}
+          verdict={report.verdict || 'N/A'}
+          score={report.score}
+          entry={report.entry}
+          stopLoss={report.stop}
+          target={report.target}
+        />
 
         {/* Indicator Summary */}
         <div className="bg-white rounded shadow overflow-hidden mb-6">
