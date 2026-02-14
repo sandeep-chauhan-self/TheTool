@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  addToWatchlist,
-  analyzeStocks,
-  cancelJob,
-  deleteWatchlistCollection,
-  getJobStatus,
-  getStockHistory,
-  getWatchlist,
-  getWatchlistCollections,
-  removeFromWatchlist
+    addToWatchlist,
+    analyzeStocks,
+    cancelJob,
+    deleteWatchlistCollection,
+    getJobStatus,
+    getStockHistory,
+    getWatchlist,
+    getWatchlistCollections,
+    removeFromWatchlist
 } from '../api/api';
 import AddStockModal from '../components/AddStockModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
@@ -265,6 +265,7 @@ function Dashboard() {
       setAnalyzing(true);
       pollJobStatus(savedJobId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadAllData = async () => {

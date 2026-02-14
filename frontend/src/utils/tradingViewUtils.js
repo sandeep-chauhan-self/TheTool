@@ -80,9 +80,11 @@ export const TradingViewLink = ({ ticker, displayText, className = '' }) => {
   );
 };
 
-export default {
+const tradingViewUtils = {
   extractBaseSymbol,
   getTradingViewUrl,
   TradingViewIcon,
   TradingViewLink
 };
+
+export default tradingViewUtils;

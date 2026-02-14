@@ -10,15 +10,6 @@ import NavigationBar from '../components/NavigationBar';
 import { useStocks } from '../context/StocksContext';
 import { TradingViewLink } from '../utils/tradingViewUtils';
 
-// Define verdict sort order (higher priority first) - outside component to avoid recreating on every render
-const VERDICT_PRIORITY = {
-  'STRONG BUY': 5,
-  'BUY': 4,
-  'HOLD': 3,
-  'SELL': 2,
-  'STRONG SELL': 1,
-  '-': 0 // No analysis
-};
 
 // Memoized table row component to prevent unnecessary re-renders
 const StockRow = React.memo(function StockRow({ 
@@ -89,14 +80,12 @@ const StockRow = React.memo(function StockRow({
 function AllStocksAnalysis() {
   // Use global stocks context for caching
   const { 
-    stocks: cachedStocks, 
     stocksLoading, 
     fetchAllStocks, 
     fetchAnalysisResults,
     getStocksWithAnalysis,
     getTimeSinceLastFetch,
-    lastStocksFetch,
-    updateBulkAnalysis
+    lastStocksFetch
   } = useStocks();
 
   // Local UI state only
@@ -130,6 +119,7 @@ function AllStocksAnalysis() {
   useEffect(() => {
     // Load stocks from cache or fetch if needed (respects TTL)
     loadAllStocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Poll progress when analyzing

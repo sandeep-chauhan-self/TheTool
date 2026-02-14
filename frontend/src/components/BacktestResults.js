@@ -41,6 +41,7 @@ export default function BacktestResults() {
     if (initialTicker) {
       runBacktest(initialTicker, initialStrategyId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTicker, initialStrategyId]);
 
   const runBacktest = async (tickerToTest = ticker, strategyToTest = strategyId) => {
@@ -89,7 +90,7 @@ export default function BacktestResults() {
     // Don't auto-run on change - let user click Run button
   };
 
-  const handleBackClick = () => {
+  const handleBackClick = () => { // eslint-disable-line no-unused-vars
     // If we came from an analysis page, go back there
     if (previousPage === '/results' && previousTicker) {
       navigate(`/results/${encodeURIComponent(previousTicker)}`);
