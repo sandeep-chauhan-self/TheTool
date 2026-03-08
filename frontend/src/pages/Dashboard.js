@@ -12,6 +12,7 @@ import {
     removeFromWatchlist
 } from '../api/api';
 import AddStockModal from '../components/AddStockModal';
+import PasswordModal from '../components/PasswordModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
@@ -248,6 +249,8 @@ function Dashboard() {
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(() => sessionStorage.getItem('bulkAnalysisVerified') === 'true');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [jobId, setJobId] = useState(null);
@@ -388,6 +391,17 @@ function Dashboard() {
       return;
     }
     setSelectedStocks(tickers);
+    // Gate behind password when analyzing more than 1 stock
+    if (tickers.length > 1 && !passwordVerified) {
+      setShowPasswordModal(true);
+    } else {
+      setShowConfigModal(true);
+    }
+  };
+
+  const handlePasswordSuccess = () => {
+    setPasswordVerified(true);
+    setShowPasswordModal(false);
     setShowConfigModal(true);
   };
 
@@ -602,6 +616,14 @@ function Dashboard() {
           stockCount={selectedStocks.length}
           stockNames={selectedStocks}
           title="Configure Analysis"
+        />
+      )}
+
+      {/* Password Modal for bulk analysis */}
+      {showPasswordModal && (
+        <PasswordModal
+          onClose={() => setShowPasswordModal(false)}
+          onSuccess={handlePasswordSuccess}
         />
       )}
     </div>

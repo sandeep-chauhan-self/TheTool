@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeAllStocks, getAllStocksProgress } from '../api/api';
 import AddToWatchlistModal from '../components/AddToWatchlistModal';
+import PasswordModal from '../components/PasswordModal';
 import AnalysisConfigModal from '../components/AnalysisConfigModal';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
@@ -111,6 +112,8 @@ function AllStocksAnalysis() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showWatchlistModal, setShowWatchlistModal] = useState(false);
   const [pendingAnalysisType, setPendingAnalysisType] = useState(null); // 'all' or 'selected'
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(() => sessionStorage.getItem('bulkAnalysisVerified') === 'true');
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -304,9 +307,13 @@ function AllStocksAnalysis() {
   const handleAnalyzeAll = useCallback(() => {
     if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
       setPendingAnalysisType('all');
-      setShowConfigModal(true);
+      if (!passwordVerified) {
+        setShowPasswordModal(true);
+      } else {
+        setShowConfigModal(true);
+      }
     }
-  }, [stocks.length]);
+  }, [stocks.length, passwordVerified]);
 
   const handleAnalyzeSelected = useCallback(() => {
     if (selectedStocks.length === 0) {
@@ -316,9 +323,20 @@ function AllStocksAnalysis() {
     
     if (window.confirm(`Analyze ${selectedStocks.length} selected stocks?`)) {
       setPendingAnalysisType('selected');
-      setShowConfigModal(true);
+      // Gate behind password only when analyzing multiple stocks
+      if (selectedStocks.length > 1 && !passwordVerified) {
+        setShowPasswordModal(true);
+      } else {
+        setShowConfigModal(true);
+      }
     }
-  }, [selectedStocks.length]);
+  }, [selectedStocks.length, passwordVerified]);
+
+  const handlePasswordSuccess = useCallback(() => {
+    setPasswordVerified(true);
+    setShowPasswordModal(false);
+    setShowConfigModal(true);
+  }, []);
 
   const handleAnalyzeWithConfig = useCallback(async (config) => {
     setShowConfigModal(false);
@@ -818,6 +836,14 @@ function AllStocksAnalysis() {
           })}
           onClose={() => setShowWatchlistModal(false)}
           onSuccess={handleWatchlistSuccess}
+        />
+      )}
+
+      {/* Password Modal for bulk analysis */}
+      {showPasswordModal && (
+        <PasswordModal
+          onClose={() => setShowPasswordModal(false)}
+          onSuccess={handlePasswordSuccess}
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeStocks, getConfig, getJobStatus, getWatchlist } from '../api/api';
 import Breadcrumbs from '../components/Breadcrumbs';
+import PasswordModal from '../components/PasswordModal';
 import Header from '../components/Header';
 
 function AnalysisConfig() {
@@ -24,6 +25,8 @@ function AnalysisConfig() {
   const [config, setConfig] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(() => sessionStorage.getItem('bulkAnalysisVerified') === 'true');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,6 +67,12 @@ function AnalysisConfig() {
 
     if (tickersToAnalyze.length === 0) {
       alert('No stocks to analyze');
+      return;
+    }
+
+    // Gate behind password when analyzing all stocks (multi-stock)
+    if (selectedStock === 'all' && !passwordVerified) {
+      setShowPasswordModal(true);
       return;
     }
 
@@ -208,6 +217,19 @@ function AnalysisConfig() {
           )}
         </div>
       </div>
+
+      {/* Password Modal for bulk analysis */}
+      {showPasswordModal && (
+        <PasswordModal
+          onClose={() => setShowPasswordModal(false)}
+          onSuccess={() => {
+            setPasswordVerified(true);
+            setShowPasswordModal(false);
+            // Re-trigger the analysis now that password is verified
+            handleAnalyze();
+          }}
+        />
+      )}
     </div>
   );
 }

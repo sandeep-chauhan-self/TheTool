@@ -39,6 +39,10 @@ class Config:
     
     MASTER_API_KEY = os.getenv('MASTER_API_KEY')
     
+    # Bcrypt hash of the password required for bulk/multi-stock analysis
+    # Generate with: python -c "import bcrypt; print(bcrypt.hashpw(b'your-password', bcrypt.gensalt()).decode())"
+    BULK_ANALYSIS_PASSWORD_HASH = os.getenv('BULK_ANALYSIS_PASSWORD_HASH', '')
+    
     # =============================================================================
     # DATABASE CONFIGURATION (PostgreSQL Only)
     # =============================================================================

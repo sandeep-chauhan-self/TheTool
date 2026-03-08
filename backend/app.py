@@ -30,6 +30,7 @@ from routes.stocks import bp as stocks_bp
 from routes.admin import bp as admin_bp
 from routes.strategies import strategies_bp
 from routes.backtesting import bp as backtesting_bp
+from routes.bulk_auth import bp as bulk_auth_bp
 
 
 def create_app(config_object=None):
@@ -213,6 +214,7 @@ def create_app(config_object=None):
     app.register_blueprint(stocks_bp)
     app.register_blueprint(strategies_bp)
     app.register_blueprint(backtesting_bp)
+    app.register_blueprint(bulk_auth_bp)
     
     # Log initialization only once (main process)
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not os.environ.get('GUNICORN_CMD_ARGS'):

@@ -267,4 +267,9 @@ export const moveStocksToCollection = async (stockIds, targetCollectionId) => {
   return response.data;
 };
 
+export const verifyBulkPassword = async (password) => {
+  const response = await api.post('/api/auth/verify-bulk-password', { password });
+  return response.data;
+};
+
 export default api;
