@@ -3,6 +3,7 @@ import BacktestResults from './components/BacktestResults';
 import { StocksProvider } from './context/StocksContext';
 import AllStocksAnalysis from './pages/AllStocksAnalysis';
 import AnalysisConfig from './pages/AnalysisConfig';
+import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import Results from './pages/Results';
 import StrategiesIndex from './pages/StrategiesIndex';
@@ -14,7 +15,8 @@ function App() {
       <StocksProvider>
         <div className="min-h-screen bg-gray-100">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/config" element={<AnalysisConfig />} />
             <Route path="/results/:ticker" element={<Results />} />
             <Route path="/all-stocks" element={<AllStocksAnalysis />} />

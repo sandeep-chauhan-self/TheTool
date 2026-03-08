@@ -8,15 +8,21 @@ const Breadcrumbs = ({ items = [], className = '' }) => {
 
   const defaultItems = () => {
     const pathSegments = location.pathname.split('/').filter(Boolean);
-    const breadcrumbs = [{ label: 'Dashboard', path: '/' }];
+    const breadcrumbs = [{ label: 'Dashboard', path: '/dashboard' }];
     
     const pathMap = {
       'all-stocks': { label: 'Inventory', path: '/all-stocks' },
       'strategies': { label: 'Models', path: '/strategies' },
       'results': { label: 'Analysis', path: null },
       'backtest': { label: 'Simulation', path: null },
-      'config': { label: 'Engine Config', path: null }
+      'config': { label: 'Engine Config', path: null },
+      'dashboard': { label: 'Dashboard', path: '/dashboard' } // Ensure dashboard is mapped
     };
+
+    // If we're exactly on /dashboard, we don't need to add it twice
+    if (pathSegments.length === 1 && pathSegments[0] === 'dashboard') {
+        return breadcrumbs;
+    }
 
     pathSegments.forEach((segment, index) => {
       if (pathMap[segment]) {
@@ -36,7 +42,7 @@ const Breadcrumbs = ({ items = [], className = '' }) => {
       <div className="bg-white/40 backdrop-blur-md rounded-xl border border-white/50 px-5 py-2.5 shadow-sm inline-block">
         <ol className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest">
           <li className="flex items-center">
-            <Link to="/" className="text-slate-400 hover:text-primary-600 transition-colors">
+            <Link to="/dashboard" className="text-slate-400 hover:text-primary-600 transition-colors">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
               </svg>

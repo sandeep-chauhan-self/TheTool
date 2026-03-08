@@ -25,8 +25,11 @@ function NavigationBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo & Brand */}
-          <div className="flex-shrink-0 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-lg shadow-glow-primary">
+          <div 
+            onClick={() => navigate('/')}
+            className="flex-shrink-0 flex items-center gap-3 cursor-pointer group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-lg shadow-glow-primary group-hover:scale-105 transition-transform">
               T
             </div>
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
@@ -47,9 +50,9 @@ function NavigationBar() {
             </div>
 
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/dashboard')}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                isActive('/')
+                isActive('/dashboard') || isActive('/') // Keep highlighted if on landing for context, or exact match
                   ? 'bg-slate-900 text-white shadow-md'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
