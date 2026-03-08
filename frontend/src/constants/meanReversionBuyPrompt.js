@@ -1,6 +1,13 @@
+/**
+ * Optimized Mean Reversion BUY Analysis Prompt
+ * 
+ * Specialized deep-dive framework for validating BUY signals in Mean Reversion strategy.
+ */
+
+export const MEAN_REVERSION_BUY_PROMPT_TEMPLATE = `
 # Optimized Mean Reversion Analysis: SOMATEX BUY Signal
 
-```markdown
+\`\`\`markdown
 # Mean Reversion Trade Validation: SOMATEX (SOMATEX.NS)
 ## BUY SIGNAL - Oversold Bounce Expected
 
@@ -34,7 +41,7 @@
 - **Philosophy:** "Buy oversold, sell overbought, play the range"
 - **Optimized for:** Sideways, range-bound markets with clear support/resistance
 - **Indicator Weighting (vs Balanced 1.0x):**
-  ```
+  \`\`\`
   HEAVY OSCILLATOR FOCUS:
   ├─ RSI: 2.5x (primary oversold detector)
   ├─ Bollinger Bands: 2.5x (price extremes, band bounces)
@@ -53,7 +60,7 @@
   ├─ ATR: 1.0x (position sizing, stop placement)
   ├─ OBV: 1.0x (volume confirmation)
   └─ CMF: 1.0x (money flow at extremes)
-  ```
+  \`\`\`
 
 **Strategy Characteristics:**
 - ✅ Excels in: Sideways, range-bound markets (70-80% win rate)
@@ -71,7 +78,7 @@
 
 **This is a COUNTER-TREND strategy. Special considerations apply:**
 
-```
+\`\`\`
 Mean Reversion vs Trend Following:
 ├─ MR: Buys when others panic (contrarian)
 ├─ TF: Buys when momentum builds (confirmatory)
@@ -88,10 +95,10 @@ The BIGGEST Risk: BREAKOUTS
 ├─ When they do, your 1.5% stop may not be enough
 ├─ Breakout can gap past your stop (slippage)
 └─ Example: Earnings gap from ₹105 → ₹98 = -6.7% loss vs -1.5% planned
-```
+\`\`\`
 
 **Critical Success Factors for Mean Reversion:**
-```
+\`\`\`
 ✅ MUST HAVE:
 1. Well-defined range (clear support/resistance)
 2. Multiple bounces (range tested 3+ times)
@@ -107,7 +114,7 @@ The BIGGEST Risk: BREAKOUTS
 4. Strong trend forming (MACD, ADX rising despite dampening)
 5. Fundamental shift (earnings deterioration, news catalyst)
 6. Market in strong trend (Nifty making new highs/lows)
-```
+\`\`\`
 
 ---
 
@@ -117,7 +124,7 @@ The BIGGEST Risk: BREAKOUTS
 "Is SOMATEX in a stable range where ₹105.11 represents oversold support that will bounce to ₹107.47, OR is this a breakdown in progress?"
 
 **Decision Tree:**
-```
+\`\`\`
 IF Range is intact + No breakout risk + No events + Fundamentals support:
    → ✅ EXECUTE Mean Reversion trade
 
@@ -126,7 +133,7 @@ ELSE IF Range weakening OR Event risk OR Breakout signals:
 
 ELSE IF Range already broken OR Strong trend emerging:
    → ❌ ABORT - Strategy mismatch (use Trend Following instead)
-```
+\`\`\`
 
 **Your Mission:**
 Forensically validate whether this 0.341 score represents:
@@ -156,7 +163,7 @@ Forensically validate whether this 0.341 score represents:
 - [ ] Is broader market in sideways consolidation?
 
 **Data Quality Requirement:**
-```
+\`\`\`
 Mean Reversion needs PRECISE range data:
 - Chart analysis preferred over just fundamentals
 - Recent price action (last 3 months) more important than long-term
@@ -165,7 +172,7 @@ Mean Reversion needs PRECISE range data:
 
 If <80% data available → High risk to proceed
 Missing chart data or event calendar → MANDATORY SKIP
-```
+\`\`\`
 
 ---
 
@@ -174,7 +181,7 @@ Missing chart data or event calendar → MANDATORY SKIP
 ### Priority: CRITICAL ⚠️⚠️⚠️
 
 **Why This Is THE Most Important Section:**
-```
+\`\`\`
 Mean Reversion's Achilles Heel = BREAKOUTS
 
 Statistics:
@@ -183,24 +190,24 @@ Statistics:
 ├─ When range breaks, loss often exceeds 1.5% stop (gaps, slippage)
 ├─ One bad breakout can erase 5-10 successful mean reversion trades
 └─ MUST validate range integrity before every trade
-```
+\`\`\`
 
 ### Search Strategy:
 
-```
+\`\`\`
 Query 1: "SOMATEX stock chart 3 month 6 month support resistance"
 Query 2: "SOMATEX trading range February 2025"
 Query 3: "SOMATEX 52 week high low range"
 Query 4: "SOMATEX technical analysis breakout breakdown"
 Query 5: "SOMATEX ATR volatility Bollinger Band width"
 Query 6: "SOMATEX volume spike support resistance"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Range Definition & History:
 
-```
+\`\`\`
 **Current Trading Range (Last 3 Months):**
 - Resistance (Upper Bound): ₹[HIGH] - tested [X] times
 - Support (Lower Bound): ₹[LOW] - tested [Y] times
@@ -232,11 +239,11 @@ Weak Range (Risky for MR):
 └─ Low volume at extremes
 
 **SOMATEX Range Status:** [Strong ✅ / Moderate ⚠️ / Weak 🔴]
-```
+\`\`\`
 
 #### 2. Entry Point Validation:
 
-```
+\`\`\`
 **Where is ₹105.11 in the Range?**
 
 [Create ASCII chart visualization]
@@ -258,11 +265,11 @@ Distance from Resistance: [Y]%
 ❌ DANGER: Below support (breakdown in progress)
 
 **SOMATEX Entry at ₹105.11:** [Rating]
-```
+\`\`\`
 
 #### 3. Volatility Analysis - Compression Check:
 
-```
+\`\`\`
 **Bollinger Band Width & ATR Trend:**
 
 | Period | BB Width | ATR (₹) | Trend | Breakout Risk |
@@ -297,11 +304,11 @@ BB Width below 20-day MA for [X] consecutive days:
 - 6-10 days: ⚠️ Watch closely
 - 11-15 days: 🔴 High squeeze risk
 - 16+ days: 🔴🔴 Imminent breakout, SKIP trade
-```
+\`\`\`
 
 #### 4. Volume Pattern Analysis:
 
-```
+\`\`\`
 **Volume at Range Extremes:**
 
 Support Bounces (₹[LOW] area):
@@ -330,11 +337,11 @@ Resistance Rejections (₹[HIGH] area):
 - Big volume spike breaking resistance/support
 
 **Current Pattern:** [Healthy range ✅ / Neutral ⚪ / Breakout building 🔴]
-```
+\`\`\`
 
 #### 5. False Breakout History:
 
-```
+\`\`\`
 **Previous Breakout Attempts:**
 
 | Date | Direction | Intraday High/Low | Close | Result |
@@ -353,11 +360,11 @@ Resistance Rejections (₹[HIGH] area):
 - If most breakouts fail within same day → Strong range, safe MR
 - If breakouts last 2-3 days then reverse → Moderate range
 - If no attempt to break range → Either very strong OR building pressure
-```
+\`\`\`
 
 #### 6. Breakout Catalyst Check:
 
-```
+\`\`\`
 **Upcoming Binary Events (Next 30 Days):**
 
 | Event | Date | Days Away | Potential Impact | Breakout Risk |
@@ -385,11 +392,11 @@ Resistance Rejections (₹[HIGH] area):
 - Quiet period
 
 **Current Event Risk:** [Rating] - [Recommendation]
-```
+\`\`\`
 
 #### 7. Adjacent Levels - "What if Range Breaks?"
 
-```
+\`\`\`
 **Breakout/Breakdown Targets:**
 
 If Resistance Breaks (₹[HIGH]+):
@@ -416,11 +423,11 @@ If typical gap is [-3%] and your stop is -1.5%:
    
 If typical gap is [-1%] and your stop is -1.5%:
    → ✅ ADEQUATE - Stop will likely execute near planned level
-```
+\`\`\`
 
 ### Range Validation Verdict:
 
-```
+\`\`\`
 **Overall Range Health Score:**
 
 | Component | Score /20 | Weight | Weighted |
@@ -454,7 +461,7 @@ If typical gap is [-1%] and your stop is -1.5%:
 1. [Specific condition - e.g., "Clear bounce from ₹103 support"]
 2. [Another condition - e.g., "Volume spike at support"]
 3. [Alternative - e.g., "Wait for resistance test at ₹108 for MR short"]
-```
+\`\`\`
 
 ---
 
@@ -462,20 +469,20 @@ If typical gap is [-1%] and your stop is -1.5%:
 
 ### Search Strategy:
 
-```
+\`\`\`
 Query 1: "SOMATEX intrinsic value fair value estimate"
 Query 2: "SOMATEX PE ratio PB ratio historical average"
 Query 3: "SOMATEX DCF valuation analysis"
 Query 4: "SOMATEX vs peers valuation comparison"
 Query 5: "SOMATEX analyst target price consensus"
 Query 6: "SOMATEX fundamental analysis Screener Tijori"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Intrinsic Value Estimation:
 
-```
+\`\`\`
 **Multiple Valuation Approaches:**
 
 A. P/E Based Valuation:
@@ -511,11 +518,11 @@ D. Analyst Consensus (if available):
 - Optimistic (P/E, high peer): ₹[HIGH]
 
 **Working Fair Value: ₹[MID]** (median of approaches)
-```
+\`\`\`
 
 #### 2. Range vs Fair Value Alignment:
 
-```
+\`\`\`
 **Current Range Analysis:**
 - Support: ₹[LOW]
 - Midpoint: ₹[MID_RANGE]
@@ -553,11 +560,11 @@ D. Analyst Consensus (if available):
 - Current: ₹105.11
 - Discount/Premium: [Y]%
 - **Alignment:** [✅ Good / ⚠️ Questionable / 🔴 Misaligned]
-```
+\`\`\`
 
 #### 3. Recent Fundamental Changes:
 
-```
+\`\`\`
 **Has Fair Value Shifted Recently?**
 
 | Factor | 6M Ago | 3M Ago | Current | Trend | Impact on FV |
@@ -592,11 +599,11 @@ D. Analyst Consensus (if available):
 - Improving fundamentals: ⚠️ Risk of upside breakout (stop loss safe, but may miss rally)
 - Deteriorating fundamentals: 🔴 Risk of downside breakdown (stop loss at risk)
 - Stable fundamentals: ✅ Supports range-bound trading
-```
+\`\`\`
 
 #### 4. Mean Reversion Target Validation:
 
-```
+\`\`\`
 **Is ₹107.47 Target Fundamentally Reasonable?**
 
 Current Price: ₹105.11
@@ -628,11 +635,11 @@ Fair Value ₹[FV] vs Target ₹107.47:
 - **Target is:** [Below FV ✅ / At FV ✅ / Above FV 🔴]
 - **Likelihood of achieving:** [High ✅ / Medium ⚠️ / Low 🔴]
 - **Recommended adjustment:** [Keep ₹107.47 / Lower to ₹[X] / Extend to ₹[Y]]
-```
+\`\`\`
 
 ### Fundamental Alignment Verdict:
 
-```
+\`\`\`
 **Summary Assessment:**
 
 | Check | Status | Impact on MR Trade |
@@ -654,7 +661,7 @@ Fair Value ₹[FV] vs Target ₹107.47:
 - If fundamentals support: Proceed with standard position sizing
 - If fundamentals neutral: Reduce size by 30-50%
 - If fundamentals contra-indicate: Skip trade or wait for better setup
-```
+\`\`\`
 
 ---
 
@@ -662,20 +669,20 @@ Fair Value ₹[FV] vs Target ₹107.47:
 
 ### Search Strategy:
 
-```
+\`\`\`
 Query 1: "SOMATEX earnings date Q4 FY25 calendar"
 Query 2: "SOMATEX dividend record date ex-dividend"
 Query 3: "SOMATEX board meeting schedule February March 2025"
 Query 4: "SOMATEX corporate action bonus split rights"
 Query 5: "Medical devices sector India policy news budget"
 Query 6: "SOMATEX historical earnings gap volatility"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Earnings Calendar & Historical Volatility:
 
-```
+\`\`\`
 **Next Earnings Report:**
 - Expected Date: [DD-MMM-YYYY] ([X] trading days away)
 - Quarter: Q[X] FY[XX]
@@ -697,7 +704,7 @@ Query 6: "SOMATEX historical earnings gap volatility"
 - Gap Frequency: [A]/4 quarters
 
 **Risk Assessment vs 1.5% Stop:**
-```
+\`\`\`
 Your Stop Loss: -1.5%
 Average Earnings Gap: ±[X]%
 
@@ -714,11 +721,11 @@ IF Average Gap <1.5%:
    → Can trade but monitor closely
 
 **Current Status:** [Assessment based on days to earnings]
-```
+\`\`\`
 
 #### 2. Event Risk Decision Matrix:
 
-```
+\`\`\`
 **Timeline-Based Risk Assessment:**
 
 Days to Earnings: [X] days
@@ -739,11 +746,11 @@ Days to Earnings: [X] days
 - Your expected holding: ~7 days
 - Earnings in: [X] days
 - Conflict? [Yes - will hit earnings / No - clean exit possible]
-```
+\`\`\`
 
 #### 3. Other Corporate Actions:
 
-```
+\`\`\`
 **Dividend/Bonus/Split Schedule:**
 
 | Event Type | Record Date | Ex-Date | Days Away | Impact |
@@ -764,11 +771,11 @@ Days to Earnings: [X] days
 - Or factor in as non-risk (price + dividend = total return)
 
 **Current Status:** [Any conflicts? YES/NO - details]
-```
+\`\`\`
 
 #### 4. Board Meetings & Unknown Events:
 
-```
+\`\`\`
 **Upcoming Board Meetings:**
 
 | Date | Purpose | Likely Announcements | Risk |
@@ -787,11 +794,11 @@ Board meetings sometimes announce:
 → ⚠️ CAUTION - Consider waiting for announcement
 
 **Current:** [Assessment]
-```
+\`\`\`
 
 #### 5. Sector & Macro Events:
 
-```
+\`\`\`
 **Relevant Upcoming Events (Next 30 Days):**
 
 | Date | Event | Potential Impact on SOMATEX | Risk to MR Trade |
@@ -815,11 +822,11 @@ SOMATEX is sensitive to:
 └─ [Other factors]
 
 **Current Macro Calendar Risk:** [🔴 High / 🟡 Medium / ✅ Low]
-```
+\`\`\`
 
 ### Event Risk Verdict:
 
-```
+\`\`\`
 **Consolidated Event Risk Score:**
 
 | Event Type | Days Away | Historical Impact | Risk Rating | Weight |
@@ -855,7 +862,7 @@ IF Event Risk <25:
 └─ Normal 1.5% stop
 
 **For SOMATEX:** [Specific recommendation]
-```
+\`\`\`
 
 ---
 
@@ -863,20 +870,20 @@ IF Event Risk <25:
 
 ### Search Strategy:
 
-```
+\`\`\`
 Query 1: "SOMATEX futures options available NSE"
 Query 2: "SOMATEX put call ratio PCR"
 Query 3: "SOMATEX options open interest strike price"
 Query 4: "SOMATEX max pain level"
 Query 5: "SOMATEX implied volatility IV rank"
 Query 6: "SOMATEX options chain analysis"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### Preliminary Check - F&O Availability:
 
-```
+\`\`\`
 **Does SOMATEX have F&O Derivatives?**
 
 IF NO F&O:
@@ -888,11 +895,11 @@ IF NO F&O:
 
 IF YES (F&O Available):
    → Proceed with full options analysis below
-```
+\`\`\`
 
 #### 1. Put-Call Ratio (PCR):
 
-```
+\`\`\`
 **SOMATEX PCR Analysis:**
 
 | Timeframe | Put OI | Call OI | PCR | Interpretation |
@@ -926,11 +933,11 @@ IF YES (F&O Available):
 - If PCR falling → Complacency → Bad for MR bounce
 
 **SOMATEX PCR Trend:** [Rising 🟢 / Stable ⚪ / Falling 🔴]
-```
+\`\`\`
 
 #### 2. Max Pain Analysis:
 
-```
+\`\`\`
 **Options Max Pain Level:**
 
 Current Price: ₹105.11
@@ -959,11 +966,11 @@ Stock price tends to gravitate toward the level where options writers (sellers) 
 - Max Pain: ₹[X]
 - Your Target: ₹107.47
 - **Alignment:** [Strongly supports ✅ / Moderately supports ⚪ / Contradicts 🔴]
-```
+\`\`\`
 
 #### 3. Strike-Level Open Interest:
 
-```
+\`\`\`
 **OI Distribution at Key Strikes:**
 
 CALL SIDE (Resistance):
@@ -996,11 +1003,11 @@ PUT SIDE (Support):
 **OI-Based Trading Range:** ₹[PUT_SUPPORT] to ₹[CALL_RESISTANCE]
 **Your Trade:** Entry ₹105.11, Target ₹107.47, Stop ₹103.53
 **Fit:** [Well within range ✅ / At edge ⚠️ / Outside range 🔴]
-```
+\`\`\`
 
 #### 4. Implied Volatility:
 
-```
+\`\`\`
 **IV Analysis:**
 
 Current IV: [X]%
@@ -1035,11 +1042,11 @@ Historical IV (52-week): Min [A]% | Avg [B]% | Max [C]%
 If IV Rank >75 AND rising:
    → 🔴🔴 SKIP MEAN REVERSION - Market pricing big move
    → Wait for IV to contract post-event
-```
+\`\`\`
 
 #### 5. Options Trader Positioning:
 
-```
+\`\`\`
 **Recent Options Activity:**
 
 | Date | Action | Strike | Volume | OI Change | Interpretation |
@@ -1058,11 +1065,11 @@ If IV Rank >75 AND rising:
 - Net Options Positioning: [Bullish / Neutral / Bearish]
 - Confidence Level: [High / Medium / Low]
 - Alignment with MR Trade: [Supports ✅ / Neutral ⚪ / Contradicts 🔴]
-```
+\`\`\`
 
 ### Options Market Verdict:
 
-```
+\`\`\`
 **Derivatives Sentiment Score:**
 
 | Factor | Reading | MR Trade Impact | Score /20 |
@@ -1093,7 +1100,7 @@ Analyze broader market (Nifty) and sector options:
 - Healthcare Index options: [If available]
 - General derivative market stress: [VIX India level]
 - Impact on small-cap stocks like SOMATEX: [Assessment]
-```
+\`\`\`
 
 ---
 
@@ -1101,20 +1108,20 @@ Analyze broader market (Nifty) and sector options:
 
 ### Search Strategy:
 
-```
+\`\`\`
 Query 1: "Nifty 50 trend February 2025 bull bear sideways"
 Query 2: "VIX India volatility index current level"
 Query 3: "Nifty market breadth advance decline ratio"
 Query 4: "India stock market regime trending or ranging"
 Query 5: "FII DII flows India February 2025"
 Query 6: "Small cap mid cap performance vs Nifty"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Market Trend vs Range:
 
-```
+\`\`\`
 **Broader Market Regime:**
 
 | Index | Current | 20 DMA | 50 DMA | 200 DMA | Regime |
@@ -1149,11 +1156,11 @@ Query 6: "Small cap mid cap performance vs Nifty"
 └─ Trend following strategies outperform
 
 **Current Market Regime:** [Sideways ✅ / Trending 🔴 / Transitioning ⚠️]
-```
+\`\`\`
 
 #### 2. Volatility Environment:
 
-```
+\`\`\`
 **VIX Analysis:**
 
 Current VIX: [X]
@@ -1180,11 +1187,11 @@ VIX 52-week Range: [Low] to [High]
    - Volatility expansion
    - Breakouts more likely
    - Tight 1.5% stops at risk
-```
+\`\`\`
 
 #### 3. Market Breadth:
 
-```
+\`\`\`
 **Breadth Indicators:**
 
 | Metric | Current | Assessment |
@@ -1209,11 +1216,11 @@ VIX 52-week Range: [Low] to [High]
 - Broad participation in trend
 
 **Current Breadth:** [Range-bound ✅ / Directional 🔴]
-```
+\`\`\`
 
 #### 4. Small/Mid Cap Behavior:
 
-```
+\`\`\`
 **Size-Based Performance (1 Month):**
 
 | Category | Return | vs Nifty 50 | Assessment |
@@ -1234,11 +1241,11 @@ VIX 52-week Range: [Low] to [High]
    - May pressure SOMATEX regardless of MR setup
    
 **Current:** [Favorable ✅ / Neutral ⚪ / Unfavorable 🔴]
-```
+\`\`\`
 
 #### 5. FII/DII Flows:
 
-```
+\`\`\`
 **Institutional Money Flows:**
 
 | Period | FII (₹Cr) | DII (₹Cr) | Net | Impact |
@@ -1259,11 +1266,11 @@ VIX 52-week Range: [Low] to [High]
 - Directional flows = trend forming
 
 **Current Flow Status:** [Supportive ✅ / Neutral ⚪ / Unsupportive 🔴]
-```
+\`\`\`
 
 ### Market Regime Verdict:
 
-```
+\`\`\`
 **Overall Market Environment Score:**
 
 | Factor | Status | MR-Friendly? | Score /20 |
@@ -1290,7 +1297,7 @@ VIX 52-week Range: [Low] to [High]
 - Sideways market: Full MR position sizing
 - Trending market: Skip MR, use Trend Following strategy instead
 - Uncertain/transitioning: 50% position size or wait
-```
+\`\`\`
 
 ---
 
@@ -1298,7 +1305,7 @@ VIX 52-week Range: [Low] to [High]
 
 ### Comprehensive Risk Matrix:
 
-```
+\`\`\`
 **Mean Reversion-Specific Risk Assessment:**
 
 | Risk Category | Probability | Impact | Mitigation | Priority |
@@ -1309,11 +1316,11 @@ VIX 52-week Range: [Low] to [High]
 | Fair Value Misalignment | [L/M/H] | [M] | [Adjust target] | [🟡 Medium] |
 | Illiquidity Slippage | [L/M/H] | [L/M] | [Limit orders] | [🟢 Low] |
 | Market Regime Shift | [L/M/H] | [H] | [Monitor Nifty ADX, VIX] | [🟡 Medium] |
-```
+\`\`\`
 
 ### Multi-Factor Scorecard:
 
-```
+\`\`\`
 | Dimension | Weight | Score /100 | Weighted | Status |
 |-----------|--------|------------|----------|--------|
 | **Technical Conviction** | 20% | 34 (score 0.341 = moderate) | 6.8 | [Moderate signal] |
@@ -1323,11 +1330,11 @@ VIX 52-week Range: [Low] to [High]
 | **Options Sentiment** | 10% | [XX] | [X.X] | [Derivatives support] |
 | **Market Regime** | 15% | [XX] | [X.X] | [Sideways vs trending] |
 | **TOTAL SCORE** | **100%** | | **[XX.X]** | |
-```
+\`\`\`
 
 ### Decision Matrix Application:
 
-```
+\`\`\`
 Total Score Interpretation FOR MEAN REVERSION:
 80-100: ✅ TEXTBOOK SETUP - High confidence MR trade
 65-79: ✅ GOOD SETUP - Execute with standard size
@@ -1337,11 +1344,11 @@ Total Score Interpretation FOR MEAN REVERSION:
 
 SOMATEX Total Score: [XX.X]
 Preliminary Recommendation: [Based on score band]
-```
+\`\`\`
 
 ### Critical Override Rules:
 
-```
+\`\`\`
 🔴 MANDATORY SKIP if ANY:
 - [ ] Breakout probability >50% (range breaking)
 - [ ] Earnings in next 3 days
@@ -1367,11 +1374,11 @@ Preliminary Recommendation: [Based on score band]
 - [ ] Entry near support
 
 SOMATEX Override Check: [PASS / CONDITIONAL / FAIL]
-```
+\`\`\`
 
 ### FINAL RECOMMENDATION:
 
-```
+\`\`\`
 ┌──────────────────────────────────────────────────────────────┐
 │                                                               │
 │  VERDICT: [✅ EXECUTE MR / ⚠️ CONDITIONAL / 🔴 SKIP]          │
@@ -1379,11 +1386,11 @@ SOMATEX Override Check: [PASS / CONDITIONAL / FAIL]
 │  Confidence: [🟢 HIGH 75%+ / 🟡 MEDIUM 50-75% / 🔴 LOW <50%] │
 │                                                               │
 └──────────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 **If EXECUTE MEAN REVERSION:**
 
-```
+\`\`\`
 📋 **TRADE PLAN:**
 
 Entry Strategy:
@@ -1428,11 +1435,11 @@ Monitoring Schedule:
   ├─ VIX spikes >5 points → Reassess
   ├─ Earnings date announced <10 days → Plan exit
   └─ News catalyst → Validate range still intact
-```
+\`\`\`
 
 **If CONDITIONAL:**
 
-```
+\`\`\`
 ⚠️ **PROCEED WITH MODIFICATIONS:**
 
 Issues Identified:
@@ -1456,11 +1463,11 @@ Alternative Approach:
 - Use options: Buy ₹105 Call (defined risk, limited capital)
 - Paper trade first to validate range
 - Wait for resistance test at ₹108 for MR SHORT instead
-```
+\`\`\`
 
 **If SKIP:**
 
-```
+\`\`\`
 🔴 **DO NOT EXECUTE - MEAN REVERSION NOT APPROPRIATE**
 
 Primary Reasons (Top 3):
@@ -1493,11 +1500,11 @@ Monitor These Developments:
 - [Specific price level or pattern]
 - [Event date]
 - [Market regime change]
-```
+\`\`\`
 
 ### TOP 3 RISKS (Ranked):
 
-```
+\`\`\`
 🔴 **RISK #1: BREAKOUT / RANGE BREAK**
 - Probability: [High/Medium/Low based on analysis]
 - Impact: Range breaks → 1.5% stop insufficient, could lose 3-5%
@@ -1529,11 +1536,11 @@ Monitor These Developments:
   ├─ [Quick stop if pattern changes]
   ├─ [Watch for MACD continuing bearish despite dampening]
   └─ [Respect the stop, don't average down]
-```
+\`\`\`
 
 ### TOP 3 SUPPORTING FACTORS:
 
-```
+\`\`\`
 ✅ **FACTOR #1: [Strongest Support]**
 - Evidence: [e.g., "Range tested 6 times in 10 weeks, all bounces successful"]
 - Why it matters: [Proven support, high probability of 7th bounce]
@@ -1551,11 +1558,11 @@ Monitor These Developments:
 - Why it matters: [Ideal environment for range trading]
 - Strength: [HIGH/MEDIUM/LOW]
 - Weight: [XX%]
-```
+\`\`\`
 
 ### EXECUTIVE SUMMARY (The Bottom Line):
 
-```
+\`\`\`
 **Consolidated Analysis:**
 
 [4-5 sentence synthesis addressing:]
@@ -1567,11 +1574,11 @@ Monitor These Developments:
 
 **Example:**
 "Mean Reversion strategy detected moderately oversold conditions (0.341) at ₹105.11, near established support. Analysis reveals [RANGE STATUS - strong/weak], with [BREAKOUT PROBABILITY]. Fair value estimated at ₹[X] [supports/challenges] the ₹107.47 target. Critical risk: [BIGGEST RISK - earnings/breakout/regime]. Market regime is [sideways ✅ / trending 🔴]. Net assessment: [EXECUTE/CONDITIONAL/SKIP] with [HIGH/MEDIUM/LOW] confidence. If trading, strict 1.5% stop at ₹103.53 is [adequate/insufficient], target ₹107.47 is [realistic/aggressive], position size [X]%."
-```
+\`\`\`
 
 ### Mean Reversion vs Other Strategies:
 
-```
+\`\`\`
 **Strategy Suitability Matrix:**
 
 Current Market Conditions: [Summary]
@@ -1588,11 +1595,11 @@ IF Mean Reversion unsuitable:
    
 IF Mean Reversion suitable:
    → "MR is optimal for current conditions: [SPECIFIC REASONS]"
-```
+\`\`\`
 
 ### Critical Success Factors Checklist:
 
-```
+\`\`\`
 For this Mean Reversion trade to succeed:
 ✓ Range must hold (₹[X] to ₹[Y])
 ✓ No surprise news/events
@@ -1609,7 +1616,7 @@ Daily Checklist:
 □ Is Nifty trending strongly?
 □ Any upcoming events announced?
 □ Should I take profit early?
-```
+\`\`\`
 
 ---
 
@@ -1636,7 +1643,7 @@ Daily Checklist:
 
 **END OF MEAN REVERSION ANALYSIS**
 
-```
+\`\`\`
 
 ---
 
@@ -1644,7 +1651,7 @@ Daily Checklist:
 
 ### Mean Reversion Special Protocols:
 
-```python
+\`\`\`python
 # Mean Reversion requires different validation vs Trend Following
 if strategy == "Mean Reversion":
     
@@ -1681,11 +1688,11 @@ if strategy == "Mean Reversion":
     if final_confidence < 50:
         recommendation = "SKIP - Mean Reversion inappropriate for current conditions"
         suggest_alternative_strategy()
-```
+\`\`\`
 
 ### Output Quality Checklist:
 
-```
+\`\`\`
 For Mean Reversion specifically, verify:
 ✅ Range clearly defined with support/resistance levels
 ✅ Minimum 3 successful bounces documented
@@ -1699,8 +1706,9 @@ For Mean Reversion specifically, verify:
 ✅ Alternative strategy suggested if MR unsuitable
 ✅ Clear time-based exit if range doesn't play out
 ✅ Emphasized tight stop discipline
-```
+\`\`\`
 
 ---
 
 **This Mean Reversion-optimized prompt is ready for your analysis system.**
+`;

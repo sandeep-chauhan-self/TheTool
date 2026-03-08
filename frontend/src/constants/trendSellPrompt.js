@@ -1,4 +1,11 @@
 /**
+ * Trend Following SELL Analysis Prompt
+ * 
+ * Specialized deep-dive framework.
+ */
+
+export const TREND_SELL_PROMPT_TEMPLATE = `
+/**
  * Trend Following Strategy Analysis Prompt - SELL Signals
  * Version: 2.0 - Dynamic Template
  * 
@@ -17,7 +24,7 @@
  * @param {string} date - Current date
  */
 
-export const TREND_FOLLOWING_PROMPT = `
+export const TREND_FOLLOWING_PROMPT = \`
 # Trend-Following Trade Validation: {stockName} ({ticker})
 ## {verdict} SIGNAL - Downtrend Confirmation Required
 
@@ -35,7 +42,7 @@ export const TREND_FOLLOWING_PROMPT = `
 ### Technical Analysis Summary
 
 **Signal:** {verdict} 🔴
-**Conviction Score:** {score} / 1.000 ${
+**Conviction Score:** {score} / 1.000 \${
   Math.abs(parseFloat('{score}')) > 0.70 
     ? '🔴🔴 **STRONG BEARISH**' 
     : Math.abs(parseFloat('{score}')) > 0.50 
@@ -46,19 +53,19 @@ export const TREND_FOLLOWING_PROMPT = `
 }
 
 **Score Interpretation:**
-\`\`\`
+\\\`\\\`\\\`
 Score Range: -1.0 (Strong Sell) ← {score} → 0.0 (Neutral) → +1.0 (Strong Buy)
 
 Position on Scale:
 │────────────────────┼─────────┼─────────┼─────────┼
 -1.0              -0.5      0.0      0.5      1.0
-${parseFloat('{score}') < -0.70 ? '▼' :
+\${parseFloat('{score}') < -0.70 ? '▼' :
   parseFloat('{score}') < -0.50 ? '    ▼' :
   parseFloat('{score}') < -0.30 ? '         ▼' :
   '              ▼'}
 
 Current: {score}
-Assessment: ${
+Assessment: \${
   Math.abs(parseFloat('{score}')) > 0.70 
     ? 'STRONG DOWNTREND DETECTED - High conviction'
     : Math.abs(parseFloat('{score}')) > 0.50
@@ -67,17 +74,17 @@ Assessment: ${
         ? 'WEAK DOWNTREND - Low conviction'
         : 'BARELY BEARISH - Nearly neutral, questionable trade'
 }
-\`\`\`
+\\\`\\\`\\\`
 
 **Trade Setup:**
 - **Entry Price:** ₹{entry} (Current market price)
 - **Stop Loss:** ₹{stopLoss}
-  - Risk: ₹${Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')).toFixed(2)}
-  - Risk %: ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%
+  - Risk: ₹\${Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')).toFixed(2)}
+  - Risk %: \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%
 - **Target:** ₹{target}
-  - Reward: ₹${Math.abs(parseFloat('{entry}') - parseFloat('{target}')).toFixed(2)}
-  - Reward %: ${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(2)}%
-- **Risk-Reward Ratio:** 1:${(Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))).toFixed(2)} ${
+  - Reward: ₹\${Math.abs(parseFloat('{entry}') - parseFloat('{target}')).toFixed(2)}
+  - Reward %: \${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(2)}%
+- **Risk-Reward Ratio:** 1:\${(Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))).toFixed(2)} \${
   (Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))) >= 3.0 
     ? '⭐ (Excellent for trend trades)'
     : (Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))) >= 2.0
@@ -89,7 +96,7 @@ Assessment: ${
 - **Philosophy:** "Trust the trend, ignore oscillator warnings, ride winners"
 - **Optimized for:** Capturing sustained directional moves (down in this case)
 - **Indicator Weighting (vs Balanced 1.0x):**
-\`\`\`
+\\\`\\\`\\\`
   HEAVY TREND FOCUS:
   ├─ MACD: 2.5x (primary trend confirmation)
   ├─ ADX: 2.5x (trend strength measurement)
@@ -107,12 +114,12 @@ Assessment: ${
   ├─ CMF: 1.0x (money flow direction)
   ├─ Bollinger Bands: 1.0x (volatility context)
   └─ ATR: 1.0x (position sizing based on volatility)
-\`\`\`
+\\\`\\\`\\\`
 
 **Strategy Characteristics:**
 - ✅ Excels in: Strong trending markets (up or down)
-- ✅ Wider stops: ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}% - Avoids getting shaken out of trend
-- ✅ Higher R:R: ${(Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))).toFixed(1)}:1 (Minimum 3:1 target for trend trades)
+- ✅ Wider stops: \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}% - Avoids getting shaken out of trend
+- ✅ Higher R:R: \${(Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))).toFixed(1)}:1 (Minimum 3:1 target for trend trades)
 - ⚠️ Weakness: Choppy/sideways markets cause whipsaws
 - ⚠️ Entry timing: Often enters after trend has begun (misses early move)
 - ⚠️ Reversal risk: Can hold too long if trend breaks unexpectedly
@@ -122,7 +129,7 @@ Assessment: ${
 ## ⚠️ CRITICAL CONTEXT: SELL TRADE CONSIDERATIONS
 
 **This is a SHORT/SELL position. Special risks apply:**
-\`\`\`
+\\\`\\\`\\\`
 SELL Trade Risks vs BUY Trade:
 ├─ Unlimited upside risk (stop loss is CRITICAL - NEVER widen it)
 ├─ Lower circuit limits upside, but you're on wrong side
@@ -151,7 +158,7 @@ IF shorting via derivatives:
    → Ensure liquidity in F&O segment (check separately)
    → Understand margin requirements and mark-to-market
    → Options (Put buying) limits risk vs Futures short
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
@@ -168,7 +175,7 @@ IF shorting via derivatives:
 5. **Trend Health:** Is momentum accelerating or decelerating?
 6. **Reversal Risk:** Any upcoming positive catalysts that could reverse trend?
 
-${Math.abs(parseFloat('{score}')) < 0.30 ? `
+\${Math.abs(parseFloat('{score}')) < 0.30 ? \`
 ⚠️ **SPECIAL ALERT: WEAK SELL SIGNAL**
 
 Score {score} is BARELY bearish. For SELL trades, this is VERY risky:
@@ -178,7 +185,7 @@ Score {score} is BARELY bearish. For SELL trades, this is VERY risky:
 
 Weak SELL signals have 60-70% failure rate in backtests.
 Proceed ONLY if analysis reveals strong fundamental reasons.
-` : Math.abs(parseFloat('{score}')) < 0.50 ? `
+\` : Math.abs(parseFloat('{score}')) < 0.50 ? \`
 **Moderate SELL Signal Alert:**
 
 Score {score} shows moderate downtrend. This requires:
@@ -187,7 +194,7 @@ Score {score} shows moderate downtrend. This requires:
 - Smart money exit (FII/DII selling)
 
 Without these, risk of reversal is 40-50%.
-` : `
+\` : \`
 **Strong SELL Signal:**
 
 Score {score} indicates strong downtrend conviction.
@@ -195,7 +202,7 @@ Technical setup is solid. Now validate:
 - Sustainability (will trend continue to target?)
 - Risk management (stop loss placement critical)
 - Catalyst strength (what's driving this down?)
-`}
+\`}
 
 **Your Mission:**
 Perform forensic analysis to determine if this {score} score represents:
@@ -228,7 +235,7 @@ Perform forensic analysis to determine if this {score} score represents:
 - [ ] Credit rating downgrade
 
 **Data Quality Requirement:**
-\`\`\`
+\\\`\\\`\\\`
 For SELL signals, data quality is MORE critical than BUY:
 - Need confirmation of negative catalysts (can't short on hope)
 - Must verify smart money exit (institutions selling)
@@ -237,7 +244,7 @@ For SELL signals, data quality is MORE critical than BUY:
 
 If <70% data available → Reduce confidence significantly
 If <50% data available → Consider skipping trade entirely
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
@@ -246,7 +253,7 @@ If <50% data available → Consider skipping trade entirely
 ### Priority: CRITICAL ⚠️⚠️
 
 **Why This Matters MORE for SELL Trades:**
-\`\`\`
+\\\`\\\`\\\`
 Illiquid stocks + Short positions = DISASTER SCENARIO
 ├─ Can't exit short if stock gaps up on news
 ├─ Wide spreads = high slippage on entry AND exit  
@@ -256,10 +263,10 @@ Illiquid stocks + Short positions = DISASTER SCENARIO
 
 SELL trades require HIGHER liquidity than BUY trades
 Minimum: ₹1 Cr daily value (vs ₹50L for BUY trades)
-\`\`\`
+\\\`\\\`\\\`
 
 ### Search Strategy:
-\`\`\`
+\\\`\\\`\\\`
 Query 1: "{stockName} NSE volume {date}"
 Query 2: "{ticker} average daily value traded"
 Query 3: "{stockName} delivery percentage trend"
@@ -267,12 +274,12 @@ Query 4: "{stockName} bid ask spread liquidity"
 Query 5: "{stockName} circuit breaker hits upper lower"
 Query 6: "{stockName} futures options F&O liquidity"
 Query 7: "{stockName} free float market cap"
-\`\`\`
+\\\`\\\`\\\`
 
 ### Analysis Tasks:
 
 #### 1. Cash Market Liquidity:
-\`\`\`
+\\\`\\\`\\\`
 | Metric | Value | Benchmark for SELL | Status |
 |--------|-------|-------------------|---------|
 | Avg Daily Value (20D) | ₹[X] Lakhs/Cr | >₹1 Cr (REQUIRED) | [✅/⚠️/❌] |
@@ -287,10 +294,10 @@ Query 7: "{stockName} free float market cap"
 
 ✅ GOOD for SELL: Declining delivery % (weak hands exiting, low conviction)
 🔴 BAD for SELL: Increasing delivery % (strong hands buying dip, conviction building)
-\`\`\`
+\\\`\\\`\\\`
 
 #### 2. Volatility & Circuit Risk:
-\`\`\`
+\\\`\\\`\\\`
 **Circuit Breaker History (Last 30 Days):**
 
 | Date | Circuit Hit | Reason | Price Impact |
@@ -304,7 +311,7 @@ Summary:
 
 **Intraday Volatility:**
 - Average daily range: [X]%
-- vs Stop Loss distance: ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}%
+- vs Stop Loss distance: \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}%
 - Assessment: [✅ Stop > 2× volatility / ⚠️ Stop = 1-2× / 🔴 Stop < volatility = too tight]
 
 **Gap Risk Analysis:**
@@ -314,10 +321,10 @@ Summary:
 
 🔴 CRITICAL: If gap ups > gap downs → Stock prone to positive surprises, risky SELL
 ✅ GOOD: If gap downs > gap ups → Downtrend confirmed with momentum
-\`\`\`
+\\\`\\\`\\\`
 
 #### 3. Derivative Market Check (F&O Availability):
-\`\`\`
+\\\`\\\`\\\`
 **Does {stockName} have F&O segment?**
 [YES / NO - Check NSE F&O stocks list]
 
@@ -338,7 +345,7 @@ IF YES - F&O Metrics:
 └─ Recommendation: [Specific strategy based on OI, liquidity, volatility]
 
 IF NO F&O:
-\`\`\`
+\\\`\\\`\\\`
 🔴 NO DERIVATIVES AVAILABLE
 
 Short Options:
@@ -352,11 +359,11 @@ Short Options:
 - If you don't own {stockName}, analysis is purely informational
 - No way to profit from downtrend unless you own the stock
 → Recommendation: [HOLD EXISTING vs SELL / SKIP if don't own]
-\`\`\`
-\`\`\`
+\\\`\\\`\\\`
+\\\`\\\`\\\`
 
 ### Liquidity Decision Matrix for SELL:
-\`\`\`
+\\\`\\\`\\\`
 MANDATORY SKIP - DO NOT TRADE if ANY:
 ├─ Avg Daily Value <₹50 Lakhs → 🔴🔴 TOO ILLIQUID FOR SHORT
 ├─ Delivery % <30% consistently → 🔴🔴 MANIPULATED, AVOID SHORT  
@@ -381,11 +388,11 @@ SAFE TO SHORT if ALL:
 ├─ Active F&O segment (>10K lots OI) → ✅ Multiple exit routes available
 └─ Free float >₹200 Cr → ✅ Hard to manipulate
 → Standard position sizing applicable (2-5% based on conviction)
-\`\`\`
+\\\`\\\`\\\`
 
 ### Liquidity Verdict:
 
-\`\`\`
+\\\`\\\`\\\`
 **Overall Liquidity Score:** [Calculate: X/100]
 
 Component Scores:
@@ -408,12 +415,12 @@ Component Scores:
 **VERDICT:** [✅ EXECUTE / ⚠️ CAUTION / 🔴 SKIP]
 
 **Recommended Shorting Method:**
-${`
+\${\`
 IF score >80: [Futures short OR Sell holdings - both viable]
 IF score 65-79: [Sell holdings preferred OR small futures short]
 IF score 50-64: [Only if holding - sell. Don't initiate new short]
 IF score <50: [DO NOT SHORT. Sell holdings if must, but risky]
-`}
+\`}
 
 **Position Size Limit (based on liquidity):**
 - Maximum: [X]% of portfolio
@@ -426,7 +433,7 @@ IF score <50: [DO NOT SHORT. Sell holdings if must, but risky]
 Reason: [Primary liquidity issue]
 Alternative: [Suggest more liquid stocks in same sector if applicable]
 Do not proceed to other sections - liquidity risk overrides all other factors.
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
@@ -435,16 +442,16 @@ Do not proceed to other sections - liquidity risk overrides all other factors.
 ### Priority: CRITICAL ⚠️⚠️⚠️
 
 **Fundamental Principle for SELL Trades:**
-\`\`\`
+\\\`\\\`\\\`
 "Never short a stock just because it's falling"
 "Always short a stock because there's a REASON it should fall MORE"
 
 Without a clear catalyst, SELL trades have 60-70% failure rate.
 This section is THE most important for SELL signal validation.
-\`\`\`
+\\\`\\\`\\\`
 
 ### Search Strategy:
-\`\`\`
+\\\`\\\`\\\`
 Query 1: "{stockName} news negative {date}"
 Query 2: "{stockName} latest news February 2025"
 Query 3: "{stockName} earnings miss profit warning guidance"
@@ -455,14 +462,14 @@ Query 7: "{stockName} competitor wins market share loss"
 Query 8: "{stockName} stock price fall reason today why"
 Query 9: "{stockName} downgrade rating analyst"
 Query 10: "{stockName} debt problem credit downgrade"
-\`\`\`
+\\\`\\\`\\\`
 
 ### Analysis Framework:
 
 #### 1. Catalyst Hunt - "What Started the Downtrend?"
 
 **Check for Primary SELL Catalysts (Last 30 Days):**
-\`\`\`
+\\\`\\\`\\\`
 🔴 EARNINGS-RELATED:
 - [ ] Earnings miss vs estimates (Revenue/EPS/EBITDA)
 - [ ] Guidance cut / Negative outlook statement
@@ -511,10 +518,10 @@ Query 10: "{stockName} debt problem credit downgrade"
 - [ ] Input commodity price spike
 - [ ] Forex headwind (for exporters/importers)
 - [ ] Demand destruction in end market
-\`\`\`
+\\\`\\\`\\\`
 
 **Catalyst Discovery Output:**
-\`\`\`
+\\\`\\\`\\\`
 | Catalyst Type | Date | Specific Event | Magnitude | Duration |
 |---------------|------|----------------|-----------|----------|
 | [PRIMARY] | [DD-MMM] | [Detailed description] | [🔴🔴 High / 🔴 Med / 🟡 Low] | [Short/Medium/Long-term] |
@@ -552,12 +559,12 @@ NOT acceptable: "Technical breakdown" (this is circular reasoning)
    → 🔴🔴 RED FLAG: Skip SELL trade
 
 **{stockName} Catalyst Strength:** [XX]/100 → [Rating]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 2. Catalyst Sustainability - "Will It Keep Falling?"
 
 **Duration Analysis:**
-\`\`\`
+\\\`\\\`\\\`
 For each identified catalyst, assess sustainability:
 
 **ONE-TIME EVENTS (1-4 weeks impact):**
@@ -587,15 +594,15 @@ PRIMARY CATALYST: [Description from above]
 ├─ Historical Precedent: [Similar issues in past took X months to resolve]
 └─ **Sustainability Score:** [🟢 Long-lasting / 🟡 Moderate / 🔴 Short-lived]
 
-**For ₹{entry} → ₹{target} (${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}% fall):**
+**For ₹{entry} → ₹{target} (\${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}% fall):**
 - Requires [X] weeks of sustained weakness
 - Catalyst(s) support this duration? [✅ YES / ⚠️ PARTIALLY / ❌ NO]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 3. Counter-Catalysts - "What Could Reverse This?"
 
 **Positive Surprises That Could Break Downtrend:**
-\`\`\`
+\\\`\\\`\\\`
 **UPCOMING EVENTS (Next 30-60 Days) - HIGH REVERSAL RISK:**
 
 | Event | Date | Positive Scenario | Probability | Impact on SELL |
@@ -632,10 +639,10 @@ PRIMARY CATALYST: [Description from above]
    → Recommendation: Full target ₹{target} viable
 
 **{stockName} Counter-Catalyst Risk:** [Rating + reasoning]
-\`\`\`
+\\\`\\\`\\\`
 
 **Potential Bottom Formation Signals:**
-\`\`\`
+\\\`\\\`\\\`
 Watch for these reversal indicators during trade:
 ├─ Promoter buying disclosed
 ├─ Institutional buying (FII/MF increasing stakes)
@@ -646,12 +653,12 @@ Watch for these reversal indicators during trade:
 └─ Management buyback announcement
 
 **Current Status:** [Any of these present? Detail]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 4. News Flow Quality & Sentiment Timeline:
 
 **14-Day News Sentiment Analysis:**
-\`\`\`
+\\\`\\\`\\\`
 | Week | Positive News | Neutral News | Negative News | Net Sentiment |
 |------|---------------|--------------|---------------|---------------|
 | Week 1 (Recent) | [X] count | [Y] count | [Z] count | [🔴🔴 Very Bearish / 🔴 Bearish / ⚪ Neutral / 🟢 Bullish] |
@@ -672,12 +679,12 @@ Watch for these reversal indicators during trade:
 ✅ SUPPORTS SELL: News getting progressively worse, new negatives emerging
 ⚪ STABLE: Negative but no new information
 🔴 WARNING: Negative news flow slowing, sentiment bottoming out
-\`\`\`
+\\\`\\\`\\\`
 
 #### 5. Analyst & Brokerage Actions:
 
 **Recent Analyst Activity:**
-\`\`\`
+\\\`\\\`\\\`
 | Date | Brokerage | Action | Target Price | Reasoning |
 |------|-----------|--------|--------------|-----------|
 | [DD-MMM] | [Name] | Downgrade/Cut | ₹[X] → ₹[Y] | [Brief reason] |
@@ -702,11 +709,11 @@ Summary (Last 30 Days):
 ✅ SUPPORTS SELL: Multiple downgrades, target cuts, negative revisions
 ⚪ MIXED: Some cuts but also stable ratings
 🔴 CONTRADICTS: Upgrades, target raises, turning positive
-\`\`\`
+\\\`\\\`\\\`
 
 ### Catalyst & Sentiment Verdict:
 
-\`\`\`
+\\\`\\\`\\\`
 **Overall Catalyst Assessment:**
 
 | Component | Score /100 | Weight | Weighted |
@@ -736,22 +743,22 @@ Summary (Last 30 Days):
 [Synthesize THE single most important finding about why this stock is falling and whether it's sustainable to target]
 
 Example: "Primary catalyst is 340bps margin compression from polymer cost inflation without pricing power, disclosed in Q3 results with management guiding for 2-3 more quarters of pressure. This is structural medium-term issue (6+ months), supporting target ₹{target}. Counter-risk is potential crude oil decline or pricing power recovery, but low probability in next 2-3 months."
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ## SECTION 3: FUNDAMENTAL DETERIORATION CHECK
 
 **Why This Section Matters:**
-\`\`\`
+\\\`\\\`\\\`
 Technical downtrend + Fundamental deterioration = HIGH PROBABILITY SELL
 Technical downtrend + Strong fundamentals = DANGEROUS VALUE TRAP
 
 This section validates whether fundamentals justify lower prices.
-\`\`\`
+\\\`\\\`\\\`
 
 ### Search Strategy:
-\`\`\`
+\\\`\\\`\\\`
 Query 1: "{stockName} quarterly results trend FY24 FY25"
 Query 2: "{stockName} profit margins declining compression"
 Query 3: "{stockName} debt equity ratio increased"
@@ -762,13 +769,13 @@ Query 7: "{stockName} PE ratio valuation expensive cheap"
 Query 8: "{stockName} vs [PEER1] [PEER2] financial comparison"
 Query 9: "{stockName} ROE ROCE declining"
 Query 10: "{stockName} working capital problems"
-\`\`\`
+\\\`\\\`\\\`
 
 ### Analysis Framework:
 
 #### 1. Earnings Trajectory - "Is Profit Story Broken?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Quarterly Performance Trend:**
 
 | Quarter | Revenue (₹Cr) | YoY Δ | EBITDA (₹Cr) | PAT (₹Cr) | PAT YoY Δ | EPS (₹) | vs Est | Status |
@@ -801,11 +808,11 @@ Query 10: "{stockName} working capital problems"
    → Risky to short when fundamentals improving
 
 **{stockName} Earnings-Price Alignment:** [Rating]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 2. Margin Compression - "Profitability Under Pressure?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Margin Trend (Last 4 Quarters):**
 
 | Metric | Q2 FY25 | Q1 FY25 | Q4 FY24 | Q3 FY24 | Trend | Change | Bearish? |
@@ -854,11 +861,11 @@ Root Cause Analysis:
 - Primary Cause: [Structural/Cyclical/One-time]
 - Recovery Outlook: [Low/Medium/High]
 - **Verdict:** [🔴 Margins compressing = Strong SELL signal / ⚪ Stable / 🟢 Expanding = Contradicts SELL]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 3. Debt & Leverage - "Financial Stress Building?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Debt Trend Analysis:**
 
 | Metric | Latest | 1Q Ago | 2Q Ago | 4Q Ago | Trend | Risk Level |
@@ -903,11 +910,11 @@ Root Cause Analysis:
 - Debt Trend: [Concerning 🔴 / Stable ⚪ / Improving 🟢]
 - **Stress Score:** [High 🔴 / Medium ⚪ / Low ✅]
 - **Impact on SELL thesis:** [Strengthens / Neutral / Weakens]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 4. Earnings Quality - "Is Profit Real or Accounting Gimmick?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Cash Flow Reality Check:**
 
 | Metric | FY24 | FY23 | FY22 | Trend | Quality |
@@ -952,11 +959,11 @@ Root Cause Analysis:
 - Red Flags: [X] found → [None ✅ / Minor ⚪ / Major 🔴]
 - **Quality Score:** [High ✅ / Medium ⚪ / Low 🔴]
 - **SELL Implication:** [Quality issues strengthen SELL / Neutral / Quality contradicts SELL]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 5. Valuation - "Has Stock Become Cheap Enough to Attract Value Buyers?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Valuation Metrics Evolution:**
 
 | Metric | Current (at ₹{entry}) | 6M Ago | 1Y Ago | Historical 3Y Avg | Status |
@@ -1017,11 +1024,11 @@ AT ₹{target} (SELL Target):
 - Target Level (₹{target}): [Reasonable / Aggressive / Too low]
 - Value Trap Risk: [🔴 High / ⚪ Medium / ✅ Low]
 - **Support for SELL:** [✅ Yes, room to fall / ⚠️ Limited / ❌ No, already cheap]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 6. Peer Comparison - "Relative Weakness Confirmation"
 
-\`\`\`
+\\\`\\\`\\\`
 **Identify Comparable Peers:**
 Peer 1: [Company Name] ([TICKER])
 Peer 2: [Company Name] ([TICKER])
@@ -1069,11 +1076,11 @@ What makes {stockName} weaker than peers:
 **{stockName} Peer Position:**
 - Relative Strength: [Weak 🔴 / In-line ⚪ / Strong 🟢]
 - **SELL Justification:** [Underperformance justified / Not justified]
-\`\`\`
+\\\`\\\`\\\`
 
 ### Fundamental Deterioration Verdict:
 
-\`\`\`
+\\\`\\\`\\\`
 **Overall Fundamental Health Score:**
 
 | Dimension | Assessment | Score /100 | Weight | Weighted |
@@ -1111,23 +1118,23 @@ What makes {stockName} weaker than peers:
 
 **Example:**
 "Fundamentals show clear deterioration: Revenue growth decelerated from 18% to 6%, EBITDA margins compressed 340 bps due to input cost inflation, and debt increased by ₹45 Cr while profits fell. OCF/PAT ratio at 0.68 indicates earnings quality concerns. However, at ₹{entry}, P/E of X.Xx is already 25% below 3-year average, suggesting limited further multiple compression. Target ₹{target} implies P/E of Y.Yy, which is at historical trough levels - value buyers may emerge before reaching target."
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ## SECTION 4: SMART MONEY FLOW - "Who's Selling & Why?"
 
 **Fundamental Principle:**
-\`\`\`
+\\\`\\\`\\\`
 "Follow the smart money" - Institutions sell before retail realizes problems
 
 For SELL trades, institutional exit is CRITICAL confirmation:
 - If FII/DII selling: Validates downtrend
 - If FII/DII buying: 🔴 RED FLAG - They see value you don't
-\`\`\`
+\\\`\\\`\\\`
 
 ### Search Strategy:
-\`\`\`
+\\\`\\\`\\\`
 Query 1: "{stockName} FII DII selling shareholding pattern latest"
 Query 2: "{stockName} promoter holding {date}"
 Query 3: "{stockName} mutual fund exit holdings reduced"
@@ -1136,13 +1143,13 @@ Query 5: "{stockName} delivery percentage declining trend"
 Query 6: "{stockName} insider selling director selling"
 Query 7: "{stockName} institutional investors selling list"
 Query 8: "{ticker} short interest data futures"
-\`\`\`
+\\\`\\\`\\\`
 
 ### Analysis Framework:
 
 #### 1. Institutional Exodus Check - "Are Smart Investors Running?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Quarterly Shareholding Pattern:**
 
 | Category | Q3 FY25 | Q2 FY25 | Q1 FY25 | Q4 FY24 | QoQ Δ | 4Q Trend | Signal |
@@ -1195,10 +1202,10 @@ Total Institutional Stake Change (2 Quarters):
 - FII: [🔴 Selling / ⚪ Neutral / 🟢 Buying]
 - DII: [🔴 Selling / ⚪ Neutral / 🟢 Buying]
 - Overall: [✅ Confirms SELL / ⚪ Mixed / 🔴 Contradicts SELL]
-\`\`\`
+\\\`\\\`\\\`
 
 **Specific Institutional Movements:**
-\`\`\`
+\\\`\\\`\\\`
 **Mutual Funds - Complete Exits (Red Flag):**
 Funds that EXITED completely in recent quarter(s):
 1. [Fund Name] - Was [X.XX]% (₹Y Cr), Now 0% - Quarter: [QX FYXX]
@@ -1225,11 +1232,11 @@ Largest MF holders remaining:
 Notable FII movements (if identifiable):
 - [FII Name]: [Bought/Sold] [X] shares worth ₹[Y] Cr
 - Trend: [Systematic exit / Opportunistic / Entry]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 2. Promoter Behavior - "Are Insiders Losing Faith?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Promoter Holding Trend:**
 
 | Metric | Q3 FY25 | Q2 FY25 | Q1 FY25 | Q4 FY24 | Change (2Q) | Signal |
@@ -1280,11 +1287,11 @@ Notable FII movements (if identifiable):
 - Holding Trend: [🔴 Declining / ⚪ Stable / 🟢 Increasing]
 - Pledge Status: [🔴 High/Rising / ⚪ Moderate / ✅ Low/Falling]
 - **Overall:** [✅ Confirms SELL / ⚪ Neutral / 🔴 Contradicts SELL]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 3. Insider Transactions (Director-Level):
 
-\`\`\`
+\\\`\\\`\\\`
 **Director/Key Management Transactions (Last 90 Days):**
 
 | Date | Insider | Designation | Action | Shares | Price (₹) | Value (₹L) | Context |
@@ -1319,11 +1326,11 @@ Notable FII movements (if identifiable):
 - Pattern: [🔴 Systematic selling / ⚪ Minimal activity / 🟢 Buying on dip]
 - Magnitude: [Small / Moderate / Large]
 - **Assessment:** [Confirms SELL / Neutral / Contradicts SELL]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 4. Volume, Delivery & Retail vs Institution:
 
-\`\`\`
+\\\`\\\`\\\`
 **Volume Analysis During Downtrend:**
 
 | Period | Avg Volume (Shares) | vs 3M Avg | Delivery % | Interpretation |
@@ -1360,11 +1367,11 @@ Trend: [↑ Increasing / → Stable / ↓ Declining]
 - During Fall: [Healthy distribution ✅ / Mixed ⚪ / Exhaustion signs 🔴]
 - Delivery Trend: [Declining ✅ / Stable ⚪ / Rising 🔴]
 - **Signal:** [Confirms continued fall / Uncertain / Reversal warning]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 5. Bulk & Block Deals:
 
-\`\`\`
+\\\`\\\`\\\`
 **Large Transactions (Last 30 Days):**
 
 | Date | Client Name | Type | Buy/Sell | Quantity | Price (₹) | Value (₹L) | % of Eq |
@@ -1399,11 +1406,11 @@ Buyers (Positive or Contrarian?):
 **{stockName} Bulk Deal Signal:**
 - Pattern: [🔴 Heavy distribution / ⚪ Mixed / 🟢 Accumulation on dip]
 - Quality of participants: [Known smart money selling ✅ / Mixed / Buying 🔴]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 6. Short Interest (if F&O available):
 
-\`\`\`
+\\\`\\\`\\\`
 **Futures & Options Data:**
 
 IF {stockName} has F&O:
@@ -1441,11 +1448,11 @@ IF {stockName} has F&O:
 
 IF NO F&O:
 "No derivatives available - cannot assess short interest or options positioning. Relying solely on cash market signals."
-\`\`\`
+\\\`\\\`\\\`
 
 ### Smart Money Verdict:
 
-\`\`\`
+\\\`\\\`\\\`
 **Smart Money Flow Scorecard:**
 
 | Component | Assessment | Score /100 | Weight | Weighted |
@@ -1483,24 +1490,24 @@ Primary Buyers: [Retail catching falling knife / Value institutions / Mixed]
 [🟢 LOW - Continued selling expected]
 [🟡 MEDIUM - Stabilizing, monitor]
 [🔴 HIGH - Institutions turning buyers, exit SELL]
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ## SECTION 5: SECTOR MOMENTUM & RELATIVE WEAKNESS
 
 **Why This Matters for SELL:**
-\`\`\`
+\\\`\\\`\\\`
 Stock falling in rising sector = Stock-specific problem = Good SELL
 Stock falling in falling sector = Sector-wide issue = All boats sinking
 
 If sector is weak AND stock is weakest in sector = Best SELL candidate
 If sector is strong but stock falling = Isolated weakness = High conviction SELL
 If stock falling inline with sector = Sector bet, not stock bet = Lower conviction
-\`\`\`
+\\\`\\\`\\\`
 
 ### Search Strategy:
-\`\`\`
+\\\`\\\`\\\`
 Query 1: "[SECTOR] sector India performance February 2025"
 Query 2: "Nifty [SECTOR] index trend {date}"
 Query 3: "[SECTOR] stocks performance ranking India"
@@ -1508,13 +1515,13 @@ Query 4: "FII DII selling [SECTOR] sector India"
 Query 5: "Sector rotation India money flow {date}"
 Query 6: "{stockName} vs competitors performance comparison"
 Query 7: "[SECTOR] sector headwinds India 2025"
-\`\`\`
+\\\`\\\`\\\`
 
 ### Analysis Framework:
 
 #### 1. Sector Classification & Trend:
 
-\`\`\`
+\\\`\\\`\\\`
 **Sector Identification:**
 - Primary Sector: [AUTO-DETECT from stock nature]
 - Sub-Sector: [Specific niche]
@@ -1560,11 +1567,11 @@ Query 7: "[SECTOR] sector headwinds India 2025"
 - Trend: [Strong Down ✅✅ / Down ✅ / Sideways ⚪ / Up 🔴]
 - Relative to Nifty: [Underperforming / Inline / Outperforming]
 - **SELL Implication:** [Tailwind / Neutral / Headwind]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 2. Sector Ranking & Money Rotation:
 
-\`\`\`
+\\\`\\\`\\\`
 **Nifty Sectoral Performance Ranking ({date} - Last 1 Month):**
 
 Rank | Sector | 1M Return | Status
@@ -1598,10 +1605,10 @@ X | **[{stockName}'s Sector]** | **[+/-X]%** | **← {stockName} is here**
 **{stockName} Sector Rank Impact:**
 - Rank [X]/12: [Analysis]
 - Money Flow: [Rotating OUT ✅ / Balanced ⚪ / Rotating IN 🔴]
-\`\`\`
+\\\`\\\`\\\`
 
 **Sector-Specific Money Flows:**
-\`\`\`
+\\\`\\\`\\\`
 **[SECTOR] Sector FII/DII Activity:**
 
 | Period | FII (₹Cr) | DII (₹Cr) | Net (₹Cr) | Signal |
@@ -1624,11 +1631,11 @@ X | **[{stockName}'s Sector]** | **[+/-X]%** | **← {stockName} is here**
    → Even if {stockName} weak, sector strength may support recovery
 
 **Current Flow Status:** [Outflow ✅ / Balanced ⚪ / Inflow 🔴]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 3. Relative Strength - {stockName} vs Sector:
 
-\`\`\`
+\\\`\\\`\\\`
 **{stockName} Performance vs Sector Benchmark:**
 
 | Period | {stockName} | [SECTOR] Index | Relative Performance | Assessment |
@@ -1665,11 +1672,11 @@ X | **[{stockName}'s Sector]** | **[+/-X]%** | **← {stockName} is here**
 - Short-term (1M): [Weaker by X% / Inline / Stronger]
 - Medium-term (3M): [Same]
 - **Pattern:** [Consistent underperformance ✅ / Mixed ⚪ / Relative strength 🔴]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 4. Sector Leaderboard - Where Does {stockName} Rank?
 
-\`\`\`
+\\\`\\\`\\\`
 **[SECTOR] Top & Bottom Performers (3 Months):**
 
 **Top 5 Outperformers:**
@@ -1709,10 +1716,10 @@ Rank | Stock | 3M Return | Why Underperforming
 **Analysis:**
 {stockName} ranks [X]/[Y] because: [Specific reason - margins worst, growth slowest, debt highest, etc.]
 Peers outperforming because: [Contrast - they have pricing power, better product mix, etc.]
-\`\`\`
+\\\`\\\`\\\`
 
 **Peer Group Direct Comparison (Similar Size/Niche):**
-\`\`\`
+\\\`\\\`\\\`
 | Stock | Mkt Cap | 3M Return | YTD | Key Strength/Weakness |
 |-------|---------|-----------|-----|----------------------|
 | {stockName} | ₹[X]Cr | [-Y]% | [-Z]% | [Why falling - specify] |
@@ -1722,11 +1729,11 @@ Peers outperforming because: [Contrast - they have pricing power, better product
 
 **Key Differentiator:**
 {stockName} is worst because: [THE specific competitive disadvantage or problem]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 5. Sector-Specific Headwinds/Tailwinds:
 
-\`\`\`
+\\\`\\\`\\\`
 **Current Sector Dynamics for [SECTOR]:**
 
 🔴 **HEADWINDS (Support SELL if {stockName} exposed):**
@@ -1765,11 +1772,11 @@ Check which apply to {stockName}:
 Most affected by: [#1 headwind that impacts this stock most]
 Could benefit from: [#1 tailwind if any]
 **Net Impact:** [Strengthens SELL case / Neutral / Weakens SELL case]
-\`\`\`
+\\\`\\\`\\\`
 
 ### Sector Context Verdict:
 
-\`\`\`
+\\\`\\\`\\\`
 **Sector Analysis Scorecard:**
 
 | Factor | Assessment | Score /100 | Weight | Weighted |
@@ -1812,7 +1819,7 @@ Analysis:
 
 **Example:**
 "Healthcare sector ranks 9/12, underperforming Nifty by 8% over 3 months with FII outflows of ₹2,400 Cr - clear sector weakness. However, {stockName} has underperformed sector by additional 12%, falling 20% vs sector's 8% decline. This stock-specific weakness (margin compression + order loss) amplifies sector-wide pressure, validating SELL case to ₹{target}."
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
@@ -1823,7 +1830,7 @@ Analysis:
 ## SECTION 6: TREND HEALTH & REVERSAL RISK
 
 **Critical for SELL Trades:**
-\`\`\`
+\\\`\\\`\\\`
 Unlike BUY trades where "buy and hold" works, SELL trades have TIME DECAY:
 - Downtrends exhaust faster than uptrends
 - Oversold bounces are sharp and violent
@@ -1831,10 +1838,10 @@ Unlike BUY trades where "buy and hold" works, SELL trades have TIME DECAY:
 - Market has upward bias long-term
 
 Must assess: Is downtrend EARLY (safe to ride) or LATE (exhausted, reversal imminent)?
-\`\`\`
+\\\`\\\`\\\`
 
 ### Search Strategy:
-\`\`\`
+\\\`\\\`\\\`
 Query 1: "{stockName} technical analysis support resistance"
 Query 2: "{stockName} RSI oversold stochastic levels"
 Query 3: "{stockName} moving average 50 DMA 200 DMA"
@@ -1843,13 +1850,13 @@ Query 5: "Nifty market trend bull bear {date}"
 Query 6: "India VIX volatility index {date}"
 Query 7: "{stockName} volume pattern distribution exhaustion"
 Query 8: "{stockName} price action lower lows highs"
-\`\`\`
+\\\`\\\`\\\`
 
 ### Analysis Framework:
 
 #### 1. Trend Stage & Maturity - "How Old Is This Downtrend?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Downtrend Timeline:**
 
 Peak Price: ₹[X] on [DD-MMM-YYYY]
@@ -1901,11 +1908,11 @@ From ₹{entry} to ₹{target} = [Z]% additional decline
 vs Already fallen: [A]% from peak
 Ratio: Asking for [Z/A]× the decline already seen
 **Realistic?** [Yes ✅ / Maybe ⚠️ / Unlikely 🔴]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 2. Volume Confirmation - "Is Selling Accelerating or Exhausting?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Volume Analysis During Downmove:**
 
 | Period | Avg Volume | vs Baseline | Volume on Down Days | Volume on Up Days | Pattern |
@@ -1951,11 +1958,11 @@ Ratio: Asking for [Z/A]× the decline already seen
 - Price making new lows? [Yes/No]
 - Volume increasing on new lows? [Yes ✅ / No 🔴]
 - If NO: 🔴 Bearish divergence exhausted, reversal risk
-\`\`\`
+\\\`\\\`\\\`
 
 #### 3. Technical Divergence Analysis:
 
-\`\`\`
+\\\`\\\`\\\`
 **Divergence Checks (Uses dampened oscillators from strategy):**
 
 **Bearish Divergences (Support continued fall):**
@@ -1987,11 +1994,11 @@ IF Bullish Divergence Present:
 
 IF No Divergences:
 ✅ CLEAR - Trend intact, no reversal signals from momentum
-\`\`\`
+\\\`\\\`\\\`
 
 #### 4. Key Support & Resistance Levels:
 
-\`\`\`
+\\\`\\\`\\\`
 **Price Levels Between ₹{entry} and ₹{target}:**
 
 **ABOVE (Resistance if price bounces):**
@@ -2008,7 +2015,7 @@ IF No Divergences:
 
 **Path Analysis from ₹{entry} to ₹{target}:**
 
-Required Move: ₹{entry} → ₹{target} = ${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}%
+Required Move: ₹{entry} → ₹{target} = \${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}%
 
 **Obstacles En Route:**
 1. **₹[LEVEL 1] Support:**
@@ -2036,11 +2043,11 @@ Required Move: ₹{entry} → ₹{target} = ${((Math.abs(parseFloat('{entry}') -
 [🟢 HIGH >60% / 🟡 MEDIUM 40-60% / 🔴 LOW <40%]
 
 IF LOW: Consider adjusted target: ₹[LEVEL] instead of ₹{target}
-\`\`\`
+\\\`\\\`\\\`
 
 #### 5. Oscillator Extremes - "How Oversold Is Too Oversold?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Current Oscillator Readings:**
 
 | Indicator | Current Level | Zone | Interpretation |
@@ -2091,13 +2098,13 @@ Trend Following strategy DAMPENS oscillators (0.5× weight for RSI/Stoch)
 When {stockName} reached similar RSI levels in past:
 - Typical bounce magnitude: [X]% (from low to high of bounce)
 - Duration: [Y] days before downtrend resumed (if it did)
-- vs Our Stop Loss: ₹{stopLoss} = ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}% buffer
+- vs Our Stop Loss: ₹{stopLoss} = \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}% buffer
 - Risk: [Bounce could hit stop ⚠️ / Stop should hold ✅]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 6. Market Regime - "Is Broader Market Supportive?"
 
-\`\`\`
+\\\`\\\`\\\`
 **Broader Market Context for SELL Trades:**
 
 | Index | Current | 20 DMA | 50 DMA | 200 DMA | Position | Trend |
@@ -2150,11 +2157,11 @@ Assessment:
 Global sentiment: [Risk-off ✅ (defensive, good for shorts) / Risk-on 🔴 (aggressive, shorts risky)]
 FII activity: [Selling ✅ / Neutral ⚪ / Buying 🔴]
 **Overall:** [Supportive ✅ / Neutral ⚪ / Headwind 🔴]
-\`\`\`
+\\\`\\\`\\\`
 
 #### 7. Event Risk Calendar - "Surprises That Could Break Thesis"
 
-\`\`\`
+\\\`\\\`\\\`
 **Upcoming Events (Next 30-60 Days):**
 
 | Date | Event | Potential Impact | Positive Surprise Probability | Risk to SELL |
@@ -2168,7 +2175,7 @@ FII activity: [Selling ✅ / Neutral ⚪ / Buying 🔴]
 **Days from Now:** [X] days
 **If Positive Surprise:**
 - Potential gap up: [+Y%]
-- vs Stop Loss: ₹{stopLoss} = ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}% buffer
+- vs Stop Loss: ₹{stopLoss} = \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}% buffer
 - Can stop protect? [Yes ✅ / No - gap through 🔴]
 
 **Risk Mitigation Plan:**
@@ -2186,11 +2193,11 @@ IF Event >30 days away OR LOW risk:
 → ✅ Trade as planned, reassess as date approaches
 
 **{stockName} Event Risk:** [🔴 HIGH - Adjust plan / 🟡 MODERATE - Monitor / 🟢 LOW - Proceed]
-\`\`\`
+\\\`\\\`\\\`
 
 ### Trend Health & Reversal Risk Verdict:
 
-\`\`\`
+\\\`\\\`\\\`
 **Comprehensive Trend Health Assessment:**
 
 | Risk Factor | Status | Score /20 | Trend Health |
@@ -2223,17 +2230,17 @@ Given trend health score of [XXX]/140:
 - Probability of reaching ₹{target}: [X]%
 - Expected outcome: [Full target / Partial to ₹[Y] / Time/stop exit]
 - Timeframe: [X weeks if successful]
-\`\`\`
+\\\`\\\`\\\`
 
 ### Scenario Probability Analysis:
 
-\`\`\`
+\\\`\\\`\\\`
 **Probabilistic Outcome Modeling:**
 
 **BASE CASE ([X]% Probability):**
 Scenario: Downtrend continues but stalls before full target
 - Price Movement: ₹{entry} → ₹[PARTIAL TARGET ~80% of way]
-- Return: [-A]% (vs -${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}% target)
+- Return: [-A]% (vs -\${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}% target)
 - Timeline: [Y] weeks
 - Exit Reason: [Support holds / Momentum fades / Time decay]
 - Action Plan: Book partial profits at ₹[LEVEL], exit before exhaustion
@@ -2241,7 +2248,7 @@ Scenario: Downtrend continues but stalls before full target
 **BULL CASE for SELL ([Y]% Probability):**
 Scenario: Clean fall to full target or below
 - Price Movement: ₹{entry} → ₹{target} or lower
-- Return: [-${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}]% or better
+- Return: [-\${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}]% or better
 - Timeline: [Z] weeks
 - Catalysts Needed: [Specific negative developments]
 - Action Plan: Full target achieved, book profits
@@ -2249,7 +2256,7 @@ Scenario: Clean fall to full target or below
 **BEAR CASE for SELL ([Z]% Probability):**
 Scenario: Reversal, stop loss hit
 - Price Movement: ₹{entry} → ₹{stopLoss}
-- Loss: [+${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%
+- Loss: [+\${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%
 - Timeline: [A] days (quick)
 - Triggers: [Oversold bounce / Positive surprise / Market rally]
 - Action Plan: Accept stop loss, don't chase or re-short immediately
@@ -2258,7 +2265,7 @@ Scenario: Reversal, stop loss hit
 
 EV = (P_BullCase × Return_BullCase) + (P_BaseCase × Return_BaseCase) + (P_BearCase × Return_BearCase)
 
-EV = ([Y]% × [-${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%) + ([X]% × [-A]%) + ([Z]% × [+${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%)
+EV = ([Y]% × [-\${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%) + ([X]% × [-A]%) + ([Z]% × [+\${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%)
 
 **EV = [CALCULATED: -B.B]%**
 
@@ -2277,7 +2284,7 @@ EV = ([Y]% × [-${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / p
 
 **{stockName} Expected Value: [-B.B]%** → [Rating]
 **Worth Trading?** [✅ YES / ⚠️ CONDITIONAL / ❌ NO]
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
@@ -2285,12 +2292,12 @@ EV = ([Y]% × [-${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / p
 
 ### Multi-Dimensional Scorecard:
 
-\`\`\`
+\\\`\\\`\\\`
 **Comprehensive SELL Trade Assessment:**
 
 | Dimension | Assessment | Score /100 | Weight | Weighted | Impact |
 |-----------|-----------|-----------|--------|----------|--------|
-| **Technical Conviction** | Score {score} = ${Math.abs(parseFloat('{score}')) > 0.70 ? 'Strong' : Math.abs(parseFloat('{score}')) > 0.50 ? 'Moderate' : Math.abs(parseFloat('{score}')) > 0.30 ? 'Weak' : 'Very Weak'} | ${Math.abs(parseFloat('{score}')) * 100} | 20% | [X.X] | [Baseline] |
+| **Technical Conviction** | Score {score} = \${Math.abs(parseFloat('{score}')) > 0.70 ? 'Strong' : Math.abs(parseFloat('{score}')) > 0.50 ? 'Moderate' : Math.abs(parseFloat('{score}')) > 0.30 ? 'Weak' : 'Very Weak'} | \${Math.abs(parseFloat('{score}')) * 100} | 20% | [X.X] | [Baseline] |
 | **Liquidity & Execution** | [From Section 1] | [XX] | 15% | [X.X] | [Critical for SELL] |
 | **Catalyst Strength** | [From Section 2] | [XX] | 15% | [X.X] | [PRIMARY for SELL] |
 | **Fundamental Deterioration** | [From Section 3] | [XX] | 20% | [X.X] | [Justification] |
@@ -2304,11 +2311,11 @@ EV = ([Y]% × [-${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / p
 SELL trades weight Catalyst (15%) higher than typical
 - Need REASON to fall, not just "falling because falling"
 - Catalyst + Deterioration = 35% combined (highest weight)
-\`\`\`
+\\\`\\\`\\\`
 
 ### Decision Matrix Application:
 
-\`\`\`
+\\\`\\\`\\\`
 **Score-Based SELL Recommendation:**
 
 TOTAL SCORE: [XX.X]/100
@@ -2344,11 +2351,11 @@ TOTAL SCORE: [XX.X]/100
         - Confidence: VERY LOW (<30%)
 
 **{stockName} Classification:** [Based on score] → [Recommendation]
-\`\`\`
+\\\`\\\`\\\`
 
 ### Override Rules - Mandatory Checks:
 
-\`\`\`
+\\\`\\\`\\\`
 🔴🔴 MANDATORY SKIP - DO NOT SELL if ANY:
 - [ ] Illiquid (Avg Daily Value <₹50 Lakhs)
 - [ ] Extreme oversold (RSI <20, Stochastic <5)
@@ -2383,11 +2390,11 @@ TOTAL SCORE: [XX.X]/100
 [✅ PASSED - All clear to trade]
 [⚠️ CONDITIONAL - Triggers: [List] → Adjustments: [Specify]]
 [🔴 FAILED - Rule: [Specific override] → SKIP trade]
-\`\`\`
+\\\`\\\`\\\`
 
 ### Position Sizing for SELL Trades:
 
-\`\`\`
+\\\`\\\`\\\`
 **Conviction-Based Sizing:**
 
 Base Position Size (from score):
@@ -2405,7 +2412,7 @@ Signal Strength Adjustment:
 ├─ Weak SELL ({score} -0.30 to -0.50): -40% (reduce more)
 └─ Very Weak ({score} > -0.30): -60% or skip
 
-Current Signal: {score} = ${Math.abs(parseFloat('{score}')) > 0.70 ? 'Strong' : Math.abs(parseFloat('{score}')) > 0.50 ? 'Moderate' : Math.abs(parseFloat('{score}')) > 0.30 ? 'Weak' : 'Very Weak'}
+Current Signal: {score} = \${Math.abs(parseFloat('{score}')) > 0.70 ? 'Strong' : Math.abs(parseFloat('{score}')) > 0.50 ? 'Moderate' : Math.abs(parseFloat('{score}')) > 0.30 ? 'Weak' : 'Very Weak'}
 Multiplier: [X]%
 
 Liquidity Adjustment:
@@ -2430,13 +2437,13 @@ In absolute terms (₹10L portfolio):
 → Investment: ₹[CALCULATED]
 → Risk (if stop hit): ₹[CALC × stop %]
 → Reward (if target hit): ₹[CALC × target %]
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### 🎯 FINAL RECOMMENDATION:
 
-\`\`\`
+\\\`\\\`\\\`
 ┌──────────────────────────────────────────────────────────────┐
 │                                                               │
 │  VERDICT: [✅ EXECUTE SELL / ⚠️ CONDITIONAL / 🔴 SKIP]        │
@@ -2448,19 +2455,19 @@ In absolute terms (₹10L portfolio):
 │  Method: [Sell holdings / Futures short / Put buying]        │
 │                                                               │
 └──────────────────────────────────────────────────────────────┘
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### IF ✅ EXECUTE SELL - Detailed Trade Plan:
 
-\`\`\`
+\\\`\\\`\\\`
 📋 **SHORT/SELL EXECUTION PLAN:**
 
 **Entry Strategy:**
 
 Method Selection:
-${`
+\${\`
 IF you OWN {stockName}:
    → Action: SELL existing holdings
    → Order: [Market/Limit at ₹{entry}]
@@ -2483,7 +2490,7 @@ IF you DON'T own {stockName} AND F&O available:
 IF No F&O:
    → Cannot actively short this stock
    → Analysis is for "hold vs sell holdings" decision only
-`}
+\`}
 
 **Position Details:**
 - Entry Price: ₹{entry}
@@ -2502,9 +2509,9 @@ IF No F&O:
 5. ⚠️ If gap up through stop, EXIT AT MARKET immediately on open
 
 **Stop Loss = ₹{stopLoss}:**
-- Distance: ₹${Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')).toFixed(2)}
-- Risk: ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%
-- Total Risk: ₹[AMOUNT] × ${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}% = ₹[CALCULATED]
+- Distance: ₹\${Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')).toFixed(2)}
+- Risk: \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%
+- Total Risk: ₹[AMOUNT] × \${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}% = ₹[CALCULATED]
 
 **IF STOP HIT:**
 - Exit entire position, no hesitation
@@ -2518,22 +2525,22 @@ IF No F&O:
 
 Given Signal Strength {score} and Total Score [XX]/100:
 
-${Math.abs(parseFloat('{score}')) > 0.70 && '[XX]' > '75' ? `
+\${Math.abs(parseFloat('{score}')) > 0.70 && '[XX]' > '75' ? \`
 **STRONG SETUP - Full Target Viable:**
 - Target 1: ₹[60% to target] - Book 30-40% position
 - Target 2: ₹{target} - Book another 30-40%
 - Target 3: Trail remaining 20-30% below ₹{target}
-` : Math.abs(parseFloat('{score}')) > 0.50 ? `
+\` : Math.abs(parseFloat('{score}')) > 0.50 ? \`
 **MODERATE SETUP - Balanced Approach:**
 - Target 1: ₹[50% to target] - Book 40% position (secure some profit)
 - Target 2: ₹{target} - Book 40% position
 - Target 3: Trail final 20% with tight stop
-` : `
+\` : \`
 **WEAK SETUP - Take Profits Early:**
 - Target 1: ₹[30-40% to target] - Book 50% position (get some money off table)
 - Target 2: ₹[70% to target] - Book remaining 50%
 - Do NOT hold for full ₹{target} - too risky given weak setup
-`}
+\`}
 
 **Trailing Stop Strategy (as price falls):**
 - When reaches [30-40% to target]: Move stop to ₹[BREAKEVEN or small profit]
@@ -2632,13 +2639,13 @@ Day 30+ (Month mark):
 | [X] days, no progress | Exit | Time decay, find better opportunity |
 | Sector reverses strongly | Reassess/Exit | Headwind emerged |
 | FII starts buying | Reassess urgently | Smart money disagrees |
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### IF ⚠️ CONDITIONAL SELL - Modified Approach:
 
-\`\`\`
+\\\`\\\`\\\`
 **PROCEED WITH MODIFICATIONS:**
 
 **Primary Concerns Identified:**
@@ -2654,13 +2661,13 @@ Day 30+ (Month mark):
 - Rationale: Lower conviction due to [specific concerns]
 
 **ADJUSTED Targets:**
-- Original Target: ₹{target} (${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}% fall)
-- **Revised Target: ₹[CONSERVATIVE]** (${((Math.abs(parseFloat('{entry}') - parseFloat('[CONSERVATIVE]')) / parseFloat('{entry}')) * 100).toFixed(1)}% fall)
+- Original Target: ₹{target} (\${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}% fall)
+- **Revised Target: ₹[CONSERVATIVE]** (\${((Math.abs(parseFloat('{entry}') - parseFloat('[CONSERVATIVE]')) / parseFloat('{entry}')) * 100).toFixed(1)}% fall)
 - Rationale: [Approach major support / Time constraints / Reversal risk]
 
 **TIGHTER Stop Loss (Optional):**
-- Original Stop: ₹{stopLoss} (${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%)
-- **Consider: ₹[TIGHTER]** (${((Math.abs(parseFloat('[TIGHTER]') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%)
+- Original Stop: ₹{stopLoss} (\${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%)
+- **Consider: ₹[TIGHTER]** (\${((Math.abs(parseFloat('[TIGHTER]') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(2)}%)
 - Rationale: [Lower conviction, don't want large loss]
 - Trade-off: Tighter stop = higher probability of being stopped out
 
@@ -2713,13 +2720,13 @@ IF during trade:
 - Reward: [Y]%
 - R:R: 1:[Z]
 - Assessment: [Still acceptable / Marginal / Poor]
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### IF 🔴 SKIP - Do Not Trade:
 
-\`\`\`
+\\\`\\\`\\\`
 ❌ **RECOMMENDATION: DO NOT EXECUTE SELL TRADE**
 
 **Primary Reasons for Skipping (Top 3):**
@@ -2799,13 +2806,13 @@ Look for stocks with:
 
 **Final Word:**
 It's better to skip a marginal SELL setup than force a trade that doesn't meet criteria. SELL trades are inherently riskier than BUY trades - they require higher conviction and clearer evidence. When in doubt, stay out.
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### 📊 TOP 3 RISKS (Detailed):
 
-\`\`\`
+\\\`\\\`\\\`
 **Risk Priority Ranking (Specific to {stockName} SELL):**
 
 🔴🔴 **RISK #1: [HIGHEST PRIORITY RISK]**
@@ -2820,7 +2827,7 @@ Probability: [HIGH 60%+ / MEDIUM 30-60% / LOW <30%]
 
 Impact if Occurs:
 - Price could bounce to: ₹[X] ([+Y]% from entry)
-- vs Stop Loss at: ₹{stopLoss} ([+${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%)
+- vs Stop Loss at: ₹{stopLoss} ([+\${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}]%)
 - **Stop would be hit:** [YES, easily / Possibly / No, stop should hold]
 - Potential Loss: [Actual loss amount in ₹ and %]
 
@@ -2891,13 +2898,13 @@ Mitigation:
 2. [e.g., "Set price-based stop (if makes higher low above ₹[X], exit)"]
 3. [e.g., "Time stop - if no progress in 15 days, exit regardless"]
 4. [e.g., "Acknowledge institutions may be right, our time horizon may be too short"]
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### ✅ TOP 3 SUPPORTING FACTORS:
 
-\`\`\`
+\\\`\\\`\\\`
 **Factors Supporting SELL Thesis (Ranked by Importance):**
 
 ✅✅ **FACTOR #1: [STRONGEST SUPPORT]**
@@ -2961,20 +2968,20 @@ Contribution: [XX]% weight
 - Provides broader context beyond just stock
 - Reduces probability of sharp reversal (would need sector AND stock recovery)
 - Supports duration of downtrend (sector trends last months, not days)
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
 ### 📝 EXECUTIVE SUMMARY (The Bottom Line):
 
-\`\`\`
+\\\`\\\`\\\`
 **{stockName} ({ticker}) SELL TRADE - FINAL ASSESSMENT**
 
 **Technical Setup:**
 - Signal: {verdict}
-- Conviction: {score}/1.0 = ${Math.abs(parseFloat('{score}')) > 0.70 ? 'STRONG Bearish' : Math.abs(parseFloat('{score}')) > 0.50 ? 'MODERATE Bearish' : Math.abs(parseFloat('{score}')) > 0.30 ? 'WEAK Bearish' : 'BARELY Bearish'}
-- Trade: ₹{entry} (Entry) → ₹{stopLoss} (Stop -${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}%) | ₹{target} (Target -${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}%)
-- Risk-Reward: 1:${(Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))).toFixed(2)}
+- Conviction: {score}/1.0 = \${Math.abs(parseFloat('{score}')) > 0.70 ? 'STRONG Bearish' : Math.abs(parseFloat('{score}')) > 0.50 ? 'MODERATE Bearish' : Math.abs(parseFloat('{score}')) > 0.30 ? 'WEAK Bearish' : 'BARELY Bearish'}
+- Trade: ₹{entry} (Entry) → ₹{stopLoss} (Stop -\${((Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}')) / parseFloat('{entry}')) * 100).toFixed(1)}%) | ₹{target} (Target -\${((Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / parseFloat('{entry}')) * 100).toFixed(1)}%)
+- Risk-Reward: 1:\${(Math.abs(parseFloat('{entry}') - parseFloat('{target}')) / Math.abs(parseFloat('{stopLoss}') - parseFloat('{entry}'))).toFixed(2)}
 
 **Comprehensive Score: [XX.X]/100**
 
@@ -3019,7 +3026,7 @@ OR
 **If Trading - Watch For:**
 [The ONE most critical thing to monitor daily]
 Example: "RSI crossing above 30 + volume spike on up day = exit immediately, oversold bounce starting."
-\`\`\`
+\\\`\\\`\\\`
 
 ---
 
@@ -3027,7 +3034,7 @@ Example: "RSI crossing above 30 + volume spike on up day = exit immediately, ove
 
 **Analysis Completed:** {date}
 **Analysis Type:** Trend Following SELL Signal Validation
-**Signal Strength:** {verdict} ({score}) - ${Math.abs(parseFloat('{score}')) > 0.70 ? 'Strong' : Math.abs(parseFloat('{score}')) > 0.50 ? 'Moderate' : Math.abs(parseFloat('{score}')) > 0.30 ? 'Weak' : 'Very Weak'} Bearish
+**Signal Strength:** {verdict} ({score}) - \${Math.abs(parseFloat('{score}')) > 0.70 ? 'Strong' : Math.abs(parseFloat('{score}')) > 0.50 ? 'Moderate' : Math.abs(parseFloat('{score}')) > 0.30 ? 'Weak' : 'Very Weak'} Bearish
 
 **Data Freshness:**
 - Price Data: [Last updated: Date/Time within 24 hours]
@@ -3066,6 +3073,7 @@ Example: "RSI crossing above 30 + volume spike on up day = exit immediately, ove
 **Strategy: {strategyName} | Signal: {verdict} | Score: {score} | Date: {date}**
 
 ---
-`;
+\`;
 
 export default TREND_FOLLOWING_PROMPT;
+`;

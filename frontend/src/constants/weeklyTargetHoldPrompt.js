@@ -1,3 +1,10 @@
+/**
+ * Weekly 4% Target HOLD Analysis Prompt
+ * 
+ * Specialized deep-dive framework.
+ */
+
+export const WEEKLY_TARGET_HOLD_PROMPT_TEMPLATE = `
 # Swing Trade Validation: SOMATEX (SOMATEX.NS)
 ## HOLD SIGNAL - 4% Target in 3 Weeks (Low Conviction)
 
@@ -34,7 +41,7 @@
 - **Optimized for:** 1-3 week swing trades in stocks showing momentum convergence
 - **Position Sizing:** Up to 35% of portfolio (HIGH for swing trades)
 - **Indicator Weighting (vs Balanced 1.0x):**
-```
+\`\`\`
   HEAVY MOMENTUM OSCILLATORS (Detect Oversold/Overbought):
   ├─ RSI: 2.0x (primary momentum gauge, 50-75 entry window)
   ├─ Stochastic: 2.0x (momentum confirmation)
@@ -52,7 +59,7 @@
   ├─ Volume: Above-average requirement
   ├─ ATR: Dynamic stop loss (3-4% based on volatility)
   └─ Purpose: Ensure liquidity and realistic stops
-```
+\`\`\`
 
 **Strategy Characteristics:**
 - ✅ Clear profit target: Always 4% (no greed, no hoping)
@@ -78,7 +85,7 @@
 ## ⚠️ CRITICAL CONTEXT: WEAK SIGNAL + SHORT TIMEFRAME
 
 **This is NOT a strong setup. Here's why:**
-```
+\`\`\`
 Conviction Score: 0.143
 ├─ Interpretation: BARELY BULLISH, mostly neutral
 ├─ Momentum indicators: Slightly positive but not converged
@@ -87,10 +94,10 @@ Conviction Score: 0.143
 └─ Overall: WEAK SETUP, borderline entry
 
 Translation: "Momentum is barely there, trend is weak, this is a coin flip"
-```
+\`\`\`
 
 **What "HOLD" with 0.143 Means:**
-```
+\`\`\`
 In Weekly 4% Target Strategy:
 ├─ BUY Signal: Strong momentum convergence + trend (score >0.40)
 ├─ HOLD Signal: Marginal setup, consider entering but not ideal
@@ -98,10 +105,10 @@ In Weekly 4% Target Strategy:
 └─ Score 0.143: VERY weak bullish bias
 
 THIS IS A "BORDERLINE" SIGNAL - Barely meets entry criteria
-```
+\`\`\`
 
 **The 4% Target Challenge:**
-```
+\`\`\`
 Target: ₹109.31 (4% gain)
 Timeframe: Maximum 15 bars (3 weeks)
 Current Conviction: 0.143 (very weak)
@@ -117,10 +124,10 @@ Expected Outcome:
 - Best case: 2-3% gain, time exit before full target
 - Base case: 1-2% gain, time exit at bar 12-15
 - Worst case: Stop loss hit at -4%
-```
+\`\`\`
 
 **The 35% Position Size Issue:**
-```
+\`\`\`
 Strategy allows UP TO 35% position (very high for swing trade)
 
 BUT this should scale with conviction:
@@ -132,7 +139,7 @@ BUT this should scale with conviction:
 Score 0.143 = VERY WEAK
 → Should use 5-10% position MAX, not 35%
 → Or skip and wait for stronger setup
-```
+\`\`\`
 
 ---
 
@@ -142,7 +149,7 @@ Score 0.143 = VERY WEAK
 "Determine if SOMATEX can realistically achieve 4% gain within 3 weeks, given the weak technical setup, and assess appropriate position sizing."
 
 **Decision Tree:**
-```
+\`\`\`
 IF Strong fundamentals + Upcoming catalyst + Favorable market + Low event risk:
    → ⚠️ CONDITIONAL ENTRY - 10-15% position (not 35%)
    → Tight monitoring, exit on time limit or target
@@ -155,7 +162,7 @@ ELSE IF Multiple negative factors OR Event risk high:
 ELSE IF Market regime poor (high VIX, trending down):
    → ❌ SKIP - Swing trades don't work in chaotic markets
    → Wait for market stabilization
-```
+\`\`\`
 
 **Your Mission:**
 Validate whether this 0.143 score represents:
@@ -183,7 +190,7 @@ Validate whether this 0.143 score represents:
 - [ ] Any binary events in next 15 trading days?
 
 **Data Quality for Short-Term Trades:**
-```
+\`\`\`
 Swing trading needs CURRENT data:
 - Event calendar must be complete and up-to-date
 - VIX and market breadth must be <24 hours old
@@ -192,7 +199,7 @@ Swing trading needs CURRENT data:
 
 If event calendar incomplete → MANDATORY SKIP (event risk unquantified)
 If VIX data unavailable → Use Nifty volatility as proxy
-```
+\`\`\`
 
 ---
 
@@ -201,7 +208,7 @@ If VIX data unavailable → Use Nifty volatility as proxy
 ### Priority: CRITICAL ⚠️⚠️⚠️
 
 **Why This Is THE Most Important Section:**
-```
+\`\`\`
 For 3-Week Swing Trades:
 ├─ ONE unexpected event can destroy the trade
 ├─ Earnings can gap stock +/-10% overnight
@@ -214,10 +221,10 @@ Statistics:
 - 60% of swing trade failures due to unexpected events
 - Earnings typically cause 5-15% moves (exceeds 4% target OR stop)
 - Stop loss (-4%) won't protect against adverse gap
-```
+\`\`\`
 
 ### Search Strategy:
-```
+\`\`\`
 Query 1: "SOMATEX earnings date Q4 FY25 when announcement"
 Query 2: "SOMATEX dividend ex-date record date February March 2025"
 Query 3: "SOMATEX board meeting schedule 2025"
@@ -225,12 +232,12 @@ Query 4: "SOMATEX corporate actions calendar"
 Query 5: "RBI monetary policy February March 2025"
 Query 6: "India budget 2025 date announcements"
 Query 7: "SOMATEX quarterly results history dates pattern"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Earnings Calendar - THE Critical Risk:
-```
+\`\`\`
 **Next Earnings Report:**
 - Expected Quarter: Q[X] FY[YY]
 - Expected Announcement: [DD-MMM-YYYY or "TBD"]
@@ -239,7 +246,7 @@ Query 7: "SOMATEX quarterly results history dates pattern"
 - **Falls within 15-bar window? [YES ⚠️⚠️ / NO ✅]**
 
 **Historical Earnings Patterns:**
-```
+\`\`\`
 | Quarter | Announcement Date | Day of Month | Pattern |
 |---------|------------------|--------------|---------|
 | Q3 FY25 | [DD-MMM] | [Day XX] | [e.g., "Mid-Feb each year"] |
@@ -253,7 +260,7 @@ Query 7: "SOMATEX quarterly results history dates pattern"
 - Confidence: [High if consistent pattern / Low if irregular]
 
 **If Earnings Within 15 Bars:**
-```
+\`\`\`
 ⚠️⚠️ CRITICAL WARNING ⚠️⚠️
 
 Earnings Expected: [DD-MMM]
@@ -262,7 +269,7 @@ Bars Until Earnings: [X] of 15 total
 Probability: [X%] chance of holding through earnings
 
 **MANDATORY ASSESSMENT:**
-```
+\`\`\`
 IF Earnings in bars 1-10:
    → 🔴🔴 ABORT TRADE - Too early in hold period
    → High risk of gap before target hit
@@ -278,10 +285,10 @@ IF Earnings beyond bar 15:
    → Trade will be closed before event risk
 
 **Current Status:** [Assessment and recommendation]
-```
+\`\`\`
 
 **Historical Earnings Volatility:**
-```
+\`\`\`
 | Quarter | Pre-Earnings Price | Post-Earnings Price | Gap | % Move | Beat/Miss |
 |---------|-------------------|-------------------|-----|--------|-----------|
 | Q3 FY25 | ₹[X] | ₹[Y] | ₹[Z] | [+/-A%] | [Beat/Miss/Inline] |
@@ -296,7 +303,7 @@ IF Earnings beyond bar 15:
 - Volatility: [Low <3% / Moderate 3-7% / High >7%]
 
 **Risk Assessment:**
-```
+\`\`\`
 Your Stop Loss: -4%
 Average Earnings Gap: ±[X]%
 
@@ -314,10 +321,10 @@ IF Average Gap <3%:
    → Stop should roughly protect
 
 **Verdict:** [Safe / Risky / Dangerous]
-```
+\`\`\`
 
 #### 2. Dividend & Corporate Actions:
-```
+\`\`\`
 **Dividend Schedule:**
 
 | Type | Record Date | Ex-Date | Amount | Impact |
@@ -326,7 +333,7 @@ IF Average Gap <3%:
 | Final Dividend | [DD-MMM or N/A] | [DD-MMM or N/A] | ₹[X] or N/A | [Assessment] |
 
 **Ex-Dividend Date Risk:**
-```
+\`\`\`
 IF Ex-Date within 15 bars:
    → Price drops by dividend amount on ex-date
    → Your entry ₹105.11 → ₹[105.11 - dividend] mechanically
@@ -343,10 +350,10 @@ Example:
 **Current Status:**
 - Ex-Date within window? [YES - details / NO - safe]
 - If YES: [Adjustment calculation and recommendation]
-```
+\`\`\`
 
 **Other Corporate Actions:**
-```
+\`\`\`
 | Action | Date | Details | Impact |
 |--------|------|---------|--------|
 | Bonus | [DD-MMM or None] | [Ratio] | [Price adjustment] |
@@ -357,10 +364,10 @@ Example:
 **If ANY corporate action in window:**
    → Assess impact on ₹105.11 → ₹109.31 target
    → Adjust expectations or exit before action
-```
+\`\`\`
 
 #### 3. Board Meetings:
-```
+\`\`\`
 **Scheduled Board Meetings (Next 30 Days):**
 
 | Date | Purpose | Likely Announcements | Risk Level |
@@ -369,7 +376,7 @@ Example:
 | [DD-MMM] | [General / Unknown] | [Unknown] | [🟡 Medium] |
 
 **Board Meeting Risk Assessment:**
-```
+\`\`\`
 Known Purpose (Earnings, Dividend):
 ├─ Risk: HIGH if earnings
 ├─ Action: Plan exit before meeting OR
@@ -386,10 +393,10 @@ Unknown Purpose:
 - Known purpose: [YES/NO - details]
 - Risk level: [LOW/MEDIUM/HIGH]
 - Recommendation: [Proceed / Exit before meeting / Skip trade]
-```
+\`\`\`
 
 #### 4. Macro & Sector Events:
-```
+\`\`\`
 **Upcoming Macro Events (Next 21 Days):**
 
 | Date | Event | Potential Impact on Markets | SOMATEX Exposure |
@@ -408,7 +415,7 @@ Unknown Purpose:
 | [DD-MMM] | Healthcare Budget | [Government spending] | [Medium] |
 
 **Risk Assessment:**
-```
+\`\`\`
 High Impact Events (Could move market ±3%+):
 - [List]
 
@@ -421,10 +428,10 @@ SOMATEX-Specific High Risk:
 **If HIGH IMPACT event in bars 1-10:**
    → ⚠️ CAUTION - Market volatility could disrupt swing trade
    → Consider: Reduce position size OR exit before event
-```
+\`\`\`
 
 #### 5. Global Risk Calendar:
-```
+\`\`\`
 **Major Global Events (Next 21 Days):**
 
 | Date | Event | Impact on India |
@@ -441,7 +448,7 @@ SOMATEX-Specific High Risk:
 - Global Risk Appetite: [Risk-on ✅ / Risk-off 🔴]
 
 **Impact on Swing Trade:**
-```
+\`\`\`
 Risk-On Environment (Global markets rallying):
    → ✅ Supportive for SOMATEX swing trade
    → FII inflows, positive sentiment
@@ -452,10 +459,10 @@ Risk-Off Environment (Global sell-off):
    → Recommendation: Avoid swing trades, wait for stability
 
 **Current:** [Assessment]
-```
+\`\`\`
 
 ### Event Calendar Verdict:
-```
+\`\`\`
 **Consolidated Event Risk Score:**
 
 | Event Type | Date | Bars Away | Risk Level | Score (0-20) |
@@ -480,7 +487,7 @@ Risk-Off Environment (Global sell-off):
 [✅ YES - Calendar clear / ⚠️ CONDITIONAL - Exit before [EVENT] / 🔴 NO - Too risky]
 
 **Recommended Actions:**
-```
+\`\`\`
 IF Event Risk >60 (Moderate to High):
    → EITHER skip trade entirely
    → OR enter with plan to exit before event at bar [X]
@@ -492,10 +499,10 @@ IF Event Risk <40 (Low):
    → Monitor calendar daily for new announcements
 
 **For SOMATEX:** [Specific recommendation based on calendar findings]
-```
+\`\`\`
 
 **Key Dates to Monitor:**
-```
+\`\`\`
 Critical Dates During 15-Bar Hold:
 ├─ Bar [X] ([DD-MMM]): [Event] - [Action required]
 ├─ Bar [Y] ([DD-MMM]): [Event] - [Action required]
@@ -505,26 +512,26 @@ Set Calendar Alerts:
 - [DD-MMM]: Check for earnings announcement
 - [DD-MMM]: Exit before [Event]
 - [DD-MMM]: Bar 15 time exit
-```
+\`\`\`
 
 ---
 
 ## SECTION 2: MARKET REGIME & SWING TRADE ENVIRONMENT
 
 ### Search Strategy:
-```
+\`\`\`
 Query 1: "India VIX current level February 2025"
 Query 2: "Nifty 50 advance decline ratio breadth"
 Query 3: "Nifty above 50 DMA 200 DMA trend"
 Query 4: "FII DII flows India this week"
 Query 5: "Nifty volatility February 2025"
 Query 6: "India stock market sentiment February 2025"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Volatility Environment (VIX):
-```
+\`\`\`
 **India VIX Analysis:**
 
 Current VIX: [X]
@@ -532,7 +539,7 @@ Current VIX: [X]
 52-Week Range: [Low] to [High]
 
 **VIX Zones for Swing Trading:**
-```
+\`\`\`
 VIX <12: 🟢🟢 EXCELLENT - Very calm, ideal for swing trades
 VIX 12-15: 🟢 GOOD - Low volatility, favorable
 VIX 15-18: ✅ ACCEPTABLE - Normal conditions, proceed
@@ -547,7 +554,7 @@ VIX >28: 🔴🔴 EXTREME - AVOID swing trades entirely
 - Last 5 Days: [Decreasing volatility good / Increasing bad]
 
 **Implication for 3-Week Swing:**
-```
+\`\`\`
 IF VIX <15 AND falling/stable:
    → ✅ IDEAL CONDITIONS
    → Market calm enough for 4% target swing
@@ -565,10 +572,10 @@ IF VIX >20:
    → Recommendation: SKIP swing trades, wait for VIX <18
 
 **Current Assessment:** [Safe / Acceptable / Too volatile]
-```
+\`\`\`
 
 #### 2. Market Breadth:
-```
+\`\`\`
 **NSE Breadth Indicators:**
 
 | Indicator | Current | Signal |
@@ -581,7 +588,7 @@ IF VIX >20:
 | New 52W Lows | [Y] stocks | [Weakness indicator] |
 
 **Breadth Assessment:**
-```
+\`\`\`
 HEALTHY MARKET (Good for swings):
 - More advances than declines
 - >60% stocks above 20 DMA
@@ -597,10 +604,10 @@ WEAK MARKET (Bad for swings):
 → Falling tide sinks boats, avoid swings
 
 **Current Breadth:** [Healthy ✅ / Mixed ⚪ / Weak 🔴]
-```
+\`\`\`
 
 #### 3. Index Trend Alignment:
-```
+\`\`\`
 **Nifty 50 Technical Position:**
 
 Nifty Current: [X]
@@ -609,7 +616,7 @@ Nifty 50 DMA: [Z] ([X is above/below])
 Nifty 200 DMA: [A] ([X is above/below])
 
 **Trend Classification:**
-```
+\`\`\`
 ALL above (20, 50, 200 DMA):
    → ✅ STRONG UPTREND
    → Best environment for LONG swing trades
@@ -633,7 +640,7 @@ Below 200 DMA:
 **Nifty Status:** [Above all / Mixed / Below / Downtrend]
 
 **For SOMATEX Swing Trade:**
-```
+\`\`\`
 Strategy requires: Price above SMA(50)
 
 IF Nifty above 50 DMA AND SOMATEX above SMA(50):
@@ -649,10 +656,10 @@ IF Both below SMA(50):
    → Strategy shouldn't trigger, but if it did, SKIP
 
 **Current:** [Assessment]
-```
+\`\`\`
 
 #### 4. Institutional Flows (FII/DII):
-```
+\`\`\`
 **Money Flow Analysis:**
 
 | Period | FII (₹Cr) | DII (₹Cr) | Net | Impact |
@@ -663,7 +670,7 @@ IF Both below SMA(50):
 | YTD 2025 | [X] | [Y] | [Z] | [Same] |
 
 **Flow Interpretation for Swing Trades:**
-```
+\`\`\`
 STRONG FII/DII BUYING (Both positive, >₹2000 Cr/week):
    → ✅ VERY BULLISH
    → Money coming into market
@@ -688,10 +695,10 @@ STRONG SELLING (Both negative, <-₹2000 Cr/week):
 - Strong buying: Can use full position size
 - Mixed: Reduce size by 30%
 - Selling: Skip or reduce size by 50%+
-```
+\`\`\`
 
 #### 5. Sector-Specific Sentiment:
-```
+\`\`\`
 **Healthcare Sector Flows (if available):**
 
 FII in Healthcare (Monthly): [₹X Cr]
@@ -699,7 +706,7 @@ DII in Healthcare (Monthly): [₹Y Cr]
 Net Healthcare Flow: [Inflow/Outflow]
 
 **Sectoral Preference:**
-```
+\`\`\`
 Healthcare Sector Rank: [X/12]
 
 Top 3 Sectors (Money rotating IN):
@@ -712,10 +719,10 @@ Bottom 3 (Money rotating OUT):
    → 🔴 If Healthcare here: Headwind
 
 **For SOMATEX:** [Sector supportive / Neutral / Headwind]
-```
+\`\`\`
 
 ### Market Regime Verdict:
-```
+\`\`\`
 **Swing Trade Environment Scorecard:**
 
 | Factor | Status | Score /20 | Weight |
@@ -740,7 +747,7 @@ Bottom 3 (Money rotating OUT):
 [✅ YES - Ideal conditions / ⚠️ CONDITIONAL - Reduce size / 🔴 NO - Wait for better regime]
 
 **Specific Impact on SOMATEX Trade:**
-```
+\`\`\`
 IF Environment >65:
    → Proceed with swing trade
    → Standard position sizing applies
@@ -756,25 +763,25 @@ IF Environment <50:
    → Wait for improvement (VIX down, breadth up, flows positive)
 
 **For ₹105.11 → ₹109.31 swing:** [Recommendation based on score]
-```
+\`\`\`
 
 ---
 
 ## SECTION 3: HISTORICAL VOLATILITY & TARGET ACHIEVABILITY
 
 ### Search Strategy:
-```
+\`\`\`
 Query 1: "SOMATEX historical volatility average weekly move"
 Query 2: "SOMATEX ATR average true range"
 Query 3: "SOMATEX 52 week price range volatility"
 Query 4: "SOMATEX price movement patterns"
 Query 5: "SOMATEX stock beta volatility vs Nifty"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Historical Movement Analysis:
-```
+\`\`\`
 **SOMATEX Price Movement (Last 6 Months):**
 
 | Timeframe | Avg Move (±) | Largest Up Move | Largest Down Move | Frequency >4% |
@@ -785,7 +792,7 @@ Query 5: "SOMATEX stock beta volatility vs Nifty"
 | 3-Week (15 bars) | [X]% | [+Y%] | [-Z%] | [D] periods |
 
 **4% Target Achievability:**
-```
+\`\`\`
 Average 3-Week Move: [X]%
 
 IF Average >5%:
@@ -809,10 +816,10 @@ IF Average <1%:
    → Very low probability, likely time exit
 
 **SOMATEX Assessment:** [Easy/Achievable/Stretch/Unrealistic]
-```
+\`\`\`
 
 **Frequency Analysis:**
-```
+\`\`\`
 In last 6 months (26 weeks):
 - 3-week periods with >4% gain: [X] times
 - 3-week periods with >4% loss: [Y] times
@@ -827,10 +834,10 @@ Historical 4%+ move in 15 bars: [X/26] = [Y%] of the time
 <30%: 🔴 Low odds, stock too quiet
 
 **SOMATEX Historical:** [Y%] success rate
-```
+\`\`\`
 
 #### 2. ATR & Volatility Profile:
-```
+\`\`\`
 **Average True Range:**
 
 Current ATR (14-period): ₹[X]
@@ -838,7 +845,7 @@ Current ATR (14-period): ₹[X]
 Trend: [Expanding / Stable / Contracting]
 
 **Stop Loss Validation:**
-```
+\`\`\`
 Your Stop: ₹100.91 (4% below ₹105.11)
 Stop Distance: ₹4.20
 
@@ -853,10 +860,10 @@ IDEAL: Stop = 2-3× ATR
 **Assessment:**
 - Stop at [A]× ATR: [Too tight / Optimal / Too wide]
 - Recommendation: [Keep ₹100.91 / Adjust to ₹[NEW] / Accept risk]
-```
+\`\`\`
 
 **Volatility Trend:**
-```
+\`\`\`
 ATR Expanding:
    → Higher volatility
    → Easier to hit 4% target
@@ -874,10 +881,10 @@ ATR Stable:
    → ✅ Good for swing trades
 
 **Current:** [Assessment and implication for target]
-```
+\`\`\`
 
 #### 3. Beta & Market Correlation:
-```
+\`\`\`
 **SOMATEX Beta:**
 
 Beta vs Nifty: [X]
@@ -887,7 +894,7 @@ Interpretation:
 └─ Beta <0.8: Lower volatility, less responsive
 
 **For 4% Target:**
-```
+\`\`\`
 High Beta (>1.2):
    → IF market moves +3%, SOMATEX likely +3.6-4%
    → ✅ Good - Market can help hit target
@@ -903,10 +910,10 @@ Low Beta (<0.8):
    → 4% harder to achieve from market tailwind alone
 
 **SOMATEX Beta [X]:** [Implication for hitting 4% target]
-```
+\`\`\`
 
 #### 4. Price Range Context:
-```
+\`\`\`
 **52-Week Price Action:**
 
 52W High: ₹[X]
@@ -915,7 +922,7 @@ Current Price: ₹105.11
 Position in Range: [Z]%
 
 **Context:**
-```
+\`\`\`
 Near 52W Low (<25% of range):
    → Potential oversold bounce
    → ✅ Good for upside swing
@@ -940,10 +947,10 @@ Near 52W High (>75% of range):
 - Clear path to target: ✅ High probability
 - Minor resistance: ⚪ May stall briefly
 - Major resistance: 🔴 May not reach target
-```
+\`\`\`
 
 ### Historical Volatility Verdict:
-```
+\`\`\`
 **Target Achievability Score:**
 
 | Factor | Assessment | Score /25 |
@@ -968,7 +975,7 @@ Near 52W High (>75% of range):
 [✅ YES - History supports / ⚪ MAYBE - Needs help / 🔴 UNLIKELY - Too ambitious]
 
 **Expected Outcome Based on History:**
-```
+\`\`\`
 Most Likely Scenario: [X% gain in Y bars]
 - Probability of hitting full 4%: [Z%]
 - Probability of time exit (1-3% gain): [A%]
@@ -978,26 +985,26 @@ Most Likely Scenario: [X% gain in Y bars]
 Given weak 0.143 signal + historical data:
 → Expected gain: [1-2% likely / 2-3% possible / Full 4% unlikely]
 → Recommendation: [Take partial profit at 2% / Hold for full 4% / Skip trade]
-```
+\`\`\`
 
 ---
 
 ## SECTION 4: FUNDAMENTAL QUICK SCREEN
 
 ### Search Strategy:
-```
+\`\`\`
 Query 1: "SOMATEX latest quarterly results Q2 Q3 FY25"
 Query 2: "SOMATEX debt equity ratio financial health"
 Query 3: "SOMATEX promoter holding pledge governance"
 Query 4: "SOMATEX cash flow operating cash positive"
 Query 5: "SOMATEX earnings growth revenue trend"
 Query 6: "SOMATEX PE ratio valuation expensive cheap"
-```
+\`\`\`
 
 ### Analysis Framework (Rapid Assessment):
 
 #### 1. Recent Earnings Quality:
-```
+\`\`\`
 **Last 2 Quarters Performance:**
 
 | Quarter | Revenue | YoY Growth | PAT | YoY Growth | Result vs Est |
@@ -1006,7 +1013,7 @@ Query 6: "SOMATEX PE ratio valuation expensive cheap"
 | Q2 FY25 | ₹[X] Cr | [+/-Y%] | ₹[Z] Cr | [+/-A%] | [Beat/Miss/Inline] |
 
 **Traffic Light Assessment:**
-```
+\`\`\`
 🟢 GREEN:
 - Both quarters beat estimates
 - Revenue growing >10% YoY
@@ -1027,10 +1034,10 @@ Query 6: "SOMATEX PE ratio valuation expensive cheap"
 → Weak fundamentals, avoid or reduce size
 
 **SOMATEX Earnings:** [🟢/🟡/🔴] - [Brief reasoning]
-```
+\`\`\`
 
 #### 2. Debt & Financial Stress:
-```
+\`\`\`
 **Balance Sheet Quick Check:**
 
 | Metric | Latest | Status |
@@ -1040,7 +1047,7 @@ Query 6: "SOMATEX PE ratio valuation expensive cheap"
 | Current Ratio | [Z] | [🟢 >1.5 / 🟡 1-1.5 / 🔴 <1] |
 
 **Assessment:**
-```
+\`\`\`
 🟢 GREEN (All metrics healthy):
 - Low debt, strong coverage
 - No financial stress
@@ -1057,10 +1064,10 @@ Query 6: "SOMATEX PE ratio valuation expensive cheap"
 → High risk, avoid or very small position
 
 **SOMATEX Debt:** [🟢/🟡/🔴] - [Key metric and interpretation]
-```
+\`\`\`
 
 #### 3. Promoter & Governance:
-```
+\`\`\`
 **Promoter Health Check:**
 
 | Factor | Status | Flag |
@@ -1071,7 +1078,7 @@ Query 6: "SOMATEX PE ratio valuation expensive cheap"
 | Corporate Governance Issues | [None/Some/Major] | [🟢/🟡/🔴] |
 
 **Traffic Light:**
-```
+\`\`\`
 🟢 GREEN:
 - Promoter holding >40%, stable or increasing
 - Pledge <25% or decreasing
@@ -1091,10 +1098,10 @@ Query 6: "SOMATEX PE ratio valuation expensive cheap"
 → Avoid - trust issues
 
 **SOMATEX Promoter:** [🟢/🟡/🔴] - [Key finding]
-```
+\`\`\`
 
 #### 4. Cash Flow Reality Check:
-```
+\`\`\`
 **Operating Cash Flow:**
 
 Latest Year OCF: ₹[X] Cr
@@ -1102,7 +1109,7 @@ Latest Year PAT: ₹[Y] Cr
 Ratio (OCF/PAT): [Z]
 
 **Assessment:**
-```
+\`\`\`
 🟢 OCF/PAT >1.0:
 - Profit backed by actual cash
 - High quality earnings
@@ -1120,10 +1127,10 @@ Ratio (OCF/PAT): [Z]
 → High risk, avoid
 
 **SOMATEX Cash Flow:** [🟢/🟡/🔴] - [Ratio and interpretation]
-```
+\`\`\`
 
 #### 5. Valuation Sanity Check:
-```
+\`\`\`
 **Quick Valuation:**
 
 Current P/E (TTM): [X]x
@@ -1131,7 +1138,7 @@ Sector Median P/E: [Y]x
 Historical 3Y Avg P/E: [Z]x
 
 **Assessment:**
-```
+\`\`\`
 🟢 REASONABLE VALUATION:
 - P/E in line with sector or below
 - Not trading at extremes
@@ -1149,10 +1156,10 @@ Historical 3Y Avg P/E: [Z]x
 → Risky - valuation correction risk
 
 **SOMATEX Valuation:** [🟢/🟡/🔴] - [P/E context]
-```
+\`\`\`
 
 #### 6. Sector Fundamental Health:
-```
+\`\`\`
 **Medical Devices Sector:**
 
 Sector Trends:
@@ -1162,7 +1169,7 @@ Sector Trends:
 - Regulatory: [Supportive/Neutral/Headwinds]
 
 **Traffic Light:**
-```
+\`\`\`
 🟢 Sector Tailwinds:
 - PLI scheme benefits
 - Import substitution
@@ -1179,10 +1186,10 @@ Sector Trends:
 → Sector weakness, stock will struggle
 
 **Healthcare/Medical Devices:** [🟢/🟡/🔴] - [Key factor]
-```
+\`\`\`
 
 ### Fundamental Quick Screen Verdict:
-```
+\`\`\`
 **Traffic Light Summary:**
 
 | Check | Status | Weight | Points |
@@ -1207,7 +1214,7 @@ Sector Trends:
 [✅ YES - Strong fundamentals / ⚪ ACCEPTABLE - Moderate / 🔴 NO - Too risky]
 
 **Position Sizing Recommendation:**
-```
+\`\`\`
 Based on 0.143 weak signal + fundamental score:
 
 IF Fundamentals 🟢🟢 (5-6 green):
@@ -1227,25 +1234,25 @@ IF Fundamentals 🔴 (0-1 green):
 - Too many red flags
 
 **For SOMATEX:** [Specific position size recommendation]
-```
+\`\`\`
 
 ---
 
 ## SECTION 5: SECTOR MOMENTUM & FINAL PROBABILITY ASSESSMENT
 
 ### Search Strategy:
-```
+\`\`\`
 Query 1: "Healthcare sector India performance last 2 weeks"
 Query 2: "Nifty Healthcare index 1 week 2 week returns"
 Query 3: "Medical devices stocks India February 2025 performance"
 Query 4: "Healthcare sector ranking NSE February 2025"
 Query 5: "SOMATEX vs peers performance comparison"
-```
+\`\`\`
 
 ### Analysis Framework:
 
 #### 1. Sector Short-Term Momentum:
-```
+\`\`\`
 **Healthcare Sector Returns:**
 
 | Period | Healthcare Index | Nifty 50 | Relative Performance | Trend |
@@ -1255,7 +1262,7 @@ Query 5: "SOMATEX vs peers performance comparison"
 | 1 Month | [+/-X%] | [+/-Y%] | [+/-Z%] | [Same] |
 
 **Short-Term Momentum Assessment:**
-```
+\`\`\`
 FOR 3-WEEK SWING TRADE (care about recent trends):
 
 1-2 Week Momentum Crucial:
@@ -1274,10 +1281,10 @@ FOR 3-WEEK SWING TRADE (care about recent trends):
    → Lower probability
 
 **Current Sector Momentum:** [Strong ✅ / Neutral ⚪ / Weak 🔴]
-```
+\`\`\`
 
 #### 2. Sector Ranking & Money Flow:
-```
+\`\`\`
 **Nifty Sectoral Performance (2 Weeks):**
 
 | Rank | Sector | 2W Return | Money Flow Status |
@@ -1292,7 +1299,7 @@ FOR 3-WEEK SWING TRADE (care about recent trends):
 **Healthcare Sector Rank:** [X]/12
 
 **For 3-Week Swing Trade:**
-```
+\`\`\`
 Top 3 Sectors:
    → ✅ STRONG SUPPORT
    → Money rotating IN
@@ -1310,10 +1317,10 @@ Bottom 3:
    → Lower probability
 
 **Healthcare at Rank [X]:** [Assessment]
-```
+\`\`\`
 
 #### 3. Peer Comparison (Short-Term):
-```
+\`\`\`
 **Healthcare Stocks Performance (2 Weeks):**
 
 | Stock | 2W Return | vs SOMATEX | Trend |
@@ -1325,7 +1332,7 @@ Bottom 3:
 | [Peer 4] | [+/-X%] | [Same] | [Same] |
 
 **SOMATEX Relative Standing:**
-```
+\`\`\`
 ✅ LEADER (Top 3 in sector):
 - SOMATEX outperforming peers
 - Stock-specific strength
@@ -1342,10 +1349,10 @@ Bottom 3:
 
 **SOMATEX Position:** [Leader / Mid-pack / Laggard]
 **Implication:** [Positive / Neutral / Negative for 4% target]
-```
+\`\`\`
 
 #### 4. Comprehensive Probability Assessment:
-```
+\`\`\`
 **All Factors Integrated:**
 
 | Dimension | Score /100 | Weight | Weighted |
@@ -1368,7 +1375,7 @@ Bottom 3:
 **SOMATEX 4% Target Probability: [XX]/100**
 
 **Expected Outcome:**
-```
+\`\`\`
 Based on [XX]/100 score:
 
 Most Likely Scenario ([X%] probability):
@@ -1386,14 +1393,14 @@ Pessimistic Scenario ([Z%] probability):
 
 **Realistic Expectation:**
 Most probable outcome: [Specific forecast]
-```
+\`\`\`
 
 ---
 
 ## 🎯 FINAL CONSOLIDATED VERDICT
 
 ### Reconciling Weak 0.143 Signal:
-```
+\`\`\`
 **Understanding the Marginal Setup:**
 
 Technical Score: 0.143 (barely bullish)
@@ -1411,10 +1418,10 @@ Overall: WEAK SETUP - Strategy barely triggers
 **Translation:**
 This is a BORDERLINE signal that barely meets entry criteria.
 Higher probability of time exit with small gain than hitting full 4% target.
-```
+\`\`\`
 
 ### Comprehensive Scorecard:
-```
+\`\`\`
 | Dimension | Assessment | Score /100 | Impact |
 |-----------|-----------|-----------|---------|
 | Technical Strength | 0.143 (very weak) | 14 | [Low conviction] |
@@ -1424,10 +1431,10 @@ Higher probability of time exit with small gain than hitting full 4% target.
 | Fundamental Safety | [X]/6 green lights | [XX] | [Safe/Risky] |
 | Sector Momentum | [Strong/Neutral/Weak] | [XX] | [Tailwind/Headwind] |
 | **WEIGHTED TOTAL** | | **[XX.X]/100** | |
-```
+\`\`\`
 
 ### Decision Matrix:
-```
+\`\`\`
 Total Score Interpretation FOR SWING TRADES:
 
 70-100: ✅ HIGH CONVICTION - Execute with standard sizing
@@ -1449,10 +1456,10 @@ Total Score Interpretation FOR SWING TRADES:
 
 SOMATEX Total Score: [XX.X]
 Classification: [Based on band]
-```
+\`\`\`
 
 ### Critical Override Rules:
-```
+\`\`\`
 🔴 MANDATORY SKIP if ANY:
 - [ ] Earnings within next 10 bars
 - [ ] VIX >22 (too volatile for swing)
@@ -1475,10 +1482,10 @@ Classification: [Based on band]
 - [ ] Fundamentals 4+ green lights
 - [ ] Historical achievability >50
 - [ ] Nifty above 50 DMA
-```
+\`\`\`
 
 ### FINAL RECOMMENDATION:
-```
+\`\`\`
 ┌──────────────────────────────────────────────────────────────┐
 │                                                               │
 │  VERDICT: [✅ EXECUTE / ⚠️ EXECUTE REDUCED / 🔴 SKIP]         │
@@ -1490,10 +1497,10 @@ Classification: [Based on band]
 │  Confidence: [🟢 MODERATE / 🟡 LOW / 🔴 VERY LOW]             │
 │                                                               │
 └──────────────────────────────────────────────────────────────┘
-```
+\`\`\`
 
 **If EXECUTE:**
-```
+\`\`\`
 📋 **SWING TRADE EXECUTION PLAN:**
 
 Entry:
@@ -1532,7 +1539,7 @@ Exit Strategy:
   └─ If major positive news hits target early: Take profit, don't hold
 
 **Monitoring Schedule:**
-```
+\`\`\`
 Daily (First 5 Days):
 - Check price vs stop (₹100.91) and target (₹109.31)
 - Check for news/announcements
@@ -1570,10 +1577,10 @@ Partial Profit Option:
 - If reaches +2.5-3% early (bar 5-8): Can book 50% position
 - Let remaining 50% run to ₹109.31 or bar 15
 - Reduces risk while keeping upside exposure
-```
+\`\`\`
 
 **If EXECUTE WITH MODIFICATIONS:**
-```
+\`\`\`
 ⚠️ **REDUCED CONVICTION ENTRY:**
 
 Issues Identified:
@@ -1605,10 +1612,10 @@ Accept:
 - Lower probability of full 4% target
 - Higher probability of time exit at +1-2%
 - Need to be nimble, not stubborn
-```
+\`\`\`
 
 **If SKIP:**
-```
+\`\`\`
 🔴 **DO NOT TRADE - SETUP NOT SUFFICIENT**
 
 Primary Reasons (Top 3):
@@ -1640,10 +1647,10 @@ Alternative Actions:
 - Add SOMATEX to watchlist, check weekly
 - Monitor for score improvement
 - Focus capital on higher-probability setups
-```
+\`\`\`
 
 ### TOP 3 RISKS:
-```
+\`\`\`
 🔴 **RISK #1: TIME DECAY WITHOUT TARGET**
 - Probability: HIGH (60-70% for weak signals)
 - Description: Weak 0.143 signal means low momentum. Stock may drift sideways for 15 bars, hitting neither target nor stop, then time exit with small gain (1-2%)
@@ -1673,10 +1680,10 @@ Alternative Actions:
   ├─ Watch Nifty vs 50 DMA (exit if breaks)
   ├─ Check FII flows weekly (caution if heavy selling)
   └─ Accept: External factors can override stock-specific setup
-```
+\`\`\`
 
 ### TOP 3 SUPPORTING FACTORS:
-```
+\`\`\`
 ✅ **FACTOR #1: [Strongest Support]**
 - Evidence: [e.g., "Clear event calendar - no earnings for 20+ days"]
 - Why it matters: Can hold full 15 bars without binary event risk
@@ -1694,10 +1701,10 @@ Alternative Actions:
 - Why it matters: Stock has habit of 4%+ moves, target is realistic
 - Strength: [HIGH/MEDIUM/LOW]
 - Contribution: [XX%]
-```
+\`\`\`
 
 ### EXECUTIVE SUMMARY:
-```
+\`\`\`
 **The Bottom Line (4-5 sentences):**
 
 1. **Signal Quality:** Weekly 4% Target strategy shows HOLD with 0.143 score - an extremely weak signal barely above neutral, indicating low momentum and marginal entry criteria.
@@ -1712,7 +1719,7 @@ Alternative Actions:
 
 **Example:**
 "Weekly 4% Target's 0.143 score indicates a marginal setup with minimal momentum. Calendar analysis reveals earnings on Mar 18 (bar 12), requiring early exit. Market regime is favorable (VIX 14, strong breadth), but fundamental screen shows only 3/6 green lights (debt elevated). Historical data: SOMATEX averages 3.5% move in 3 weeks, so 4% is achievable but not easy. Total probability score: 52/100. Recommendation: EXECUTE with 8% position (vs 35% max), plan to exit by bar 10 (before earnings). Realistic expectation: 2-3% gain in 2 weeks, not full 4% in 3 weeks. Accept this reduced target or skip for better setup."
-```
+\`\`\`
 
 ---
 
@@ -1745,3 +1752,4 @@ Alternative Actions:
 ---
 
 **END OF WEEKLY 4% TARGET SWING TRADE ANALYSIS**
+`;
