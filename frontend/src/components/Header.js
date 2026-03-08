@@ -1,10 +1,11 @@
 import React from 'react';
 
-function Header({ title }) {
+function Header({ title, subtitle }) {
   return (
-    <header className="bg-blue-900 text-white shadow">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <h1 className="text-3xl font-bold">{title}</h1>
+    <header className="py-8 bg-transparent">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-2 text-slate-500">{subtitle}</p>}
       </div>
     </header>
   );

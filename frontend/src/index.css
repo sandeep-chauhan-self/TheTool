@@ -2,16 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  body {
+    @apply bg-background text-slate-800 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@layer components {
+  /* Glassmorphism base for cards and badges */
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-md border border-slate-200/60 shadow-glass rounded-xl;
+  }
+  
+  .glass-card-hover {
+    @apply hover:shadow-glass-hover hover:border-slate-300 transition-all duration-300 ease-in-out cursor-pointer;
+  }
+
+  .mesh-bg {
+    background-color: #F8FAFC;
+    background-image: 
+      radial-gradient(at 40% 20%, hsla(258,89%,88%,0.3) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(217,100%,90%,0.3) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(258,89%,88%,0.3) 0px, transparent 50%);
+  }
+
+  .table-row-modern {
+    @apply border-b border-slate-100 hover:bg-slate-50 transition-colors duration-150;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-300;
 }

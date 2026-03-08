@@ -4,34 +4,23 @@ import { Link, useParams } from 'react-router-dom';
 import { getStrategy, getStrategyHelp } from '../api/api';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Header from '../components/Header';
+import NavigationBar from '../components/NavigationBar';
 
 /**
  * StrategyHelp - Detailed help page for a specific strategy
- * 
- * Supports both numeric IDs (/strategies/5) and slugs (/strategies/weekly-target)
  */
 
-// Slug to ID mapping
 const slugToId = {
-  'balanced': 1,
-  'trend-following': 2,
-  'mean-reversion': 3,
-  'momentum-breakout': 4,
-  'weekly-target': 5,
-  // Also support numeric strings
-  '1': 1,
-  '2': 2,
-  '3': 3,
-  '4': 4,
-  '5': 5
+  'balanced': 1, 'trend-following': 2, 'mean-reversion': 3, 'momentum-breakout': 4, 'weekly-target': 5,
+  '1': 1, '2': 2, '3': 3, '4': 4, '5': 5
 };
 
 const strategyMeta = {
-  1: { name: 'Balanced Analysis', icon: '⚖️', color: 'blue' },
-  2: { name: 'Trend Following', icon: '📈', color: 'green' },
-  3: { name: 'Mean Reversion', icon: '🔄', color: 'purple' },
-  4: { name: 'Momentum Breakout', icon: '🚀', color: 'orange' },
-  5: { name: 'Weekly 4% Target', icon: '🎯', color: 'red' }
+  1: { name: 'Balanced Analysis', icon: '⚖️', color: 'primary' },
+  2: { name: 'Trend Following', icon: '📈', color: 'success' },
+  3: { name: 'Mean Reversion', icon: '🔄', color: 'accent' },
+  4: { name: 'Momentum Breakout', icon: '🚀', color: 'warning' },
+  5: { name: 'Weekly 4% Target', icon: '🎯', color: 'danger' }
 };
 
 function StrategyHelp() {
@@ -41,37 +30,21 @@ function StrategyHelp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Convert slug or numeric string to ID
   const strategyId = slugToId[urlParam] || parseInt(urlParam);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!strategyId || strategyId < 1 || strategyId > 5) {
-        setError('Invalid strategy. Please select a valid strategy (1-5).');
-        setLoading(false);
-        return;
+        setError('Invalid core strategy ID.'); setLoading(false); return;
       }
-
       try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch strategy details and help content in parallel
-        const [strategyData, helpData] = await Promise.all([
-          getStrategy(strategyId),
-          getStrategyHelp(strategyId)
-        ]);
-        
-        setStrategy(strategyData.strategy);
-        setHelpContent(helpData.help_content || 'No help content available.');
+        setLoading(true); setError(null);
+        const [sData, hData] = await Promise.all([getStrategy(strategyId), getStrategyHelp(strategyId)]);
+        setStrategy(sData.strategy); setHelpContent(hData.help_content || '');
       } catch (err) {
-        console.error('Failed to fetch strategy help:', err);
-        setError(err.response?.data?.message || 'Failed to load strategy documentation. Please try again.');
-      } finally {
-        setLoading(false);
-      }
+        setError('Failed to fetch model documentation.');
+      } finally { setLoading(false); }
     };
-
     fetchData();
   }, [strategyId]);
 
@@ -79,246 +52,113 @@ function StrategyHelp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading strategy documentation...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center max-w-md">
-            <div className="text-red-500 text-5xl mb-4">⚠️</div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">Strategy Not Found</h1>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <Link 
-              to="/strategies" 
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              ← View All Strategies
-            </Link>
-          </div>
+      <div className="min-h-screen mesh-bg">
+        <NavigationBar />
+        <div className="flex flex-col items-center justify-center py-40">
+           <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-100 border-t-primary-600 shadow-glow-primary"></div>
+           <p className="mt-6 font-bold text-slate-500 uppercase tracking-widest text-xs">Accessing Model Repository...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      {/* Breadcrumbs */}
-      <div className="max-w-4xl mx-auto px-6 pt-6">
-        <Breadcrumbs 
-          items={[
-            { label: 'Dashboard', path: '/' },
-            { label: 'Strategies', path: '/strategies' },
-            { label: meta.name || `Strategy ${strategyId}`, path: null }
-          ]} 
-        />
-      </div>
+    <div className="min-h-screen mesh-bg pb-20">
+      <NavigationBar />
+      <Header title={meta.name} subtitle={`Model Architecture Details for Strategy ${strategyId}`} />
 
-      {/* Hero Header */}
-      <div className={`bg-gradient-to-r ${
-        meta.color === 'blue' ? 'from-blue-600 to-blue-700' :
-        meta.color === 'green' ? 'from-green-600 to-green-700' :
-        meta.color === 'purple' ? 'from-purple-600 to-purple-700' :
-        meta.color === 'orange' ? 'from-orange-500 to-orange-600' :
-        'from-red-600 to-red-700'
-      } text-white py-8 mt-4`}>
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="flex items-center gap-4">
-            <span className="text-5xl">{meta.icon}</span>
-            <div>
-              <div className="text-sm text-white/70 mb-1">Strategy {strategyId}</div>
-              <h1 className="text-3xl font-bold">
-                {strategy?.name || meta.name || `Strategy ${strategyId}`}
-              </h1>
-              {strategy?.description && (
-                <p className="text-white/90 mt-2 max-w-xl">{strategy.description}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="max-w-5xl mx-auto px-4">
+        <Breadcrumbs items={[{ label: 'Dashboard', path: '/' }, { label: 'Strategies', path: '/strategies' }, { label: meta.name, path: null }]} />
 
-      {/* Quick Navigation */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((id) => (
-                <Link
-                  key={id}
-                  to={`/strategies/${Object.keys(slugToId).find(key => slugToId[key] === id && isNaN(key))}`}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                    id === strategyId
-                      ? 'bg-gray-800 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {strategyMeta[id]?.icon} {id}
-                </Link>
-              ))}
-            </div>
-            <Link 
-              to={`/backtest?strategy_id=${strategyId}`}
-              className="px-4 py-1.5 bg-purple-600 text-white rounded-full text-sm font-medium hover:bg-purple-700 transition"
-            >
-              📊 Backtest This Strategy
+        {/* Floating Quick Navigation */}
+        <div className="flex gap-2 mb-8 mt-6 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar">
+          {[1,2,3,4,5].map(id => (
+            <Link key={id} to={`/strategies/${id}`} className={`px-5 py-2 rounded-xl border font-bold text-sm transition-all whitespace-nowrap shadow-sm ${id === strategyId ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500 hover:border-primary-500 hover:text-primary-600'}`}>
+               {strategyMeta[id].icon} Strategy {id}
             </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-xl shadow-sm border p-8">
-          {/* Markdown content with styling */}
-          <article className="prose prose-slate max-w-none prose-headings:scroll-mt-20">
-            <ReactMarkdown
-              components={{
-                // Style tables
-                table: ({ children }) => (
-                  <div className="overflow-x-auto my-4">
-                    <table className="min-w-full divide-y divide-gray-200 border rounded-lg overflow-hidden">
-                      {children}
-                    </table>
-                  </div>
-                ),
-                thead: ({ children }) => (
-                  <thead className="bg-gray-50">{children}</thead>
-                ),
-                th: ({ children }) => (
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="px-4 py-3 text-sm text-gray-700 border-b border-r last:border-r-0">
-                    {children}
-                  </td>
-                ),
-                tr: ({ children }) => (
-                  <tr className="hover:bg-gray-50 transition">{children}</tr>
-                ),
-                // Style code blocks
-                code: ({ inline, children, className }) => {
-                  if (inline) {
-                    return <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm text-red-600 font-mono">{children}</code>;
-                  }
-                  return (
-                    <code className="block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                      {children}
-                    </code>
-                  );
-                },
-                pre: ({ children }) => (
-                  <pre className="bg-gray-900 rounded-lg overflow-x-auto my-4">{children}</pre>
-                ),
-                // Style headings
-                h1: ({ children }) => (
-                  <h1 className="text-3xl font-bold text-gray-800 mb-6 pb-3 border-b-2 border-gray-200">{children}</h1>
-                ),
-                h2: ({ children }) => (
-                  <h2 className="text-2xl font-bold text-gray-800 mt-10 mb-4 pb-2 border-b border-gray-100">{children}</h2>
-                ),
-                h3: ({ children }) => (
-                  <h3 className="text-xl font-semibold text-gray-700 mt-8 mb-3">{children}</h3>
-                ),
-                h4: ({ children }) => (
-                  <h4 className="text-lg font-medium text-gray-700 mt-6 mb-2">{children}</h4>
-                ),
-                // Style lists
-                ul: ({ children }) => (
-                  <ul className="list-disc list-outside ml-5 space-y-2 text-gray-600 my-4">{children}</ul>
-                ),
-                ol: ({ children }) => (
-                  <ol className="list-decimal list-outside ml-5 space-y-2 text-gray-600 my-4">{children}</ol>
-                ),
-                li: ({ children }) => (
-                  <li className="text-gray-600 pl-1">{children}</li>
-                ),
-                // Style blockquotes
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-blue-500 pl-4 py-3 my-4 bg-blue-50 rounded-r-lg text-gray-700 italic">
-                    {children}
-                  </blockquote>
-                ),
-                // Style paragraphs
-                p: ({ children }) => (
-                  <p className="text-gray-600 leading-relaxed my-4">{children}</p>
-                ),
-                // Style strong/bold
-                strong: ({ children }) => (
-                  <strong className="font-semibold text-gray-800">{children}</strong>
-                ),
-                // Style links
-                a: ({ children, href }) => (
-                  <a href={href} className="text-blue-600 hover:text-blue-800 hover:underline">{children}</a>
-                ),
-                // Style horizontal rules
-                hr: () => (
-                  <hr className="my-8 border-gray-200" />
-                ),
-              }}
-            >
-              {helpContent}
-            </ReactMarkdown>
-          </article>
+          ))}
         </div>
 
-        {/* Bottom Actions */}
-        <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white rounded-xl shadow-sm border p-6">
-          <Link 
-            to="/strategies" 
-            className="text-gray-600 hover:text-gray-800 flex items-center gap-2"
-          >
-            ← Back to All Strategies
-          </Link>
-          <div className="flex gap-3">
-            <Link 
-              to={`/backtest?strategy_id=${strategyId}`}
-              className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition flex items-center gap-2"
-            >
-              📊 Run Backtest
+        {/* Content Body */}
+        <div className="glass-card p-10 animate-slide-up bg-white/95">
+           <div className="flex flex-col md:flex-row gap-10 items-start">
+              <div className="flex-1">
+                 <div className="flex items-center gap-4 mb-8">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-lg border border-white/50 bg-${meta.color}-50`}>
+                       {meta.icon}
+                    </div>
+                    <div>
+                        <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{strategy?.name || meta.name}</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest bg-${meta.color}-100 text-${meta.color}-700 border border-${meta.color}-200`}>Active Production Model</span>
+                           <Link to={`/backtest?strategy_id=${strategyId}`} className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-1 ml-2">📊 Run Real-time Simulation</Link>
+                        </div>
+                    </div>
+                 </div>
+
+                 <article className="prose prose-slate max-w-none prose-headings:text-slate-900 prose-p:text-slate-600 prose-p:leading-relaxed prose-strong:text-slate-900 prose-pre:bg-slate-900 prose-pre:text-primary-300">
+                    <ReactMarkdown
+                      components={{
+                        // Custom styled components for markdown mapping
+                        h1: ({children}) => <h1 className="text-4xl font-black tracking-tight mb-8 pb-4 border-b border-slate-100">{children}</h1>,
+                        h2: ({children}) => <h2 className="text-2xl font-bold tracking-tight mt-12 mb-6 text-slate-800">{children}</h2>,
+                        h3: ({children}) => <h3 className="text-xl font-bold mt-8 mb-4 text-slate-800">{children}</h3>,
+                        ul: ({children}) => <ul className="list-disc list-outside ml-6 space-y-3 my-6">{children}</ul>,
+                        li: ({children}) => <li className="text-slate-600 font-medium pl-2">{children}</li>,
+                        blockquote: ({children}) => <blockquote className="border-l-4 border-primary-500 bg-primary-50/50 p-6 my-8 rounded-r-2xl italic text-slate-700 font-medium">{children}</blockquote>,
+                        table: ({children}) => <div className="overflow-x-auto my-8 rounded-2xl border border-slate-100 shadow-sm"><table className="w-full text-sm border-collapse">{children}</table></div>,
+                        thead: ({children}) => <thead className="bg-slate-50 border-b border-slate-100">{children}</thead>,
+                        th: ({children}) => <th className="px-6 py-4 text-left font-bold text-slate-500 uppercase tracking-widest text-[10px]">{children}</th>,
+                        td: ({children}) => <td className="px-6 py-4 border-b border-slate-50 font-medium text-slate-600">{children}</td>,
+                        code: ({inline, children}) => inline ? <code className="bg-slate-100 px-1.5 py-0.5 rounded text-primary-700 font-bold font-mono text-xs">{children}</code> : <code className="block p-2 text-primary-300">{children}</code>
+                      }}
+                    >
+                      {helpContent}
+                    </ReactMarkdown>
+                 </article>
+              </div>
+
+              {/* Sidebar Diagnostics */}
+              <div className="w-full md:w-80 shrink-0 space-y-8">
+                 <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 rounded-full bg-primary-500"></div>
+                       Global Parameters
+                    </h4>
+                    <div className="space-y-4">
+                       <div className="flex justify-between items-center">
+                          <span className="text-sm font-bold text-slate-500">Conviction Cap</span>
+                          <span className="text-sm font-black text-slate-900">{strategy?.target_pct || '4.0'}%</span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                          <span className="text-sm font-bold text-slate-500">Risk Stop</span>
+                          <span className="text-sm font-black text-danger-600">{strategy?.stop_loss_pct || '2.0'}%</span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                          <span className="text-sm font-bold text-slate-500">Maximum Hold</span>
+                          <span className="text-sm font-black text-slate-900">15 Days</span>
+                       </div>
+                    </div>
+                 </div>
+
+                 <Link to={`/backtest?strategy_id=${strategyId}`} className="block p-6 rounded-2xl bg-slate-900 text-white group shadow-xl hover:shadow-primary-200/50 transition-all border border-slate-800">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Backtest Engine</div>
+                    <div className="text-lg font-black tracking-tight mb-4">Simulate Strategy {strategyId} Performance</div>
+                    <div className="flex items-center gap-2 text-primary-400 font-bold text-sm">
+                       Access Simulator
+                       <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </div>
+                 </Link>
+              </div>
+           </div>
+        </div>
+
+        {/* Footer Navigation */}
+        <div className="mt-12 flex justify-between items-center">
+            <Link to="/strategies" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors flex items-center gap-2 border-b border-transparent hover:border-primary-600 pb-1">
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+               Back to Research Index
             </Link>
-            <Link 
-              to="/"
-              className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition"
-            >
-              Start Analyzing
-            </Link>
-          </div>
-        </div>
-
-        {/* Related Strategies */}
-        <div className="mt-8 bg-white rounded-xl shadow-sm border p-6">
-          <h3 className="font-semibold text-gray-800 mb-4">Explore Other Strategies</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[1, 2, 3, 4, 5].filter(id => id !== strategyId).map((id) => (
-              <Link
-                key={id}
-                to={`/strategies/${Object.keys(slugToId).find(key => slugToId[key] === id && isNaN(key))}`}
-                className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
-              >
-                <span className="text-2xl">{strategyMeta[id]?.icon}</span>
-                <div>
-                  <div className="text-sm font-medium text-gray-800">{strategyMeta[id]?.name}</div>
-                  <div className="text-xs text-gray-500">Strategy {id}</div>
-                </div>
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
     </div>

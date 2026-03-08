@@ -11,18 +11,21 @@ import NavigationBar from '../components/NavigationBar';
 import { useStocks } from '../context/StocksContext';
 import { TradingViewLink } from '../utils/tradingViewUtils';
 
+// New UI Components
+import VerdictBadge from '../components/ui/VerdictBadge';
+import ScoreArc from '../components/ui/ScoreArc';
+import CommandPalette from '../components/ui/CommandPalette';
 
-// Define verdict sort order (higher priority first) - outside component to avoid recreating on every render
-const VERDICT_PRIORITY = { // eslint-disable-line no-unused-vars
+// Define verdict sort order
+const VERDICT_PRIORITY = { 
   'STRONG BUY': 5,
   'BUY': 4,
   'HOLD': 3,
   'SELL': 2,
   'STRONG SELL': 1,
-  '-': 0 // No analysis
+  '-': 0
 };
 
-// Memoized table row component to prevent unnecessary re-renders
 const StockRow = React.memo(function StockRow({ 
   stock, 
   isSelected, 
@@ -31,54 +34,52 @@ const StockRow = React.memo(function StockRow({
   getStatusBadge 
 }) {
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+    <tr className="table-row-modern group">
+      <td className="px-5 py-4 w-12 text-center whitespace-nowrap">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggleSelection(stock.yahoo_symbol)}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          className="w-4 h-4 text-primary-600 focus:ring-primary-500 border-slate-300 rounded cursor-pointer"
         />
       </td>
-      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+      <td className="px-5 py-4 whitespace-nowrap">
         <TradingViewLink 
           ticker={stock.yahoo_symbol} 
           displayText={stock.symbol}
-          className="text-xs sm:text-sm font-medium text-gray-900"
+          className="font-mono font-bold text-slate-900 group-hover:text-primary-600 transition-colors"
         />
-        <div className="text-xs text-gray-500">{stock.yahoo_symbol}</div>
+        <div className="text-xs text-slate-500 font-mono mt-1">{stock.yahoo_symbol}</div>
       </td>
-      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3">
-        <div className="text-xs sm:text-sm text-gray-900 truncate max-w-xs">{stock.name}</div>
+      <td className="hidden md:table-cell px-5 py-4">
+        <div className="text-sm text-slate-600 font-medium truncate max-w-xs">{stock.name}</div>
       </td>
-      <td className="hidden lg:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+      <td className="hidden lg:table-cell px-5 py-4 whitespace-nowrap">
         {getStatusBadge(stock.status)}
       </td>
-      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-        <div className="text-xs sm:text-sm text-gray-900">
-          {stock.score !== null ? stock.score.toFixed(1) : '-'}
+      <td className="px-5 py-4 whitespace-nowrap">
+        {stock.score !== null && stock.score !== undefined ? (
+          <ScoreArc score={stock.score} />
+        ) : <span className="text-slate-400">-</span>}
+      </td>
+      <td className="px-5 py-4 whitespace-nowrap">
+        {stock.verdict ? <VerdictBadge verdict={stock.verdict} /> : <span className="text-slate-400">-</span>}
+      </td>
+      <td className="hidden sm:table-cell px-5 py-4 whitespace-nowrap">
+        <div className="text-sm font-semibold text-slate-700">
+          {stock.entry ? `₹${stock.entry.toFixed(2)}` : '-'}
         </div>
       </td>
-      <td className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-        <div className="text-xs sm:text-sm text-gray-900 font-medium">
-          {stock.verdict || '-'}
+      <td className="hidden md:table-cell px-5 py-4 whitespace-nowrap">
+        <div className="text-sm font-semibold text-slate-700">
+          {stock.target ? `₹${stock.target.toFixed(2)}` : '-'}
         </div>
       </td>
-      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-        <div className="text-xs sm:text-sm text-gray-900">
-          {stock.entry ? `Rs. ${stock.entry.toFixed(2)}` : '-'}
-        </div>
-      </td>
-      <td className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
-        <div className="text-xs sm:text-sm text-gray-900">
-          {stock.target ? `Rs. ${stock.target.toFixed(2)}` : '-'}
-        </div>
-      </td>
-      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+      <td className="px-5 py-4 text-right whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
         {stock.has_analysis && (
           <button
             onClick={() => onViewDetails(stock.ticker)}
-            className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
+            className="text-primary-600 hover:text-primary-800 font-medium text-sm transition-colors"
           >
             View
           </button>
@@ -89,19 +90,16 @@ const StockRow = React.memo(function StockRow({
 });
 
 function AllStocksAnalysis() {
-  // Use global stocks context for caching
   const { 
-    stocks: cachedStocks, // eslint-disable-line no-unused-vars
+    stocks: cachedStocks, 
     stocksLoading, 
     fetchAllStocks, 
     fetchAnalysisResults,
     getStocksWithAnalysis,
     getTimeSinceLastFetch,
     lastStocksFetch,
-    updateBulkAnalysis // eslint-disable-line no-unused-vars
   } = useStocks();
 
-  // Local UI state only
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [refreshingResults, setRefreshingResults] = useState(false);
@@ -111,33 +109,27 @@ function AllStocksAnalysis() {
   const [sortDirection, setSortDirection] = useState('asc');
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showWatchlistModal, setShowWatchlistModal] = useState(false);
-  const [pendingAnalysisType, setPendingAnalysisType] = useState(null); // 'all' or 'selected'
+  const [pendingAnalysisType, setPendingAnalysisType] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordVerified, setPasswordVerified] = useState(() => sessionStorage.getItem('bulkAnalysisVerified') === 'true');
   
-  // Filter states
   const [filters, setFilters] = useState({
-    verdict: 'all',        // 'all', 'Strong Buy', 'Buy', 'Hold', 'Sell', 'Strong Sell', 'Not Analyzed'
-    status: 'all',         // 'all', 'completed', 'pending', 'analyzing', 'failed'
-    scoreMin: '',          // min score filter
-    scoreMax: '',          // max score filter
-    hasAnalysis: 'all'     // 'all', 'yes', 'no'
+    verdict: 'all',
+    status: 'all',
+    scoreMin: '',
+    scoreMax: '',
+    hasAnalysis: 'all'
   });
   const [showFilters, setShowFilters] = useState(false);
-  
   const navigate = useNavigate();
 
-  // Get merged stocks with analysis data from context
   const stocks = getStocksWithAnalysis();
   const loading = stocksLoading;
 
   useEffect(() => {
-    // Load stocks from cache or fetch if needed (respects TTL)
     loadAllStocks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll progress when analyzing
   useEffect(() => {
     let intervalId;
     let completionCheckCount = 0;
@@ -148,50 +140,35 @@ function AllStocksAnalysis() {
           const progressData = await getAllStocksProgress();
           setProgress(progressData);
           
-          // Stop polling if no stocks are being analyzed
           if (!progressData.is_analyzing && progressData.analyzing === 0) {
-            // Add small delay to ensure database is fully updated
             completionCheckCount++;
             if (completionCheckCount >= 2) {
-              // Wait for DB to settle, then refresh analysis results only
               setTimeout(async () => {
                 setAnalyzing(false);
                 setRefreshingResults(true);
-                // Force refresh analysis results to get new data
                 await fetchAnalysisResults(true);
                 setRefreshingResults(false);
               }, 1000);
             }
           } else {
-            completionCheckCount = 0; // Reset counter if still analyzing
+            completionCheckCount = 0;
           }
         } catch (error) {
           console.error('Failed to fetch progress:', error);
         }
-      }, 5000); // Poll every 5 seconds
+      }, 5000);
     }
     
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
+    return () => { if (intervalId) clearInterval(intervalId); };
   }, [analyzing, fetchAnalysisResults]);
 
   const loadAllStocks = async (forceRefresh = false) => {
-    // Use context's fetch functions - they handle caching automatically
-    await Promise.all([
-      fetchAllStocks(forceRefresh),
-      fetchAnalysisResults(forceRefresh)
-    ]);
+    await Promise.all([ fetchAllStocks(forceRefresh), fetchAnalysisResults(forceRefresh) ]);
   };
 
-  // Memoized sorted + filtered stocks with stable Lodash ordering
-  // NOTE: Defined before handleSelectAll which depends on it
   const filteredStocks = useMemo(() => {
     const query = searchQuery.toLowerCase();
-
-    // --- 1. FILTERING ---
     let filtered = stocks.filter(stock => {
-      // Text search filter
       const matchesSearch = 
         stock.symbol.toLowerCase().includes(query) ||
         stock.name.toLowerCase().includes(query) ||
@@ -199,8 +176,6 @@ function AllStocksAnalysis() {
         (stock.verdict || '').toLowerCase().includes(query);
       
       if (!matchesSearch) return false;
-      
-      // Verdict filter
       if (filters.verdict !== 'all') {
         if (filters.verdict === 'Not Analyzed') {
           if (stock.verdict && stock.verdict !== '-') return false;
@@ -208,20 +183,14 @@ function AllStocksAnalysis() {
           if ((stock.verdict || '').toUpperCase() !== filters.verdict.toUpperCase()) return false;
         }
       }
-      
-      // Status filter
       if (filters.status !== 'all') {
         if ((stock.status || 'pending') !== filters.status) return false;
       }
-      
-      // Has Analysis filter
       if (filters.hasAnalysis !== 'all') {
         const hasAnalysis = stock.has_analysis || (stock.score !== null && stock.score !== undefined);
         if (filters.hasAnalysis === 'yes' && !hasAnalysis) return false;
         if (filters.hasAnalysis === 'no' && hasAnalysis) return false;
       }
-      
-      // Score range filter
       if (filters.scoreMin !== '') {
         const minScore = parseFloat(filters.scoreMin);
         if (!isNaN(minScore) && (stock.score === null || stock.score < minScore)) return false;
@@ -230,16 +199,11 @@ function AllStocksAnalysis() {
         const maxScore = parseFloat(filters.scoreMax);
         if (!isNaN(maxScore) && (stock.score === null || stock.score > maxScore)) return false;
       }
-      
       return true;
     });
 
-    // --- 2. SORTING ---
     if (!sortBy) return filtered;
-
     const sortDirectionLodash = sortDirection === 'asc' ? 'asc' : 'desc';
-
-    // MAPPING SORT COLUMNS TO ITERATEES
     const sortIteratees = {
       verdict: (s) => (s.verdict || '-').toLowerCase(),
       symbol: (s) => (s.symbol || '').toLowerCase(),
@@ -247,24 +211,9 @@ function AllStocksAnalysis() {
       entry: (s) => s.entry ?? -1,
       target: (s) => s.target ?? -1
     };
-
-    // Primary iteratee
-    const primary = sortIteratees[sortBy];
-
-    // Add secondary ordering for stability:
-    // ALWAYS SORT BY SYMBOL after primary
-    const secondary = (s) => (s.symbol || '').toLowerCase();
-
-    // Apply orderBy with 2 keys
-    return _.orderBy(
-      filtered,
-      [primary, secondary],
-      [sortDirectionLodash, 'asc']
-    );
-
+    return _.orderBy(filtered, [sortIteratees[sortBy], (s) => (s.symbol || '').toLowerCase()], [sortDirectionLodash, 'asc']);
   }, [stocks, searchQuery, sortBy, sortDirection, filters]);
 
-  // Count active filters
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.verdict !== 'all') count++;
@@ -276,59 +225,30 @@ function AllStocksAnalysis() {
   }, [filters]);
 
   const clearAllFilters = useCallback(() => {
-    setFilters({
-      verdict: 'all',
-      status: 'all',
-      scoreMin: '',
-      scoreMax: '',
-      hasAnalysis: 'all'
-    });
+    setFilters({ verdict: 'all', status: 'all', scoreMin: '', scoreMax: '', hasAnalysis: 'all' });
     setSearchQuery('');
   }, []);
 
-  const handleSelectAll = useCallback(() => {
-    // Use memoized filtered stocks (already sorted) to respect current sort order
-    // Note: filteredStocks is computed in useMemo and available here
-    setSelectedStocks(filteredStocks.map(s => s.yahoo_symbol));
-  }, [filteredStocks]);
-
-  const handleDeselectAll = useCallback(() => {
-    setSelectedStocks([]);
-  }, []);
-
+  const handleSelectAll = useCallback(() => setSelectedStocks(filteredStocks.map(s => s.yahoo_symbol)), [filteredStocks]);
+  const handleDeselectAll = useCallback(() => setSelectedStocks([]), []);
   const toggleStockSelection = useCallback((yahooSymbol) => {
-    setSelectedStocks(prev => 
-      prev.includes(yahooSymbol)
-        ? prev.filter(s => s !== yahooSymbol)
-        : [...prev, yahooSymbol]
-    );
+    setSelectedStocks(prev => prev.includes(yahooSymbol) ? prev.filter(s => s !== yahooSymbol) : [...prev, yahooSymbol]);
   }, []);
 
   const handleAnalyzeAll = useCallback(() => {
     if (window.confirm(`Are you sure you want to analyze all ${stocks.length} stocks? This will take several hours.`)) {
       setPendingAnalysisType('all');
-      if (!passwordVerified) {
-        setShowPasswordModal(true);
-      } else {
-        setShowConfigModal(true);
-      }
+      if (!passwordVerified) setShowPasswordModal(true);
+      else setShowConfigModal(true);
     }
   }, [stocks.length, passwordVerified]);
 
   const handleAnalyzeSelected = useCallback(() => {
-    if (selectedStocks.length === 0) {
-      alert('Please select at least one stock');
-      return;
-    }
-    
+    if (selectedStocks.length === 0) { alert('Please select at least one stock'); return; }
     if (window.confirm(`Analyze ${selectedStocks.length} selected stocks?`)) {
       setPendingAnalysisType('selected');
-      // Gate behind password only when analyzing multiple stocks
-      if (selectedStocks.length > 1 && !passwordVerified) {
-        setShowPasswordModal(true);
-      } else {
-        setShowConfigModal(true);
-      }
+      if (selectedStocks.length > 1 && !passwordVerified) setShowPasswordModal(true);
+      else setShowConfigModal(true);
     }
   }, [selectedStocks.length, passwordVerified]);
 
@@ -340,18 +260,13 @@ function AllStocksAnalysis() {
 
   const handleAnalyzeWithConfig = useCallback(async (config) => {
     setShowConfigModal(false);
-    
     const symbolsToAnalyze = pendingAnalysisType === 'all' ? [] : selectedStocks;
-    
     try {
       setAnalyzing(true);
       const response = await analyzeAllStocks(symbolsToAnalyze, config);
-      
-      // Only alert if duplicate job (useful feedback)
       if (response.is_duplicate) {
         alert(`Analysis already running for these stocks.\nProgress: ${response.completed}/${response.total}`);
       }
-      // Success case: no popup needed, progress bar shows status
     } catch (error) {
       console.error('Failed to start analysis:', error);
       alert('Failed to start analysis. Please try again.');
@@ -360,49 +275,32 @@ function AllStocksAnalysis() {
   }, [pendingAnalysisType, selectedStocks]);
 
   const handleAddToWatchlist = useCallback(() => {
-    if (selectedStocks.length === 0) {
-      alert('Please select at least one stock');
-      return;
-    }
+    if (selectedStocks.length === 0) { alert('Please select at least one stock'); return; }
     setShowWatchlistModal(true);
   }, [selectedStocks.length]);
 
-  const handleWatchlistSuccess = useCallback(() => {
-    // Clear selection after successful add
-    setSelectedStocks([]);
-  }, []);
-
-  const handleViewDetails = useCallback((ticker) => {
-    navigate(`/results/${ticker}`);
-  }, [navigate]);
+  const handleWatchlistSuccess = useCallback(() => setSelectedStocks([]), []);
+  const handleViewDetails = useCallback((ticker) => navigate(`/results/${ticker}`), [navigate]);
 
   const getStatusBadge = useCallback((status) => {
     const badges = {
-      pending: { text: 'Pending', color: 'bg-gray-200 text-gray-700' },
-      analyzing: { text: 'Analyzing...', color: 'bg-blue-100 text-blue-700' },
-      completed: { text: 'Completed', color: 'bg-green-100 text-green-700' },
-      failed: { text: 'Failed', color: 'bg-red-100 text-red-700' }
+      pending: { text: 'Pending', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+      analyzing: { text: 'Analyzing...', color: 'bg-accent-50 text-accent-600 border-accent-200' },
+      completed: { text: 'Completed', color: 'bg-success-50 text-success-600 border-success-200' },
+      failed: { text: 'Failed', color: 'bg-danger-50 text-danger-600 border-danger-200' }
     };
-    
     const badge = badges[status] || badges.pending;
-    
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${badge.color}`}>
-        {badge.text}
-      </span>
-    );
+    return <span className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-wide border ${badge.color}`}>{badge.text}</span>;
   }, []);
 
   const handleSort = useCallback((column) => {
-    // If clicking the same column, toggle direction; otherwise, set new column and reset to asc
-    setSortBy(prevSortBy => {
-      if (prevSortBy === column) {
-        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-        return prevSortBy;
-      } else {
-        setSortDirection('asc');
-        return column;
+    setSortBy(prev => {
+      if (prev === column) {
+        setSortDirection(p => p === 'asc' ? 'desc' : 'asc');
+        return prev;
       }
+      setSortDirection('asc');
+      return column;
     });
   }, []);
 
@@ -412,72 +310,40 @@ function AllStocksAnalysis() {
   }, [sortBy, sortDirection]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen mesh-bg">
       <NavigationBar />
-      <Header title="All Stocks Analysis" subtitle={`${stocks.length} NSE Stocks`} />
+      <Header title="All Stocks Analysis" subtitle={`Screener and full market overview for ${stocks.length} NSE Stocks.`} />
+      <CommandPalette allStocks={stocks} />
 
-      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
-        {/* Breadcrumbs */}
-        <Breadcrumbs 
-          items={[
-            { label: 'Dashboard', path: '/' },
-            { label: 'All Stocks', path: null }
-          ]} 
-        />
+      <div className="w-full max-w-7xl mx-auto px-4 pb-20">
+        <Breadcrumbs items={[{ label: 'Dashboard', path: '/' }, { label: 'All Stocks', path: null }]} />
         
         {/* Completion Message */}
         {progress && !analyzing && progress.percentage === 100 && (
-          <div className="mb-6 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg shadow-md">
-            <div className="flex gap-3">
-              <span className="text-xl flex-shrink-0">✓</span>
+          <div className="mb-6 p-4 glass-card border-success-200 animate-slide-up">
+            <div className="flex gap-3 items-center">
+              <div className="flex-shrink-0 w-8 h-8 bg-success-100 text-success-600 rounded-full flex items-center justify-center font-bold">✓</div>
               <div>
-                <p className="text-xs sm:text-sm font-medium text-green-800">
-                  Analysis Completed Successfully!
-                </p>
-                <p className="text-xs text-green-700 mt-1">
-                  Processed {progress.completed}/{progress.total} 
-                  ({progress.successful} successful, {progress.failed} failed)
-                </p>
+                <p className="font-bold text-success-800">Analysis Completed Successfully!</p>
+                <p className="text-sm text-success-700 mt-1">Processed {progress.completed}/{progress.total} ({progress.successful} successful, {progress.failed} failed)</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Analysis Starting - shows immediately when analysis begins before first progress poll */}
-        {analyzing && !progress && (
-          <div className="mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 flex-shrink-0"></div>
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-blue-800">
-                  Starting Analysis...
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Preparing to analyze {pendingAnalysisType === 'all' ? 'all stocks' : `${selectedStocks.length} selected stocks`}. Please wait...
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* Progress Bar */}
         {analyzing && progress && (
-          <div className="mb-6 p-3 sm:p-4 bg-white rounded-lg shadow-md">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <span className="text-xs sm:text-sm font-medium text-gray-700">
-                Analyzing {progress.completed}/{progress.total} ({progress.percentage}%)
-              </span>
-              <span className="text-xs text-gray-500">
-                ETA: {progress.estimated_time_remaining}
-              </span>
+          <div className="mb-6 glass-card p-6 border-accent-200 animate-slide-up">
+            <div className="flex justify-between items-center mb-3">
+              <span className="font-bold text-slate-800">Analyzing {progress.completed}/{progress.total} ({progress.percentage}%)</span>
+              <span className="text-sm font-medium text-slate-500">ETA: {progress.estimated_time_remaining}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div 
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
-                style={{ width: `${progress.percentage}%` }}
-              ></div>
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
+              <div className="bg-gradient-to-r from-accent-400 to-primary-500 h-full transition-all duration-500 rounded-full shadow-glow-primary relative overflow-hidden" style={{ width: `${progress.percentage}%` }}>
+                 <div className="absolute inset-0 bg-white/20 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
+              </div>
             </div>
-            <div className="mt-2 grid grid-cols-2 sm:flex sm:justify-between gap-2 text-xs text-gray-600">
+            <div className="mt-3 flex justify-between gap-2 text-xs font-semibold text-slate-500">
               <span>Completed: {progress.completed}</span>
               <span>Analyzing: {progress.analyzing}</span>
               <span>Failed: {progress.failed}</span>
@@ -486,137 +352,47 @@ function AllStocksAnalysis() {
           </div>
         )}
 
-        {/* Refreshing Results - shows after analysis completes while fetching new data */}
-        {refreshingResults && (
-          <div className="mb-6 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600 flex-shrink-0"></div>
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-yellow-800">
-                  Refreshing Results...
-                </p>
-                <p className="text-xs text-yellow-600 mt-1">
-                  Loading updated analysis data. Almost there!
-                </p>
-              </div>
-            </div>
+        {/* Action Row */}
+        <div className="flex flex-wrap gap-3 mb-6 items-center">
+          <button onClick={handleAnalyzeAll} disabled={analyzing || loading} className="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
+            Analyze All Framework
+          </button>
+          
+          <button onClick={handleAnalyzeSelected} disabled={selectedStocks.length === 0 || analyzing || loading} className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl shadow-md transition-all">
+            Analyze Selected ({selectedStocks.length})
+          </button>
+
+          <button onClick={handleAddToWatchlist} disabled={selectedStocks.length === 0 || loading} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2">
+            + To Watchlist
+          </button>
+          
+          <div className="ml-auto flex items-center gap-3">
+            <button onClick={() => loadAllStocks(true)} disabled={loading} className="p-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all">
+              <svg className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 sm:gap-4 mb-6 flex-wrap justify-center sm:justify-start">
-          <button
-            onClick={handleAnalyzeAll}
-            disabled={analyzing || loading}
-            className="flex-1 sm:flex-none px-3 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium text-xs sm:text-sm whitespace-nowrap"
-          >
-            {analyzing ? 'Running...' : `Analyze All`}
-          </button>
-          
-          <button
-            onClick={handleAnalyzeSelected}
-            disabled={selectedStocks.length === 0 || analyzing || loading}
-            className="flex-1 sm:flex-none px-3 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 font-medium text-xs sm:text-sm whitespace-nowrap"
-          >
-            Analyze ({selectedStocks.length})
-          </button>
-
-          <button
-            onClick={handleAddToWatchlist}
-            disabled={selectedStocks.length === 0 || loading}
-            className="flex-1 sm:flex-none px-3 sm:px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 font-medium text-xs sm:text-sm whitespace-nowrap"
-          >
-            + Watchlist ({selectedStocks.length})
-          </button>
-          
-          <button
-            onClick={handleSelectAll}
-            disabled={loading}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm whitespace-nowrap"
-          >
-            Select All
-          </button>
-          
-          <button
-            onClick={handleDeselectAll}
-            disabled={loading || selectedStocks.length === 0}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm disabled:bg-gray-100 whitespace-nowrap"
-          >
-            Deselect All
-          </button>
-          
-          <button
-            onClick={() => loadAllStocks(true)}
-            disabled={loading}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-xs sm:text-sm ml-0 sm:ml-auto whitespace-nowrap"
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
+        {/* Filter Bar (Glassmorphic) */}
+        <div className="mb-8 glass-card p-4 flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <input type="text" placeholder="Search by symbol, name, or verdict... (or press ⌘K)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full px-4 py-2.5 pl-10 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white/50 text-slate-800 font-medium" />
+            <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </div>
+          <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-2.5 rounded-xl border font-semibold flex items-center gap-2 transition-all ${showFilters || activeFilterCount > 0 ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Filters
+            {activeFilterCount > 0 && <span className="bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center ml-1">{activeFilterCount}</span>}
           </button>
         </div>
 
-        {/* Last Synced Indicator */}
-        {lastStocksFetch && !loading && (
-          <div className="mb-2 text-xs text-gray-500 text-right">
-            Last synced: {getTimeSinceLastFetch(lastStocksFetch)}
-          </div>
-        )}
-
-        {/* Search Bar and Filters */}
-        <div className="mb-4 space-y-3">
-          {/* Search and Filter Toggle Row */}
-          <div className="flex gap-2 items-center">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                placeholder="      Search by symbol, name, or verdict..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-2 rounded-lg border text-sm font-medium flex items-center gap-2 transition-colors ${
-                showFilters || activeFilterCount > 0
-                  ? 'bg-blue-50 border-blue-300 text-blue-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={clearAllFilters}
-                className="px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                Clear All
-              </button>
-            )}
-          </div>
-
-          {/* Filter Panel */}
-          {showFilters && (
-            <div className="bg-white border rounded-lg p-4 shadow-sm">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* Verdict Filter */}
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="mb-8 glass-card p-6 animate-fade-in border-primary-100">
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Verdict</label>
-                  <select
-                    value={filters.verdict}
-                    onChange={(e) => setFilters(prev => ({ ...prev, verdict: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Verdict</label>
+                  <select value={filters.verdict} onChange={(e) => setFilters(prev => ({ ...prev, verdict: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-700">
                     <option value="all">All Verdicts</option>
                     <option value="Strong Buy">Strong Buy</option>
                     <option value="Buy">Buy</option>
@@ -626,15 +402,9 @@ function AllStocksAnalysis() {
                     <option value="Not Analyzed">Not Analyzed</option>
                   </select>
                 </div>
-
-                {/* Status Filter */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Status</label>
+                  <select value={filters.status} onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-700">
                     <option value="all">All Status</option>
                     <option value="completed">Completed</option>
                     <option value="analyzing">Analyzing</option>
@@ -642,157 +412,67 @@ function AllStocksAnalysis() {
                     <option value="failed">Failed</option>
                   </select>
                 </div>
-
-                {/* Has Analysis Filter */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Analysis</label>
-                  <select
-                    value={filters.hasAnalysis}
-                    onChange={(e) => setFilters(prev => ({ ...prev, hasAnalysis: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Analysis</label>
+                  <select value={filters.hasAnalysis} onChange={(e) => setFilters(prev => ({ ...prev, hasAnalysis: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-700">
                     <option value="all">All Stocks</option>
                     <option value="yes">With Analysis</option>
                     <option value="no">Without Analysis</option>
                   </select>
                 </div>
-
-                {/* Score Range - Min */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Min Score</label>
-                  <input
-                    type="number"
-                    placeholder="e.g., 50"
-                    value={filters.scoreMin}
-                    onChange={(e) => setFilters(prev => ({ ...prev, scoreMin: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    max="100"
-                  />
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Min Score</label>
+                  <input type="number" placeholder="e.g., 50" value={filters.scoreMin} onChange={(e) => setFilters(prev => ({ ...prev, scoreMin: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-700" min="-1" max="1" step="0.1" />
                 </div>
-
-                {/* Score Range - Max */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Max Score</label>
-                  <input
-                    type="number"
-                    placeholder="e.g., 100"
-                    value={filters.scoreMax}
-                    onChange={(e) => setFilters(prev => ({ ...prev, scoreMax: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    max="100"
-                  />
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Max Score</label>
+                  <input type="number" placeholder="e.g., 100" value={filters.scoreMax} onChange={(e) => setFilters(prev => ({ ...prev, scoreMax: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-slate-700" min="-1" max="1" step="0.1" />
                 </div>
-              </div>
+             </div>
+             {activeFilterCount > 0 && (
+               <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
+                 <button onClick={clearAllFilters} className="px-4 py-2 text-sm font-semibold text-danger-600 hover:bg-danger-50 rounded-lg transition-colors">Clear Filters</button>
+               </div>
+             )}
+          </div>
+        )}
 
-              {/* Quick Filter Buttons */}
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <span className="text-xs font-medium text-gray-500 mr-3">Quick filters:</span>
-                <div className="inline-flex flex-wrap gap-2 mt-1">
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, verdict: 'Strong Buy' }))}
-                    className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                  >
-                    Strong Buy
-                  </button>
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, verdict: 'Buy' }))}
-                    className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
-                  >
-                    Buy
-                  </button>
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, scoreMin: '70', scoreMax: '' }))}
-                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                  >
-                    Score ≥ 70
-                  </button>
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, hasAnalysis: 'yes' }))}
-                    className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
-                  >
-                    Analyzed Only
-                  </button>
-                  <button
-                    onClick={() => setFilters(prev => ({ ...prev, status: 'completed' }))}
-                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                  >
-                    Completed
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Results count */}
-          <p className="text-xs sm:text-sm text-gray-500">
-            Showing {filteredStocks.length} of {stocks.length} stocks
-            {activeFilterCount > 0 && (
-              <span className="ml-2 text-blue-600">
-                ({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} applied)
-              </span>
-            )}
-          </p>
+        <div className="flex justify-between items-center mb-4 text-sm font-medium text-slate-500 px-1">
+          <span>Showing {filteredStocks.length} of {stocks.length} stocks</span>
+          {lastStocksFetch && !loading && <span>Last synced: {getTimeSinceLastFetch(lastStocksFetch)}</span>}
         </div>
 
-        {/* Stocks List */}
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600 text-sm">Loading all 2,192 NSE stocks...</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full divide-y divide-gray-200 text-xs sm:text-sm">
-                <thead className="bg-gray-50 sticky top-0">
+        {/* Stocks Table */}
+        <div className="glass-card overflow-hidden">
+          {loading ? (
+             <div className="text-center py-24">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-100 border-t-primary-600 mb-4 shadow-glow-primary"></div>
+                <p className="text-slate-600 font-medium">Loading all NSE stocks...</p>
+             </div>
+          ) : (
+            <div className="overflow-x-auto max-h-[800px] custom-scrollbar">
+              <table className="min-w-full bg-white text-sm">
+                <thead className="bg-white sticky top-0 z-10 border-b border-slate-200">
                   <tr>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8 sm:w-12">
-                      Select
+                    <th className="px-5 py-4 w-12 text-center bg-white">
+                      <input
+                        type="checkbox"
+                        checked={selectedStocks.length > 0 && selectedStocks.length === filteredStocks.length}
+                        onChange={(e) => e.target.checked ? handleSelectAll() : handleDeselectAll()}
+                        className="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500 cursor-pointer"
+                      />
                     </th>
-                    <th 
-                      onClick={() => handleSort('symbol')}
-                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      Symbol{getSortIndicator('symbol')}
-                    </th>
-                    <th className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Company Name
-                    </th>
-                    <th className="hidden lg:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th 
-                      onClick={() => handleSort('score')}
-                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      Score{getSortIndicator('score')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('verdict')}
-                      className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      Verdict{getSortIndicator('verdict')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('entry')}
-                      className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      Entry{getSortIndicator('entry')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('target')}
-                      className="hidden md:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      Target{getSortIndicator('target')}
-                    </th>
-                    <th className="hidden sm:table-cell px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th onClick={() => handleSort('symbol')} className="px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-50 transition-colors bg-white">Symbol{getSortIndicator('symbol')}</th>
+                    <th className="hidden md:table-cell px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider bg-white">Company Name</th>
+                    <th className="hidden lg:table-cell px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider bg-white">Status</th>
+                    <th onClick={() => handleSort('score')} className="px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-50 transition-colors bg-white">Score Arc{getSortIndicator('score')}</th>
+                    <th onClick={() => handleSort('verdict')} className="px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-50 transition-colors bg-white">Verdict{getSortIndicator('verdict')}</th>
+                    <th onClick={() => handleSort('entry')} className="hidden sm:table-cell px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-50 transition-colors bg-white">Entry{getSortIndicator('entry')}</th>
+                    <th onClick={() => handleSort('target')} className="hidden md:table-cell px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-50 transition-colors bg-white">Target{getSortIndicator('target')}</th>
+                    <th className="hidden sm:table-cell px-5 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider bg-white">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-slate-100">
                   {filteredStocks.map((stock) => (
                     <StockRow
                       key={stock.yahoo_symbol}
@@ -806,46 +486,28 @@ function AllStocksAnalysis() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-
-        {!loading && filteredStocks.length === 0 && (
-          <div className="text-center py-8 sm:py-12 bg-white rounded-lg shadow-md">
-            <p className="text-gray-600 text-sm">No stocks found matching your search</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Analysis Config Modal */}
+      {showWatchlistModal && (
+        <AddToWatchlistModal
+          onClose={() => setShowWatchlistModal(false)}
+          onSuccess={handleWatchlistSuccess}
+          selectedStocks={selectedStocks}
+          stocksData={stocks}
+        />
+      )}
       {showConfigModal && (
         <AnalysisConfigModal
           onClose={() => setShowConfigModal(false)}
           onConfirm={handleAnalyzeWithConfig}
           stockCount={pendingAnalysisType === 'all' ? stocks.length : selectedStocks.length}
           stockNames={pendingAnalysisType === 'all' ? [] : selectedStocks}
-          title={pendingAnalysisType === 'all' ? 'Configure Bulk Analysis' : 'Configure Analysis'}
+          title="Deep Dive Analysis Configuration"
         />
       )}
-
-      {/* Add to Watchlist Modal */}
-      {showWatchlistModal && (
-        <AddToWatchlistModal
-          stocks={selectedStocks.map(symbol => {
-            const stock = stocks.find(s => s.yahoo_symbol === symbol);
-            return { symbol, name: stock?.name || '' };
-          })}
-          onClose={() => setShowWatchlistModal(false)}
-          onSuccess={handleWatchlistSuccess}
-        />
-      )}
-
-      {/* Password Modal for bulk analysis */}
-      {showPasswordModal && (
-        <PasswordModal
-          onClose={() => setShowPasswordModal(false)}
-          onSuccess={handlePasswordSuccess}
-        />
-      )}
+      {showPasswordModal && <PasswordModal onClose={() => setShowPasswordModal(false)} onSuccess={handlePasswordSuccess} />}
     </div>
   );
 }
