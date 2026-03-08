@@ -11,6 +11,7 @@ import { extractBaseSymbol, getTradingViewUrl } from '../utils/tradingViewUtils'
 // New UI Components
 import VerdictBadge from '../components/ui/VerdictBadge';
 import ScoreArc from '../components/ui/ScoreArc';
+import IndicatorVisual from '../components/ui/IndicatorVisual';
 
 function Results() {
   const { ticker } = useParams();
@@ -230,10 +231,6 @@ function Results() {
 
         {/* Final Verdict Summary Card */}
         <div className="glass-card mb-8 overflow-hidden relative">
-           <div className="absolute top-0 right-0 p-8 opacity-5">
-              <svg className="w-64 h-64 text-slate-900" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.1L18.4 19H5.6L12 6.1z"/></svg>
-           </div>
-           
            <div className="p-8 relative z-10 border-b border-slate-100 flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
                 <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 mb-2">Model Verdict</h2>
@@ -299,29 +296,42 @@ function Results() {
              <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Indicator Model</th>
-                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Class</th>
-                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Output Value</th>
-                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Confidence</th>
-                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Final Vote</th>
+                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Indicator</th>
+                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Model Output</th>
+                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Signal Strength</th>
+                    <th className="px-8 py-4 text-left font-bold text-slate-400 uppercase tracking-wider text-xs">Verdict</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {report.indicators && report.indicators.length > 0 ? (
                     report.indicators.map((ind, idx) => (
                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-8 py-4 font-bold text-slate-800">{ind.name}</td>
-                          <td className="px-8 py-4 text-slate-500 capitalize font-medium">{ind.category}</td>
-                          <td className="px-8 py-4 text-slate-700 font-mono text-xs">{ind.value}</td>
-                          <td className="px-8 py-4 text-slate-700 font-medium">{ind.confidence != null ? `${(ind.confidence * 100).toFixed(0)}%` : '-'}</td>
+                          <td className="px-8 py-4">
+                             <div className="font-bold text-slate-800">{ind.name}</div>
+                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{ind.category}</div>
+                          </td>
+                          <td className="px-8 py-4">
+                             <IndicatorVisual 
+                               name={ind.name} 
+                               category={ind.category} 
+                               value={ind.value} 
+                               vote={ind.vote} 
+                               confidence={ind.confidence} 
+                             />
+                          </td>
+                          <td className="px-8 py-4">
+                             <div className="flex items-center gap-3">
+                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[60px] border border-slate-200/50">
+                                   <div 
+                                     className="h-full bg-primary-500 shadow-glow-primary transition-all duration-1000" 
+                                     style={{ width: `${(ind.confidence || 0) * 100}%` }}
+                                   ></div>
+                                </div>
+                                <span className="text-xs font-black text-slate-600 w-8">{(ind.confidence || 0 * 100).toFixed(0)}%</span>
+                             </div>
+                          </td>
                           <td className="px-8 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold ${
-                              ind.vote === 1 ? 'bg-success-50 text-success-700 border border-success-100' : 
-                              ind.vote === -1 ? 'bg-danger-50 text-danger-700 border border-danger-100' : 
-                              'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}>
-                              {getVoteDisplay(ind.vote)}
-                            </span>
+                             <VerdictBadge verdict={getVoteDisplay(ind.vote)} compact />
                           </td>
                        </tr>
                     ))
